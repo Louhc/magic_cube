@@ -11,11 +11,13 @@
     color-scheme: light;
     --bg:#eef1f6; --card:#ffffff; --line:#d8dee7; --line-strong:#b9c3d0;
     --text:#1e2530; --muted:#6a7686; --accent:#2f6bd8; --field:#f4f6f9;
+    --cubie:#16181c;
   }
   html[data-theme="dark"]{
     color-scheme: dark;
     --bg:#151a22; --card:#1b222c; --line:#2a3340; --line-strong:#3a4553;
     --text:#e7edf5; --muted:#8a98aa; --accent:#5b9bff; --field:#222a35;
+    --cubie:#0c0e11;
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--text);
@@ -43,7 +45,6 @@
   .ctrl button:disabled{opacity:.35;cursor:default}
   .ctrl .pos{margin-left:auto;color:var(--muted);font:12.5px ui-monospace,Menlo,monospace}
 
-  /* 当前这一步高亮 */
   .moves{display:flex;flex-wrap:wrap;gap:4px;margin-top:10px;min-height:24px}
   .moves span{font:12.5px/1 ui-monospace,Menlo,Consolas,monospace;color:var(--muted);
               background:var(--card);border:1px solid var(--line);border-radius:5px;
@@ -52,12 +53,27 @@
   .moves span.done{color:var(--text);border-color:var(--line-strong)}
   .moves span.cur{background:var(--accent);border-color:var(--accent);color:#fff}
 
-  /* 展开图 */
-  .netwrap{margin-top:16px;background:var(--card);border:1px solid var(--line);
-           border-radius:12px;padding:16px}
-  .net{display:grid;grid-template-columns:repeat(12,1fr);gap:2px;
-       width:100%;max-width:420px;margin:0 auto}
-  .net i{border-radius:3px;aspect-ratio:1/1;box-shadow:inset 0 0 0 1px #00000030}
+  /* ---------- 立体魔方 ---------- */
+  .stage{margin-top:16px;height:340px;display:flex;align-items:center;justify-content:center;
+         perspective:1400px;perspective-origin:50% 50%;cursor:grab;
+         background:radial-gradient(circle at 50% 42%,var(--field),transparent 68%);
+         border-radius:14px;user-select:none;touch-action:none}
+  .stage.drag{cursor:grabbing}
+  .cube{position:relative;width:0;height:0;transform-style:preserve-3d;
+        transition:transform .1s linear}
+  .layer{position:absolute;left:0;top:0;width:0;height:0;transform-style:preserve-3d;
+         transition:transform .34s cubic-bezier(.34,.86,.32,1)}
+  .cubie{position:absolute;left:0;top:0;width:46px;height:46px;margin:-23px 0 0 -23px;
+         transform-style:preserve-3d}
+  .cubie i{position:absolute;width:46px;height:46px;border-radius:6px;
+           background:var(--cubie);box-shadow:inset 0 0 0 1.5px #00000055}
+  .cubie i.on{box-shadow:inset 0 0 0 1.5px #00000038,inset 0 8px 14px -8px #fff6}
+  .cubie i.px{transform:rotateY(90deg)  translateZ(23px)}
+  .cubie i.nx{transform:rotateY(-90deg) translateZ(23px)}
+  .cubie i.py{transform:rotateX(-90deg) translateZ(23px)}
+  .cubie i.ny{transform:rotateX(90deg)  translateZ(23px)}
+  .cubie i.pz{transform:translateZ(23px)}
+  .cubie i.nz{transform:rotateY(180deg) translateZ(23px)}
 
   .err{margin-top:10px;color:#c0392b;font-size:12.5px;min-height:18px}
   @media print{ .themebtn,.ctrl,#alg{display:none} }
@@ -86,7 +102,7 @@
   <div class="moves" id="moves"></div>
   <div class="err" id="err"></div>
 
-  <div class="netwrap"><div class="net" id="net"></div></div>
+  <div class="stage" id="stage"><div class="cube" id="cube"></div></div>
 </main>
 
 <script src="cubesim.js"></script>
@@ -95,37 +111,127 @@
 (function () {
   'use strict';
 
-  // 六色（和项目其它页面一致）
-  var COLOR = { U: '#FFE600', D: '#C0C0C0', F: '#00B050',
-                B: '#0070C0', R: '#C00000', L: '#FF8C00' };
-  // 展开图：十字形（U 在上，L F R B 一排，D 在下）
-  var NET = [['U', 1, 4], ['L', 4, 1], ['F', 4, 4], ['R', 4, 7], ['B', 4, 10], ['D', 7, 4]];
+  // 六色（贴近真实魔方：白、黄、绿、蓝、红、橙）
+  var COLOR = { U: '#FFE600', D: '#F4F4F4', F: '#00A651',
+                B: '#0051BA', R: '#C41E3A', L: '#FF8C1A' };
+  var S = 46;                      // 小方块间距（和 CSS 里的 46px 保持一致）
+  var DUR = 340;                   // 转动时长，和 .layer 的 transition 一致
+
+  /* 每个动作：绕哪根 CSS 轴、正向多少度、哪些坐标算这一层。
+     坐标系差异：模型是 y 朝上，CSS 是 y 朝下，所以绕 y 与 z 的符号要翻。
+     下面这些角度是逐条推出来的，不是试出来的：
+       U: 模型绕 +y 转 -90° -> CSS rotateY(+90)
+       R: 模型绕 +x 转 -90° -> CSS rotateX(-90)   （x 轴两边一致）
+       F: 模型绕 +z 转 -90° -> CSS rotateZ(+90)
+     D / L / B 是各自反向。中层与宽层共用同样的轴与方向，只是层不同。 */
+  var M3 = {
+    U: ['Y',  90, function (p) { return p[1] === 1; }],
+    D: ['Y', -90, function (p) { return p[1] === -1; }],
+    R: ['X', -90, function (p) { return p[0] === 1; }],
+    L: ['X',  90, function (p) { return p[0] === -1; }],
+    F: ['Z',  90, function (p) { return p[2] === 1; }],
+    B: ['Z', -90, function (p) { return p[2] === -1; }],
+    M: ['X',  90, function (p) { return p[0] === 0; }],
+    E: ['Y', -90, function (p) { return p[1] === 0; }],
+    S: ['Z',  90, function (p) { return p[2] === 0; }],
+    r: ['X', -90, function (p) { return p[0] >= 0; }],
+    l: ['X',  90, function (p) { return p[0] <= 0; }],
+    u: ['Y',  90, function (p) { return p[1] >= 0; }],
+    d: ['Y', -90, function (p) { return p[1] <= 0; }],
+    f: ['Z',  90, function (p) { return p[2] >= 0; }],
+    b: ['Z', -90, function (p) { return p[2] <= 0; }],
+    x: ['X', -90, function () { return true; }],
+    y: ['Y',  90, function () { return true; }],
+    z: ['Z',  90, function () { return true; }]
+  };
 
   var algEl = document.getElementById('alg');
   var movesEl = document.getElementById('moves');
-  var netEl = document.getElementById('net');
+  var cubeEl = document.getElementById('cube');
+  var stageEl = document.getElementById('stage');
   var posEl = document.getElementById('pos');
   var errEl = document.getElementById('err');
 
-  var steps = [];      // [{mv, times}]
-  var frames = [];     // 每个阶段一个局面，frames[k] = 做完前 k 步之后
-  var at = 0;
+  var steps = [], frames = [], at = 0;
+  var view = { x: -24, y: -32 };      // 观察角度，可拖动
+  var busy = false;                   // 动画进行中不接受新的单步
 
-  netEl.innerHTML = (function () {
-    var h = '';
-    NET.forEach(function (spec) {
-      for (var r = 0; r < 3; r++) for (var c = 0; c < 3; c++) {
-        h += '<i data-f="' + spec[0] + '" data-i="' + (r * 3 + c) + '"' +
-             ' style="grid-row:' + (spec[1] + r + 1) + ';grid-column:' + (spec[2] + c + 1) + '"></i>';
-      }
-    });
-    return h;
-  })();
-
-  function label(s) {
-    return s.mv + (s.times === 2 ? '2' : s.times === -1 ? "'" : s.times === -2 ? "2'" : '');
+  /* ---------- 画魔方 ---------- */
+  // 局面是 "x,y,z|nx,ny,nz" -> 颜色字母。按位置归拢成 26 个小方块。
+  function byPos(state) {
+    var out = {};
+    for (var k in state) {
+      if (!state.hasOwnProperty(k)) continue;
+      var parts = k.split('|');
+      (out[parts[0]] = out[parts[0]] || {})[parts[1]] = state[k];
+    }
+    return out;
   }
 
+  // 只画朝外的贴纸：state 里没有 (位置,法向) 这一项，说明那块没贴纸
+  function cubieHTML(faces) {
+    return ['1,0,0', '-1,0,0', '0,1,0', '0,-1,0', '0,0,1', '0,0,-1'].map(function (n) {
+      var col = faces[n];
+      if (!col) return '<i class="' + cls(n) + '"></i>';
+      return '<i class="on ' + cls(n) + '" style="background:' + COLOR[col] + '"></i>';
+    }).join('');
+  }
+  function cls(n) {
+    return { '1,0,0': 'px', '-1,0,0': 'nx', '0,1,0': 'py',
+             '0,-1,0': 'ny', '0,0,1': 'pz', '0,0,-1': 'nz' }[n];
+  }
+
+  function paint(state) {
+    var map = byPos(state);
+    cubeEl.innerHTML = Object.keys(map).map(function (pos) {
+      var p = pos.split(',').map(Number);
+      // CSS 的 y 朝下，模型的 y 朝上 -> 取负
+      return '<div class="cubie" data-pos="' + pos + '" style="transform:translate3d(' +
+             (p[0] * S) + 'px,' + (-p[1] * S) + 'px,' + (p[2] * S) + 'px)">' +
+             cubieHTML(map[pos]) + '</div>';
+    }).join('');
+    applyView();
+  }
+
+  function applyView() {
+    cubeEl.style.transform = 'rotateX(' + view.x + 'deg) rotateY(' + view.y + 'deg)';
+  }
+
+  /* ---------- 转动动画 ---------- */
+  // 把这一层的 9 个小方块挪进一个临时的 .layer，整体转 90°，转完再落位重画。
+  // 转完的位置正好等于新局面的位置，所以重画时看不出接缝。
+  function animate(step, done) {
+    var cfg = M3[step.mv];
+    if (!cfg) { done(); return; }
+    var ax = cfg[0], base = cfg[1], inLayer = cfg[2];
+    var deg = step.times === 2 ? base * 2 : (step.times < 0 ? -base : base);
+
+    var layer = document.createElement('div');
+    layer.className = 'layer';
+    var moving = [];
+    Array.prototype.forEach.call(cubeEl.querySelectorAll('.cubie'), function (el) {
+      var p = el.dataset.pos.split(',').map(Number);
+      if (inLayer(p)) moving.push(el);
+    });
+    layer.style.transform = 'rotate' + ax + '(0deg)';
+    cubeEl.appendChild(layer);
+    moving.forEach(function (el) { layer.appendChild(el); });
+
+    // 强制一次重排，保证 0 -> deg 的过渡真的会跑
+    void layer.offsetWidth;
+    layer.style.transform = 'rotate' + ax + '(' + deg + 'deg)';
+
+    var finished = false;
+    function finish() {
+      if (finished) return;
+      finished = true;
+      done();
+    }
+    layer.addEventListener('transitionend', finish);
+    setTimeout(finish, DUR + 80);      // 兜底：transitionend 偶尔不触发
+  }
+
+  /* ---------- 主流程 ---------- */
   function rebuild() {
     errEl.textContent = '';
     algEl.classList.remove('bad');
@@ -136,7 +242,6 @@
       algEl.classList.add('bad');
       errEl.textContent = e.message;
     }
-    // 每个阶段都算出来，拖动进度就不用重算
     frames = [CubeSim.solved()];
     var st = frames[0];
     steps.forEach(function (s) {
@@ -145,44 +250,82 @@
     });
     at = frames.length - 1;
     movesEl.innerHTML = steps.map(function (s, i) {
-      return '<span data-k="' + (i + 1) + '">' + label(s) + '</span>';
+      var t = s.times;
+      return '<span data-k="' + (i + 1) + '">' + s.mv +
+             (t === 2 ? '2' : t === -2 ? "2'" : t === -1 ? "'" : '') + '</span>';
     }).join('');
-    draw();
+    paint(frames[at]);
+    chrome();
   }
 
-  function draw() {
-    var st = frames[at] || frames[0];
-    var f = CubeSim.facelets(st);
-    Array.prototype.forEach.call(netEl.children, function (el) {
-      el.style.background = COLOR[f[el.dataset.f][+el.dataset.i]];
-    });
+  function chrome() {
     Array.prototype.forEach.call(movesEl.children, function (el) {
       var k = +el.dataset.k;
       el.classList.toggle('cur', k === at);
       el.classList.toggle('done', k < at);
     });
     posEl.textContent = at + ' / ' + steps.length;
-    document.getElementById('first').disabled = at === 0;
-    document.getElementById('prev').disabled = at === 0;
-    document.getElementById('next').disabled = at >= steps.length;
-    document.getElementById('last').disabled = at >= steps.length;
+    ['first', 'prev'].forEach(function (id) { document.getElementById(id).disabled = at === 0; });
+    ['next', 'last'].forEach(function (id) { document.getElementById(id).disabled = at >= steps.length; });
   }
 
-  function go(d) { at = Math.max(0, Math.min(steps.length, at + d)); draw(); }
+  // 单步：带动画
+  function step(dir) {
+    if (busy) return;
+    var next = at + dir;
+    if (next < 0 || next > steps.length) return;
+    busy = true;
+    var mv = steps[dir > 0 ? at : next];           // 前进用这一步，后退用它的逆
+    var s = { mv: mv.mv, times: dir > 0 ? mv.times : -mv.times };
+    animate(s, function () {
+      at = next;
+      paint(frames[at]);
+      chrome();
+      busy = false;
+    });
+  }
+
+  // 跳转：不动画
+  function jump(k) {
+    if (busy) return;
+    at = Math.max(0, Math.min(steps.length, k));
+    paint(frames[at]);
+    chrome();
+  }
 
   algEl.addEventListener('input', rebuild);
-  document.getElementById('first').addEventListener('click', function () { at = 0; draw(); });
-  document.getElementById('prev').addEventListener('click', function () { go(-1); });
-  document.getElementById('next').addEventListener('click', function () { go(1); });
-  document.getElementById('last').addEventListener('click', function () { at = steps.length; draw(); });
+  document.getElementById('first').addEventListener('click', function () { jump(0); });
+  document.getElementById('last').addEventListener('click', function () { jump(steps.length); });
+  document.getElementById('prev').addEventListener('click', function () { step(-1); });
+  document.getElementById('next').addEventListener('click', function () { step(1); });
   movesEl.addEventListener('click', function (e) {
     var el = e.target.closest ? e.target.closest('span[data-k]') : null;
-    if (el) { at = +el.dataset.k; draw(); }
+    if (el) jump(+el.dataset.k);
   });
   document.addEventListener('keydown', function (e) {
     if (e.target === algEl) return;
-    if (e.key === 'ArrowLeft') go(-1);
-    else if (e.key === 'ArrowRight') go(1);
+    if (e.key === 'ArrowLeft') step(-1);
+    else if (e.key === 'ArrowRight') step(1);
+  });
+
+  /* 拖拽转动视角 */
+  var drag = null;
+  stageEl.addEventListener('pointerdown', function (e) {
+    drag = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y };
+    stageEl.classList.add('drag');
+    if (stageEl.setPointerCapture) stageEl.setPointerCapture(e.pointerId);
+  });
+  stageEl.addEventListener('pointermove', function (e) {
+    if (!drag) return;
+    view.x = Math.max(-88, Math.min(88, drag.vx - (e.clientY - drag.y) * 0.55));
+    view.y = drag.vy + (e.clientX - drag.x) * 0.55;
+    applyView();
+  });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (ev) {
+    stageEl.addEventListener(ev, function () {
+      drag = null;
+      stageEl.classList.remove('drag');
+    });
   });
 
   /* 夜晚模式 */
