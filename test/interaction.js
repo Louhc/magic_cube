@@ -444,6 +444,12 @@ check('六个色卡都设了真实颜色',
 check('色卡颜色 = 方案的固定色',
   Cube.OLL_SCHEMES.every((sc, i) => reg['schemes'].children[i].style.background === sc.on),
   reg['schemes'].children.map(b => b.style.background).join(' '));
+check('F2L / OLL / PLL 用的黄色是同一个',
+  Cube.HEX.yellow === Cube.OLL_SCHEMES.filter(sc => sc.key === 'yellow')[0].on &&
+  Cube.HEX.yellow === Cube.PLL_FACE_COLORS.U,
+  'F2L ' + Cube.HEX.yellow +
+  ' / OLL ' + Cube.OLL_SCHEMES.filter(sc => sc.key === 'yellow')[0].on +
+  ' / PLL ' + Cube.PLL_FACE_COLORS.U);
 check('已无「石板」方案（和默认色太接近）',
   !Cube.OLL_SCHEMES.some(sc => sc.zh === '石板'), Cube.OLL_SCHEMES.map(sc => sc.zh).join(','));
 check('色卡不放文字（名字只在悬停提示里）',
@@ -452,10 +458,13 @@ check('悬停提示是方案名',
   Cube.OLL_SCHEMES.every((sc, i) => reg['schemes'].children[i].title === sc.zh),
   reg['schemes'].children.map(b => b.title).join(' '));
 schemeBtn('yellow')._ev.click[0]({});
-check('切到黄色方案后实心格变黄', ollCell('oll-1-1') === '#E0B400', ollCell('oll-1-1'));
+check('切到黄色方案后实心格变黄',
+  ollCell('oll-1-1') === Cube.OLL_SCHEMES.filter(sc => sc.key === 'yellow')[0].on,
+  ollCell('oll-1-1'));
 check('切方案不影响线的位置', bars(true) === 'B@0-0 F@2-1 F@2-2 R@0-2 R@1-2', bars(true));
 check('换配色后选中划线跟着变（黄）',
-  barStrokes(true).join() === '#E0B400', barStrokes(true).join());
+  barStrokes(true).join() === Cube.OLL_SCHEMES.filter(sc => sc.key === 'yellow')[0].on,
+  barStrokes(true).join());
 check('浅灰候选位不跟着变', barStrokes(false).join() === OLL_GHOST, barStrokes(false).join());
 schemeBtn(Cube.OLL_DEFAULT_SCHEME)._ev.click[0]({});
 check('切回默认方案', ollCell('oll-1-1') === OLL_ON, ollCell('oll-1-1'));

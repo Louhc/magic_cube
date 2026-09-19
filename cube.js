@@ -346,7 +346,8 @@
     { key: 'indigo', zh: '靛蓝', on: '#4F7BC4' },
     { key: 'green',  zh: '绿',   on: '#3E9E6D' },
     { key: 'red',    zh: '红',   on: '#B94A5C' },
-    { key: 'yellow', zh: '黄',   on: '#E0B400' },
+    // 黄色必须和 F2L / PLL 的顶面黄一致 —— 直接引用同一个常量，别再各写各的
+    { key: 'yellow', zh: '黄',   on: HEX.yellow },
     { key: 'ink',    zh: '深紫', on: '#4C4263' }   // 参考图那色，白底最佳
   ];
   var OLL_DEFAULT_SCHEME = 'violet';
