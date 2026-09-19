@@ -609,8 +609,16 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
     // 播放中别的按钮不能禁用，否则点不到，也就无从「自动暂停」
     ok('播放中按钮保持可用（只有非播放的忙才锁）',
       /var lock = busy && !playing;/.test(src2) && /\.disabled = lock;/.test(src2));
+    // 导航键要直接生效（只暂停等于「点了没反应」）
+    ok('jump 直接跳到目标并停止播放',
+      /function jump\(k\) \{[\s\S]*?playing = false;[\s\S]*?at = Math\.max/.test(src2));
+    ok('jump 递增代次，作废进行中的那一步',
+      /function jump\(k\) \{[\s\S]*?epoch\+\+/.test(src2) &&
+      /if \(my !== epoch\)/.test(src2));
+    ok('单步在连播中会先停下再走',
+      /function stepBy\(dir\)[\s\S]*?if \(playing\) \{ playing = false; \}/.test(src2));
     ok('其他动作入口会先暂停播放',
-      (src2.match(/pausedFirst\(\)/g) || []).length >= 8,
+      (src2.match(/pausedFirst\(\)/g) || []).length >= 6,
       '只有 ' + (src2.match(/pausedFirst\(\)/g) || []).length + ' 处');
     // 只有「跳到开头/末尾」和点某一步是瞬移
     ok('jump 保持瞬移（不带动画）',

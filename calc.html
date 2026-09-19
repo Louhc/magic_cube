@@ -342,6 +342,7 @@
   var view = { x: -24, y: -32 };         // 观察角度，可拖动
   var busy = false;                      // 播放中不接受新操作
   var playing = false;                   // 是否在自动连播
+  var epoch = 0;                         // 跳转时 +1，用来作废进行中的那一步
   var CS = 46;                           // 小方块边长，随舞台尺寸自适应
 
   // 公式缩略图：和公式表用同一套文件命名
@@ -654,8 +655,11 @@
   function stepAnimated(dir, done) {
     var next = at + dir;
     if (next < 0 || next > steps.length) { if (done) done(false); return; }
+    var my = epoch;
     var mv = steps[dir > 0 ? at : next];
     animate({ mv: mv.mv, times: dir > 0 ? mv.times : -mv.times }, function () {
+      // 这一步播放途中被「跳到某处」打断了，就不要再改位置
+      if (my !== epoch) { if (done) done(false); return; }
       at = next;
       paint(frames[at]);
       chrome();
@@ -673,9 +677,10 @@
   }
 
   function stepBy(dir) {
-    if (pausedFirst()) return;
-    if (busy || !steps.length) return;
+    if (!steps.length) return;
     if (at + dir < 0 || at + dir > steps.length) return;
+    if (playing) { playing = false; }        // 连播中按单步：停下并走这一步
+    if (busy && !playing) { chrome(); return; }
     busy = true;
     chrome();
     stepAnimated(dir, function () { busy = false; chrome(); });
@@ -705,9 +710,13 @@
     })();
   }
 
+  // 导航键（回到开头/末尾、点某一步）直接生效，顺带停止播放。
+  // 这与「提交/打乱/复原」不同 —— 那些会改动状态，保持「先暂停、再点一次」。
   function jump(k) {
-    if (pausedFirst()) return;
-    if (busy || !steps.length) return;
+    if (!steps.length) return;
+    epoch++;              // 作废正在播的那一步，免得它回头覆盖位置
+    playing = false;
+    busy = false;
     at = Math.max(0, Math.min(steps.length, k));
     paint(frames[at]);
     chrome();
