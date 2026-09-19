@@ -125,7 +125,13 @@ console.log('\n[5] 真跑一遍 calc.html 的脚本（DOM 桩）');
   ok('朝外的贴纸 54 张', (html.match(/class="on /g) || []).length === 54);
 
   // 画出来的颜色必须和模拟器算出来的一致 —— 这是页面正确性的核心
-  const COLOR = { U: '#FFE600', D: '#F4F4F4', F: '#00A651', B: '#0051BA', R: '#C41E3A', L: '#FF8C1A' };
+  // 从页面读配色，别在这里抄一份 —— 否则改了配色方案，这条会误报。
+  // 配色方案本身由 [8] 单独盯。
+  const COLOR = {};
+  for (const x of fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')
+           .match(/var COLOR = \{([^}]+)\}/)[1].matchAll(/([UDFBRL]):\s*'(#[0-9A-Fa-f]{6})'/g)) {
+    COLOR[x[1]] = x[2].toUpperCase();
+  }
   const N2 = { px: '1,0,0', nx: '-1,0,0', py: '0,1,0', ny: '0,-1,0', pz: '0,0,1', nz: '0,0,-1' };
   const got = {};
   for (const m of html.matchAll(/data-pos="([^"]+)"[^>]*>([\s\S]*?)<\/div>/g)) {
@@ -177,6 +183,79 @@ console.log('\n[6] 六个面的贴纸必须朝外（不是陷进方块里）');
     ok(k + ' 面朝外（贴纸不陷进方块）',
       got[k] && got[k].join() === w.join(), '推出 ' + JSON.stringify(got[k]) + ' 期望 ' + JSON.stringify(w));
   });
+}
+
+console.log('\n[7] 转动动画的方向必须和模拟器的移动一致');
+{
+  // 这是为一个真 bug 加的：状态由模拟器算（一直是对的），但动画的旋转方向
+  // 来自页面里的一张表，两者差 90° —— 于是"往反方向转一下，再啪地跳到位"。
+  // 用户的原话是「转动的结果是没问题的，有问题的是转动动画」。
+  //
+  // 模型坐标 y 朝上、CSS 的 y 朝下，两者差一次镜像，镜像会把旋转手感反转，
+  // 所以每个轴的角度都要取反。
+  const html = fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8');
+  const M3 = {};
+  // 整体旋转 x/y/z 的条件写成 function () { return true; }（没有参数），
+  // 所以这里 p 要可选
+  for (const m of html.matchAll(/^\s{4}(\w): \['([XYZ])',\s*(-?\d+), function \((\w*)\) \{ return (.+?); \}\]/gm)) {
+    M3[m[1]] = { ax: m[2], deg: +m[3], cond: m[5] };
+  }
+  const ALL = ['U','D','R','L','F','B','M','E','S','r','l','u','d','f','b','x','y','z'];
+  const miss = ALL.filter(k => !M3[k]);
+  ok('从页面里解析出全部 18 个动作', Object.keys(M3).length === 18 && miss.length === 0,
+    '共 ' + Object.keys(M3).length + '，缺 ' + miss.join(','));
+
+  const cssRot = (ax, deg, p) => {          // CSS 旋转矩阵作用在 CSS 坐标上
+    const c = Math.cos(deg * Math.PI / 180), s2 = Math.sin(deg * Math.PI / 180);
+    const [x, y, z] = p;
+    if (ax === 'X') return [x, y * c - z * s2, y * s2 + z * c];
+    if (ax === 'Y') return [x * c + z * s2, y, -x * s2 + z * c];
+    return [x * c - y * s2, x * s2 + y * c, z];
+  };
+  // 模拟器里各动作对坐标的变换（模型坐标）
+  const ROT = {
+    U: p => [-p[2], p[1], p[0]], D: p => [p[2], p[1], -p[0]],
+    F: p => [p[1], -p[0], p[2]], B: p => [-p[1], p[0], p[2]],
+    R: p => [p[0], p[2], -p[1]], L: p => [p[0], -p[2], p[1]]
+  };
+  const BASE = { U: 'U', D: 'D', F: 'F', B: 'B', R: 'R', L: 'L',
+                 M: 'L', E: 'D', S: 'F', r: 'R', l: 'L', u: 'U',
+                 d: 'D', f: 'F', b: 'B', x: 'R', y: 'U', z: 'F' };
+  // 采样点要覆盖到坐标为 0 的层（中层 M/E/S 就在那一层）
+  const pts = [[1,1,1],[1,1,-1],[1,-1,1],[-1,1,1],[-1,-1,1],[1,-1,-1],[-1,1,-1],[-1,-1,-1],
+               [0,1,1],[1,0,1],[1,1,0],[0,-1,-1],[-1,0,-1],[-1,-1,0]];
+  const wrong = [];
+  Object.keys(M3).forEach(mv => {
+    const cfg = M3[mv];
+    const inLayer = eval('(function(p){return ' + cfg.cond + ';})');
+    const base = ROT[BASE[mv]];
+    // 层里至少取 3 个点核对
+    const samples = pts.filter(inLayer).slice(0, 3);
+    if (!samples.length) { wrong.push(mv + '(层是空的)'); return; }
+    samples.forEach(t => {
+      const want = base(t).map((v, i) => i === 1 ? -v : v);      // 换到 CSS 坐标
+      const got = cssRot(cfg.ax, cfg.deg, [t[0], -t[1], t[2]]);
+      if (Math.abs(got[0] - want[0]) > 1e-9 || Math.abs(got[1] - want[1]) > 1e-9 ||
+          Math.abs(got[2] - want[2]) > 1e-9) wrong.push(mv);
+    });
+  });
+  ok('18 个动作的动画方向全部与模拟器一致', wrong.length === 0,
+    [...new Set(wrong)].join(',') + ' 方向反了');
+}
+
+console.log('\n[8] 配色必须是标准方案（不是镜像的）');
+{
+  // 标准：白上 / 绿前 / 红右。竖翻成黄上，就是 黄上 / 绿前 / 橙右。
+  // 之前写成 R=红，等于用了镜像方案，从右前方看就成了"橙在左、绿在右"。
+  const html = fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8');
+  const m = html.match(/var COLOR = \{([^}]+)\}/);
+  ok('页面里能读到 COLOR', !!m);
+  const C = {};
+  if (m) for (const x of m[1].matchAll(/([UDFBRL]):\s*'(#[0-9A-Fa-f]{6})'/g)) C[x[1]] = x[2].toUpperCase();
+  const ORANGE = '#FF8C1A', RED = '#C41E3A', GREEN = '#00A651', YELLOW = '#FFE600';
+  ok('U=黄 F=绿', C.U === YELLOW && C.F === GREEN, JSON.stringify(C));
+  ok('黄在上的时候右边必须是橙（R=橙）', C.R === ORANGE, 'R=' + C.R);
+  ok('红与橙相对', C.L === RED, 'L=' + C.L);
 }
 
 console.log('\n结果: ' + pass + ' 通过, ' + fail + ' 失败');

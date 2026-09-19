@@ -114,36 +114,38 @@
   'use strict';
 
   // 六色（贴近真实魔方：白、黄、绿、蓝、红、橙）
+  // 标准配色：白上/绿前/红右  <->  黄上/绿前/橙右（竖翻一下，左右互换）
+  // 所以黄在上的时候，右边必须是橙。写反就成了镜像魔方。
   var COLOR = { U: '#FFE600', D: '#F4F4F4', F: '#00A651',
-                B: '#0051BA', R: '#C41E3A', L: '#FF8C1A' };
+                B: '#0051BA', R: '#FF8C1A', L: '#C41E3A' };
   var S = 46;                      // 小方块间距（和 CSS 里的 46px 保持一致）
   var DUR = 340;                   // 转动时长，和 .layer 的 transition 一致
 
   /* 每个动作：绕哪根 CSS 轴、正向多少度、哪些坐标算这一层。
      坐标系差异：模型是 y 朝上，CSS 是 y 朝下，所以绕 y 与 z 的符号要翻。
-     下面这些角度是逐条推出来的，不是试出来的：
-       U: 模型绕 +y 转 -90° -> CSS rotateY(+90)
-       R: 模型绕 +x 转 -90° -> CSS rotateX(-90)   （x 轴两边一致）
-       F: 模型绕 +z 转 -90° -> CSS rotateZ(+90)
-     D / L / B 是各自反向。中层与宽层共用同样的轴与方向，只是层不同。 */
+     推导方式（以 R 为例）：模型里 R 把前面转到顶面（F->U），也就是 +z 变成 +y。
+     而 CSS 里"朝上"是 -y：rotateX(θ) 把 +z 映射到 (0,-sinθ,cosθ)，
+     要让它等于 (0,-1,0) 得 θ=+90°。所以 R 是 rotateX(+90)。
+     模型 y 朝上、CSS y 朝下，两者之间差一次镜像，镜像会把旋转手感反转，
+     所以每个轴的角度都要取反 —— U/D/L 之前就是漏了这一步才转反的。 */
   var M3 = {
-    U: ['Y',  90, function (p) { return p[1] === 1; }],
-    D: ['Y', -90, function (p) { return p[1] === -1; }],
-    R: ['X', -90, function (p) { return p[0] === 1; }],
-    L: ['X',  90, function (p) { return p[0] === -1; }],
+    U: ['Y', -90, function (p) { return p[1] === 1; }],
+    D: ['Y',  90, function (p) { return p[1] === -1; }],
+    R: ['X',  90, function (p) { return p[0] === 1; }],
+    L: ['X', -90, function (p) { return p[0] === -1; }],
     F: ['Z',  90, function (p) { return p[2] === 1; }],
     B: ['Z', -90, function (p) { return p[2] === -1; }],
-    M: ['X',  90, function (p) { return p[0] === 0; }],
-    E: ['Y', -90, function (p) { return p[1] === 0; }],
+    M: ['X', -90, function (p) { return p[0] === 0; }],
+    E: ['Y',  90, function (p) { return p[1] === 0; }],
     S: ['Z',  90, function (p) { return p[2] === 0; }],
-    r: ['X', -90, function (p) { return p[0] >= 0; }],
-    l: ['X',  90, function (p) { return p[0] <= 0; }],
-    u: ['Y',  90, function (p) { return p[1] >= 0; }],
-    d: ['Y', -90, function (p) { return p[1] <= 0; }],
+    r: ['X',  90, function (p) { return p[0] >= 0; }],
+    l: ['X', -90, function (p) { return p[0] <= 0; }],
+    u: ['Y', -90, function (p) { return p[1] >= 0; }],
+    d: ['Y',  90, function (p) { return p[1] <= 0; }],
     f: ['Z',  90, function (p) { return p[2] >= 0; }],
     b: ['Z', -90, function (p) { return p[2] <= 0; }],
-    x: ['X', -90, function () { return true; }],
-    y: ['Y',  90, function () { return true; }],
+    x: ['X',  90, function () { return true; }],
+    y: ['Y', -90, function () { return true; }],
     z: ['Z',  90, function () { return true; }]
   };
 
