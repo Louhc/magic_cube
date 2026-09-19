@@ -105,6 +105,8 @@ console.log('\n[5] 真跑一遍 calc.html 的脚本（DOM 桩）');
     window: { addEventListener() {} }, setTimeout, clearTimeout,
     localStorage: { getItem: () => null, setItem() {} }, CubeSim: S,
     document: { getElementById: id => els[id] || (els[id] = mkEl('div')),
+                // 这一节不需要箭头
+                querySelectorAll: () => [],
                 documentElement: mkEl('html'), createElement: mkEl,
                 body: { appendChild() {} }, addEventListener() {} } };
   ctx.globalThis = ctx;
@@ -114,7 +116,7 @@ console.log('\n[5] 真跑一遍 calc.html 的脚本（DOM 桩）');
     .filter(x => x.includes('M3'))[0];
   let threw = null;
   try { vm.runInContext(src, ctx); } catch (e) { threw = e; }
-  ok('脚本执行不报错', !threw, threw && threw.message);
+  ok('脚本执行不报错', !threw, threw && (threw.message + ' @ ' + String(threw.stack).split('\n')[1]));
   if (threw) { console.log('\n结果: ' + pass + ' 通过, ' + fail + ' 失败'); process.exit(1); }
   ok('无错误提示', !els.err.textContent, els.err.textContent);
   // 现在的模型是「输入 -> 提交 -> 播放」，所以刚载入时不该有任何步骤
@@ -369,10 +371,17 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
   };
   const els = { alg: mkEl('input', 'R U') };
   els.cube = mkEl('div');
+  // 六个整体旋转箭头
+  els.arrows = ['x', "x'", 'y', "y'", 'z', "z'"].map(mv => {
+    const b = mkEl('button');
+    b.dataset.mv = mv;
+    return b;
+  });
   const ctx = { console, navigator: {}, window: { addEventListener() {} },
     setTimeout, clearTimeout, localStorage: { getItem: () => null, setItem() {} },
     CubeSim: S,
     document: { getElementById: id => els[id] || (els[id] = mkEl('div')),
+                querySelectorAll: sel => sel === '.orbit button' ? els.arrows : [],
                 documentElement: mkEl('html'), createElement: mkEl,
                 body: { appendChild() {} }, addEventListener() {} } };
   ctx.globalThis = ctx;
@@ -458,6 +467,30 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
     ok('正向做完再反向做一遍 -> 回到复原态',
       sameState(readCube(), S.solved()),
       '中途 ' + JSON.stringify(midway).slice(0, 40));
+
+    // ---- 整体旋转箭头 ----
+    const src2 = fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8');
+    const arrows = [...src2.matchAll(/data-mv="([^"]+)"/g)].map(m => m[1]);
+    ok('有 6 个整体旋转箭头（' + arrows.join(' ') + '）', arrows.length === 6, arrows.join(','));
+    ok('覆盖 x/x\' y/y\' z/z\'',
+      ['x', "x'", 'y', "y'", 'z', "z'"].every(m => arrows.includes(m)), arrows.join(','));
+    // F 浮标必须在 #cube 里面，才会跟着魔方一起转
+    ok('F 面浮标在魔方内部（跟着一起转）', /class="fmark"|fmark/.test(src2) &&
+      /'<div class="fmark"/.test(src2));
+    ok('浮标贴在前面外侧（1.55 格）',
+      /translate3d\(0,0,calc\(var\(--cs\) \* 1\.55\)\)/.test(src2));
+
+    // 点一下 ← （y）：局面应当等于整体左转一次，并记进历史
+    els.reset.fire('click');
+    const before = readCube();
+    els.arrows[2].fire('click');                 // ← 是第 3 个（n s w e z1 z2）
+    await wait(1200);
+    ok('点箭头后局面 = 整体旋转 y',
+      sameState(readCube(), S.apply(S.solved(), 'y')),
+      JSON.stringify(readCube()).slice(0, 50));
+    ok('整体旋转改变了 F 面的位置', !sameState(readCube(), before));
+    ok('整体旋转记进了历史', String(els.hcount.textContent) === '1', els.hcount.textContent);
+    ok('历史里标为旋转类', /class="e rt/.test(els.hist.innerHTML), els.hist.innerHTML.slice(0, 80));
 
     // 打乱放在最后：22 步要播约 9 秒，放在前面会把后面的提交全挡在 busy 外面
     els.scramble.fire('click');

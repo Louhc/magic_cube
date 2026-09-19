@@ -43,7 +43,30 @@
             border-radius:9px;cursor:pointer;transition:.12s;font-size:15px;line-height:1}
   .themebtn:hover{color:var(--text);border-color:var(--line-strong);background:var(--chip-hover)}
 
+  /* 四周的整体旋转按钮：不参与 3D，所以不会跟着魔方一起转 */
+  .orbit{position:absolute;inset:0;pointer-events:none}
+  .orbit button{position:absolute;pointer-events:auto;width:34px;height:34px;padding:0;
+    border-radius:9px;cursor:pointer;font-size:14px;line-height:1;
+    background:var(--chip);border:1px solid var(--line);color:var(--muted);
+    transition:border-color .12s,color .12s,background .12s}
+  .orbit button:hover:not(:disabled){color:var(--accent);border-color:var(--accent);
+                                     background:var(--chip-hover)}
+  .orbit button:disabled{opacity:.35;cursor:default}
+  .orbit .n{left:50%;top:12px;transform:translateX(-50%)}
+  .orbit .s{left:50%;bottom:12px;transform:translateX(-50%)}
+  .orbit .w{left:14px;top:50%;transform:translateY(-50%)}
+  .orbit .e{right:14px;top:50%;transform:translateY(-50%)}
+  .orbit .z1{left:14px;top:56px}
+  .orbit .z2{left:56px;top:56px}
+
   .cube{position:relative;width:0;height:0;transform-style:preserve-3d}
+  /* F 面浮标：贴在前面外侧 1.55 格处，跟着魔方一起转，
+     所以做了 x/y/z 之后它仍然指着当前的前面 */
+  .fmark{position:absolute;left:0;top:0;width:22px;height:22px;
+         margin:-11px 0 0 -11px;border-radius:50%;display:grid;place-items:center;
+         font:700 12px/1 system-ui,sans-serif;letter-spacing:0;
+         background:var(--accent);color:#fff;box-shadow:0 2px 8px #0005;
+         transform:translate3d(0,0,calc(var(--cs) * 1.55))}
   .layer{position:absolute;left:0;top:0;width:0;height:0;transform-style:preserve-3d}
   .cubie{position:absolute;left:0;top:0;width:var(--cs);height:var(--cs);
          margin:calc(var(--cs) / -2) 0 0 calc(var(--cs) / -2);transform-style:preserve-3d}
@@ -115,6 +138,7 @@
   .hist .e b{flex:none;font-weight:600;color:var(--muted);opacity:.7;
              font-variant-numeric:tabular-nums}
   .hist .e.sc{color:#a3711f}
+  .hist .e.rt{color:#2b6f8f}
   .hist .e .tag{flex:none;background:var(--accent);color:#fff;border-radius:4px;
                 padding:0 4px;font-size:11px;line-height:1.5}
   .hist .e.cur{border-color:var(--accent);color:var(--text)}
@@ -149,6 +173,15 @@
   <main class="stage" id="stage">
     <button class="themebtn" id="themebtn" type="button" title="切到夜晚">☾</button>
     <div class="cube" id="cube"></div>
+    <!-- 整体旋转（x / y / z）。箭头摆在魔方四周，方向一眼可辨 -->
+    <div class="orbit">
+      <button class="n" data-mv="x"  type="button" title="整体上翻 x">↑</button>
+      <button class="s" data-mv="x'" type="button" title="整体下翻 x'">↓</button>
+      <button class="w" data-mv="y"  type="button" title="整体左转 y">←</button>
+      <button class="e" data-mv="y'" type="button" title="整体右转 y'">→</button>
+      <button class="z1" data-mv="z"  type="button" title="整体逆时针滚 z">⟲</button>
+      <button class="z2" data-mv="z'" type="button" title="整体顺时针滚 z'">⟳</button>
+    </div>
   </main>
 
   <aside class="panel">
@@ -299,7 +332,7 @@
       return '<div class="cubie" data-pos="' + pos + '" style="transform:translate3d(' +
              (p[0] * CS) + 'px,' + (-p[1] * CS) + 'px,' + (p[2] * CS) + 'px)">' +
              cubieHTML(map[pos]) + '</div>';
-    }).join('');
+    }).join('') + '<div class="fmark" title="当前的前面">F</div>';
     applyView();
   }
   function applyView() {
@@ -386,6 +419,9 @@
     });
     fwdEl.disabled = busy;
     revEl.disabled = busy;
+    Array.prototype.forEach.call(document.querySelectorAll('.orbit button'), function (b) {
+      b.disabled = busy;
+    });
     document.getElementById('scramble').disabled = busy;
     document.getElementById('reset').disabled = busy;
   }
@@ -393,7 +429,7 @@
   function renderHist() {
     document.getElementById('hcount').textContent = hist.length;
     histEl.innerHTML = hist.length ? hist.map(function (h, i) {
-      return '<div class="e' + (h.kind === 'scramble' ? ' sc' : '') +
+      return '<div class="e' + (h.kind === 'scramble' ? ' sc' : h.kind === 'rotate' ? ' rt' : '') +
              (i === hist.length - 1 ? ' cur' : '') +
              '" data-i="' + i + '" title="点一下填回输入框">' +
              '<b>' + (i + 1) + '</b>' +
@@ -431,6 +467,11 @@
     rev = !!rev;
     if (rev) list = invert(list);
 
+    run(list, alg, kind, rev);
+  }
+
+  /* 播放一串步骤并记入历史。提交公式、整体旋转、打乱都走这里。 */
+  function run(list, label, kind, rev) {
     busy = true;
     chrome();
     movesEl.innerHTML = list.map(function (x, i) {
@@ -440,7 +481,7 @@
     var from = cur;
     play(list, from, function (end) {
       cur = end;
-      hist.push({ kind: kind || 'alg', alg: alg, rev: rev });
+      hist.push({ kind: kind || 'alg', alg: label, rev: !!rev });
       renderHist();
       if (kind === 'scramble') algEl.value = "R U R' U'";
       busy = false;
@@ -502,6 +543,13 @@
     errEl.textContent = '';
   });
   document.getElementById('scramble').addEventListener('click', scramble);
+  // 整体旋转：动画 + 记进历史（它确实改变了哪一面是 F）
+  Array.prototype.forEach.call(document.querySelectorAll('.orbit button'), function (b) {
+    b.addEventListener('click', function () {
+      if (busy) return;
+      run(CubeSim.steps(b.dataset.mv), b.dataset.mv, 'rotate', false);
+    });
+  });
   document.getElementById('reset').addEventListener('click', reset);
   document.getElementById('first').addEventListener('click', function () { jump(0); });
   document.getElementById('last').addEventListener('click', function () { jump(steps.length); });
