@@ -133,5 +133,18 @@ console.log('\n[9] 页面数据必须是合法 JSON（备用公式就挂在里�
   }
 }
 
+console.log('\n[11] 公式表的单元格不能用 display:flex');
+{
+  // 为一个真 bug 加的：给公式加「↗」链接时写了 td.f{display:flex}，
+  // 单元格不再是 table-cell，行高和列宽全乱。
+  ['f2l.html', 'oll.html', 'pll.html'].forEach(p => {
+    const h = fs.readFileSync(path.join(ROOT, p), 'utf8');
+    const bad = [...h.matchAll(/(td[\w.-]*\{[^}]*display:\s*flex[^}]*\})/g)].map(m => m[1]);
+    ok(p + ' 的 td 没用 flex', bad.length === 0, bad.join(' | '));
+    ok(p + ' 仍是正常表格（有 colgroup 或 table-layout）',
+      /<colgroup>/.test(h) || /table-layout/.test(h));
+  });
+}
+
 console.log('\n结果: ' + pass + ' 通过, ' + fail + ' 失败');
 process.exit(fail ? 1 : 0);

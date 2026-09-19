@@ -66,7 +66,10 @@
            color:var(--muted);background:var(--field);border:1px solid var(--line);
            transition:.12s}
   a.tocalc:hover{color:var(--accent);border-color:var(--accent)}
-  td.f{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 0}
+  /* 注意：不要在 td 上用 display:flex —— 单元格会不再是 table-cell，
+     行高和列宽随之全乱。让公式和「↗」自然内联排即可。 */
+  td.f code{vertical-align:middle}
+  td.f a.tocalc{vertical-align:middle}
 
   /* 有备用写法时，图片可点开。展开后每条备选配一张"对应朝向"的图
      （就是原图顺时针转 m*90 度 —— 已用模拟器验证过，等价于把局面做 U^m）。 */
