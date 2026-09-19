@@ -205,8 +205,8 @@ function toCalc(alg) {
 }
 function row(n, alg, alts) {
   // 一条公式里可能有换行 —— 表示同一格内的多条写法，逐行渲染
-  var body = alg ? alg.split('
-').map(function (line) {
+  // 用 fromCharCode(10) 取换行，避免生成器里转义被多吃一层
+  var body = alg ? alg.split(String.fromCharCode(10)).map(function (line) {
       return '<code>' + esc(line) + '</code>' + toCalc(line);
     }).join('<br>')
     : '<span class="todo">—</span>';

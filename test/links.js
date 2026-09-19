@@ -148,5 +148,22 @@ console.log('\n[11] 公式表的单元格不能用 display:flex');
   });
 }
 
+console.log('\n[12] 每个页面的内联脚本都必须能通过语法检查');
+{
+  // 为一个真事故加的：生成器里的转义被多吃了一层，oll.html / pll.html
+  // 的内联脚本里出现了一个真换行，两个页面直接白屏 —— 而当时所有测试都通过，
+  // 因为没有任何一条真的去解析这些脚本。用 new Function 做语法检查即可。
+  PAGES.forEach(p => {
+    const h = fs.readFileSync(path.join(ROOT, p), 'utf8');
+    const blocks = [...h.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);
+    if (!blocks.length) return;                       // 没有内联脚本就跳过
+    let err = null;
+    blocks.forEach((b, i) => {
+      try { new Function(b); } catch (e) { err = '第 ' + (i + 1) + ' 段: ' + e.message; }
+    });
+    ok(p + ' 的内联脚本语法正确（' + blocks.length + ' 段）', !err, err);
+  });
+}
+
 console.log('\n结果: ' + pass + ' 通过, ' + fail + ' 失败');
 process.exit(fail ? 1 : 0);
