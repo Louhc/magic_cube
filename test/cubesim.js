@@ -550,9 +550,15 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
       /\.pick button/.test(src2) && ['f2l', 'oll', 'pll'].every(k => src2.includes('data-pick="' + k + '"')));
     ok('选公式是右侧独立一列（不是挤在面板下面）',
       /<aside class="picker" id="picker">/.test(src2) &&
-      /\.picker\{width:300px/.test(src2) &&
+      /\.picker\.on\{width:300px\}/.test(src2) &&
+      /<aside class="picker" id="picker">/.test(src2) &&
       !/<div class="plist" id="plist"><\/div>\s*<\/aside>/.test(src2.slice(0, src2.indexOf('</aside>'))));
-    ok('点开时才出现整列', /\.picker\.on\{display:block\}/.test(src2));
+    // 必须靠宽度过渡展开，不能用 display:none 切换 —— 那样没法过渡，只能蹦
+    ok('选公式列是缓慢展开（宽度过渡）',
+      /transition:width \.3s/.test(src2) && /\.picker\.on\{width:300px\}/.test(src2) &&
+      !/\.picker\.on\{display:block\}/.test(src2));
+    ok('内容宽度固定，收起时靠外层裁剪（不会被挤扁）',
+      /overflow:hidden/.test(src2) && /\.picker > \.inner\{width:300px/.test(src2));
     ok('列表项带缩略图', /function thumb\(kind, id\)/.test(src2) && /<img src="' \+ thumb/.test(src2));
     // 只填入、不执行 —— 让用户自己确认方向再按
     ok('点某一条只填入输入框',
