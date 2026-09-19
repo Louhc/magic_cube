@@ -429,6 +429,39 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
     ok('复原后历史清空', String(els.hcount.textContent) === '0', els.hcount.textContent);
     ok('复原后回到初始态', sameState(readCube(), S.solved()));
 
+    // ---- 反向执行 ----
+    // 逆运算的关键是「顺序也要倒过来」：R U 的逆是 U' R'，不是 R' U'
+    const srcText = fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8');
+    ok('取逆时倒序遍历（顺序也反过来）',
+      /function invert\(list\)[\s\S]*?for \(var i = list\.length - 1; i >= 0; i--\)/.test(srcText));
+    ok('有反向开关按钮', /id="rev"/.test(srcText) && /class="rev"/.test(srcText));
+
+    els.reset.fire('click');
+    els.alg.value = 'R U';
+    els.rev.fire('click');
+    ok('反向开关点亮', els.rev.classList.contains('on'));
+    els.submit.fire('click');
+    await wait(1200);
+    ok('反向提交后局面 = 逆（U\' R\'）',
+      sameState(readCube(), S.apply(S.solved(), "U' R'")),
+      JSON.stringify(readCube()).slice(0, 50));
+    ok('历史里标了反向', /class="tag"/.test(els.hist.innerHTML), els.hist.innerHTML.slice(0, 80));
+
+    // 最强的语义检查：正着做一遍、再反着做一遍，应当回到原样
+    els.reset.fire('click');
+    els.rev.fire('click');                       // 关掉反向
+    els.alg.value = "R U R' U' F";               // 5 步 -> 约 2.1s
+    els.submit.fire('click');
+    await wait(2600);
+    const midway = readCube();
+    els.rev.fire('click');                       // 打开反向
+    els.submit.fire('click');
+    await wait(2600);
+    ok('正向做完再反向做一遍 -> 回到复原态',
+      sameState(readCube(), S.solved()),
+      '中途 ' + JSON.stringify(midway).slice(0, 40));
+
+    // 打乱放在最后：22 步要播约 9 秒，放在前面会把后面的提交全挡在 busy 外面
     els.scramble.fire('click');
     await wait(120);
     ok('打乱会把随机公式填进输入框', els.alg.value.split(/\s+/).length >= 18, els.alg.value);

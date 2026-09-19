@@ -88,6 +88,11 @@
   #alg.bad{border-color:#c0392b}
 
   .ctrl{display:flex;gap:6px;margin-bottom:9px}
+  .rev{flex:none;width:34px;padding:0;border-radius:7px;cursor:pointer;font-size:14px;
+       line-height:1;background:var(--field);border:1px solid var(--line);
+       color:var(--muted);transition:.12s}
+  .rev:hover{border-color:var(--line-strong);color:var(--text)}
+  .rev.on{background:var(--accent);border-color:var(--accent);color:#fff}
   .go{flex:none;padding:0 13px;border-radius:7px;cursor:pointer;font:inherit;font-size:12.5px;
       background:var(--accent);border:1px solid var(--accent);color:#fff;transition:.12s}
   .go:hover{filter:brightness(1.08)}
@@ -102,6 +107,8 @@
   .hist .e b{flex:none;font-weight:600;color:var(--muted);opacity:.7;
              font-variant-numeric:tabular-nums}
   .hist .e.sc{color:#a3711f}
+  .hist .e .tag{flex:none;background:var(--accent);color:#fff;border-radius:4px;
+                padding:0 4px;font-size:11px;line-height:1.5}
   .hist .e.cur{border-color:var(--accent);color:var(--text)}
   .hist .empty{color:var(--muted);font-size:12.5px;opacity:.7}
   .ctrl button{flex:1;height:32px;padding:0;border-radius:7px;cursor:pointer;
@@ -142,6 +149,7 @@
       <div class="row">
         <input id="alg" type="text" spellcheck="false" autocomplete="off"
                value="R U R' U'" placeholder="例如 R U R' U'">
+        <button class="rev" id="rev" type="button" title="反向执行（取逆，顺序也倒过来）">↺</button>
         <button class="go" id="submit" type="button">提交</button>
       </div>
       <div class="ctrl">
@@ -217,6 +225,7 @@
   var posEl = document.getElementById('pos');
   var errEl = document.getElementById('err');
   var histEl = document.getElementById('hist');
+  var revEl = document.getElementById('rev');
 
   var steps = [], frames = [], at = 0;   // 最近一次提交的步骤与各阶段局面
   var cur = CubeSim.solved();            // 当前局面（累积的）
@@ -365,6 +374,7 @@
       document.getElementById(id).disabled = noSteps || at >= steps.length;
     });
     document.getElementById('submit').disabled = busy;
+    revEl.disabled = busy;
     document.getElementById('scramble').disabled = busy;
     document.getElementById('reset').disabled = busy;
   }
@@ -375,8 +385,20 @@
       return '<div class="e' + (h.kind === 'scramble' ? ' sc' : '') +
              (i === hist.length - 1 ? ' cur' : '') +
              '" data-i="' + i + '" title="点一下填回输入框">' +
-             '<b>' + (i + 1) + '</b><span>' + esc(h.alg) + '</span></div>';
+             '<b>' + (i + 1) + '</b>' +
+             (h.rev ? '<span class="tag" title="反向执行">\u21ba</span>' : '') +
+             '<span>' + esc(h.alg) + '</span></div>';
     }).join('') : '<div class="empty">还没有记录</div>';
+  }
+
+  /* 取逆：顺序倒过来，每一步再取反。
+     注意顺序也要倒 —— R U 的逆是 U' R'，不是 R' U'。 */
+  function invert(list) {
+    var out = [];
+    for (var i = list.length - 1; i >= 0; i--) {
+      out.push({ mv: list[i].mv, times: -list[i].times });
+    }
+    return out;
   }
 
   /* ---------- 提交一条公式 ---------- */
@@ -395,6 +417,8 @@
       return;
     }
     if (!list.length) return;
+    var rev = revEl.classList.contains('on');
+    if (rev) list = invert(list);
 
     busy = true;
     chrome();
@@ -405,7 +429,7 @@
     var from = cur;
     play(list, from, function (end) {
       cur = end;
-      hist.push({ kind: kind || 'alg', alg: alg });
+      hist.push({ kind: kind || 'alg', alg: alg, rev: rev });
       renderHist();
       if (kind === 'scramble') algEl.value = "R U R' U'";
       busy = false;
@@ -439,6 +463,7 @@
     algEl.classList.remove('bad');
     errEl.textContent = '';
     movesEl.innerHTML = '';
+    revEl.classList.remove('on');
     paint(cur);
     chrome();
     renderHist();
@@ -466,6 +491,7 @@
     algEl.classList.remove('bad');
     errEl.textContent = '';
   });
+  revEl.addEventListener('click', function () { revEl.classList.toggle('on'); });
   document.getElementById('scramble').addEventListener('click', scramble);
   document.getElementById('reset').addEventListener('click', reset);
   document.getElementById('first').addEventListener('click', function () { jump(0); });
@@ -483,7 +509,9 @@
   histEl.addEventListener('click', function (e) {
     var el = e.target.closest ? e.target.closest('.e') : null;
     if (!el) return;
-    algEl.value = hist[+el.dataset.i].alg;
+    var h = hist[+el.dataset.i];
+    algEl.value = h.alg;
+    revEl.classList.toggle('on', !!h.rev);
     algEl.focus();
   });
   document.addEventListener('keydown', function (e) {
