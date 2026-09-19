@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>F2L 公式合集</title>
+<link rel="icon" type="image/x-icon" href="cube-64x64.ico">
+<style>
+  :root{
+    --bg:#f4f6f9; --card:#ffffff; --line:#d8dee7; --line-strong:#b9c3d0;
+    --text:#1e2530; --muted:#6a7686; --head-red:#c0392b; --head-green:#1e8449;
+    --head-band:#f7d9b6; --accent:#2f6bd8; --field:#eef1f5;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0f1319; --card:#161c25; --line:#2a3340; --line-strong:#3a4553;
+      --text:#e7edf5; --muted:#8a98aa; --head-red:#e05a4a; --head-green:#3fbf74;
+      --head-band:#3a2f22; --accent:#5b9bff; --field:#1c232e;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+       font:14px/1.5 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+  header{padding:22px 20px 8px;text-align:center}
+  h1{margin:0;font-size:20px;letter-spacing:.02em}
+  header p{margin:6px 0 0;color:var(--muted);font-size:12.5px}
+  main{max-width:1180px;margin:0 auto;padding:10px 16px 60px}
+
+  section{margin:26px 0 0;background:var(--card);border:1px solid var(--line);
+          border-radius:12px;overflow:hidden}
+  section > h2{margin:0;padding:11px 16px;font-size:14px;font-weight:600;
+               background:var(--head-band);border-bottom:1px solid var(--line)}
+
+  table{width:100%;border-collapse:collapse;table-layout:fixed}
+  col.side{width:110px}
+  col.formula{width:auto}
+  th{padding:9px 12px;font-size:12.5px;font-weight:600;border-bottom:1px solid var(--line);
+     border-right:1px solid var(--line);background:var(--field)}
+  th.red{color:var(--head-red)} th.green{color:var(--head-green)}
+  th:last-child{border-right:none}
+  td{border-bottom:1px solid var(--line);border-right:1px solid var(--line);vertical-align:middle}
+  td:last-child{border-right:none}
+  tr:last-child td{border-bottom:none}
+  td.pic{padding:6px;text-align:center;background:var(--field)}
+  td.pic img{width:96px;height:auto;display:block;margin:0 auto;
+             image-rendering:auto;border-radius:6px}
+  td.f{padding:10px 14px}
+  td.empty{background:var(--field)}
+
+  /* 公式：等宽，点一下复制 */
+  code{font:13.5px/1.7 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+       cursor:pointer;word-break:break-word;border-radius:5px;padding:2px 5px;margin:-2px -5px}
+  code:hover{background:var(--field)}
+  code.copied{background:var(--accent);color:#fff}
+
+  .note{margin:26px 0 0;color:var(--muted);font-size:12px;line-height:1.8}
+  .note code{cursor:auto;font-size:12px}
+  .note code:hover{background:none}
+
+  /* 复制提示 */
+  #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(12px);
+         background:#111a;color:#fff;padding:8px 16px;border-radius:8px;font-size:13px;
+         opacity:0;pointer-events:none;transition:.18s}
+  #toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  @media (max-width:720px){
+    col.side{width:78px}
+    td.pic img{width:64px}
+    td.f{padding:8px 10px}
+    code{font-size:12.5px}
+  }
+  @media print{
+    body{background:#fff;color:#000}
+    header{padding:0 0 8px}
+    section{break-inside:avoid;border-color:#999}
+    code:hover{background:none}
+    #toast{display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>F2L 公式合集</h1>
+  <p>左列「红色为 F 面」，右列「绿色为 F 面」。点公式即可复制。</p>
+</header>
+
+<main id="app"></main>
+
+<p class="note" id="note"></p>
+<div id="toast"></div>
+
+<script>
+/* 数据：三节，每节若干行；每行左右两格（左=a 红色为F面，右=b 绿色为F面）。
+   图片取自 f2l/ 目录，文件名形如 f2l-01a-512x515.png。
+   公式严格照原表誊录（含原表的 U'2 / L'2 这类写法）。 */
+var SECTIONS = [
+  {
+    title: '需要特殊处理的几种情况',
+    rows: [
+      { a: '01a', b: '01b',
+        af: "(R U R' U')(R U R' U2)(R U R')",
+        bf: "(L' U L U')(L' U L U2)(L' U L)" },
+      { a: '02a', b: '02b',
+        af: "(l U)(L F' L' U' l')",
+        bf: "(r' U')(R' F R U r)" },
+      { a: '03a', b: '03b',
+        af: "(R2 U'2)(R' U' R U')(R' U2 R')",
+        bf: "(L'2 U2)(L U L' U')(L U2 L)" },
+      { a: '04a', b: '04b',
+        af: "(R U R' F')(L' U2 L F)",
+        bf: "(L' U L F)(R U2 R' F')" },
+      { a: '05a', b: '05b',
+        af: "(R U R' U')(R U R')",
+        bf: "(L' U' L U)(L' U' L)" },
+      { a: '06a', b: '06b',
+        af: "(R U)(R2 F R F')",
+        bf: "(L' U)(L2 F' L' F)" },
+      // 这一行左格有两条公式，右格为空
+      { a: '07', b: null,
+        af: "(R U R' U2)(R U2 R' U)y'(R' U R)\n(R' F R F')(R U' R' U)(R U' R' U2 R U' R')",
+        bf: null }
+    ]
+  },
+  {
+    title: '白色朝上的情况',
+    rows: [
+      { a: '08', b: null, af: "(R U R' U')(R U R' U')(R U R')", bf: null },
+      { a: '09', b: null, af: "(R U' R' U)y(L' U L)", bf: null },
+      { a: '10a', b: '10b',
+        af: "(R U' R' U2)(R U R' U')(R U' R')",
+        bf: "(L' U' L U2)(L' U' L U)(L' U' L)" },
+      { a: '11a', b: '11b',
+        af: "(R U2 R' U')(R U R')",
+        bf: "(L' U2 L U)(L' U' L)" },
+      { a: '12a', b: '12b',
+        af: "(R U' R' U2)(R U R')",
+        bf: "(L' U' L U2)(L' U' L)" },
+      { a: '13a', b: '13b',
+        af: "U(R U'2 R' U)(R U' R')",
+        bf: "U'(L' U2 L U')(L' U' L)" }
+    ]
+  },
+  {
+    title: '简单情况',
+    rows: [
+      { a: '14a', b: '14b', af: "(R U R')", bf: "(L' U' L)" },
+      { a: '15a', b: '15b',
+        af: "U'(R U' R' U)(R U R')",
+        bf: "U(L' U L U')(L' U' L)" },
+      { a: '16a', b: '16b',
+        af: "U'(R U R' U)(R U R')",
+        bf: "U(L' U' L U')(L' U' L)" },
+      { a: '17a', b: '17b', af: "(U R U' R')", bf: "(U' L' U L)" },
+      { a: '18a', b: '18b',
+        af: "U'(R U R' U2)(R U' R')",
+        bf: "U(L' U' L U2)(L' U L)" },
+      { a: '19a', b: '19b',
+        af: "U'(R U2 R' U2)(R U' R')",
+        bf: "U(L' U2 L U2)(L' U L)" },
+      { a: '20a', b: '20b',
+        af: "U'(R U' R' U2)(R U' R')",
+        bf: "U(L' U' L U2)(L' U L)" },
+      { a: '21a', b: '21b',
+        af: "(U' R U R')y(U L' U' L)",
+        bf: "(U L' U' L)y'(U' R U R')" }
+    ]
+  }
+];
+
+var IMG = function (name) { return 'f2l/f2l-' + name + '-512x515.png'; };
+
+function esc(s) {
+  return String(s).replace(/[&<>]/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c];
+  });
+}
+/* 一行里可能有多条公式（换行分隔），逐条渲染成可点的 code */
+function formulas(text) {
+  if (!text) return '';
+  return text.split('\n').map(function (line) {
+    return '<code>' + esc(line) + '</code>';
+  }).join('<br>');
+}
+function pic(name, alt) {
+  if (!name) return '<td class="empty"></td>';
+  return '<td class="pic"><img src="' + IMG(name) + '" alt="' + esc(alt) + '" loading="lazy"></td>';
+}
+
+var html = '';
+var total = 0;
+SECTIONS.forEach(function (sec) {
+  html += '<section><h2>' + esc(sec.title) + '</h2><table>' +
+          '<colgroup><col class="side"><col class="formula">' +
+          '<col class="side"><col class="formula"></colgroup>' +
+          '<thead><tr>' +
+          '<th class="red">红色为 F 面</th><th>公式</th>' +
+          '<th class="green">绿色为 F 面</th><th>公式</th>' +
+          '</tr></thead><tbody>';
+  sec.rows.forEach(function (r) {
+    if (r.a) total++;
+    if (r.b) total++;
+    html += '<tr>' +
+      pic(r.a, r.af) + '<td class="f">' + formulas(r.af) + '</td>' +
+      pic(r.b, r.bf) + '<td class="f">' + formulas(r.bf) + '</td>' +
+      '</tr>';
+  });
+  html += '</tbody></table></section>';
+});
+document.getElementById('app').innerHTML = html;
+document.getElementById('note').innerHTML =
+  '共 ' + SECTIONS.length + ' 节、' + total + ' 个情况，图片来自 <code>f2l/</code> 目录。' +
+  '公式按原表誊录 —— 原表中的 <code>U\'2</code>、<code>L\'2</code> 这类写法也照原样保留' +
+  '（通常记作 <code>U2</code> / <code>L2</code>）。';
+
+/* 点公式复制 */
+var toastEl = document.getElementById('toast'), toastTimer = null;
+function toast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { toastEl.classList.remove('on'); }, 1400);
+}
+function fallbackCopy(text) {
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); toast('已复制：' + text); }
+  catch (e) { toast('复制失败，请手动选择'); }
+  ta.remove();
+}
+document.getElementById('app').addEventListener('click', function (e) {
+  var el = e.target.closest ? e.target.closest('code') : null;
+  if (!el) return;
+  var text = el.textContent;
+  // 去掉公式里的空格，粘进播放器/脚本更省事
+  var compact = text.replace(/\s+/g, '');
+  function done() {
+    el.classList.add('copied');
+    setTimeout(function () { el.classList.remove('copied'); }, 600);
+  }
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(compact).then(function () { done(); toast('已复制：' + compact); },
+                                                function () { fallbackCopy(compact); done(); });
+  } else {
+    fallbackCopy(compact); done();
+  }
+});
+</script>
+</body>
+</html>
