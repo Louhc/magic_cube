@@ -95,7 +95,7 @@ console.log('\n[5] 真跑一遍 calc.html 的脚本（DOM 桩）');
       setPointerCapture() {}, closest() { return null; }, offsetWidth: 1,
       value: init || '',
       set innerHTML(v) { this._h = v; }, get innerHTML() { return this._h || ''; },
-      set textContent(v) { this._t = v; }, get textContent() { return this._t || ''; },
+      set textContent(v) { this._t = v; }, get textContent() { return this._t === undefined ? '' : this._t; },
       set disabled(v) {} };
     return e;
   };
@@ -117,8 +117,10 @@ console.log('\n[5] 真跑一遍 calc.html 的脚本（DOM 桩）');
   ok('脚本执行不报错', !threw, threw && threw.message);
   if (threw) { console.log('\n结果: ' + pass + ' 通过, ' + fail + ' 失败'); process.exit(1); }
   ok('无错误提示', !els.err.textContent, els.err.textContent);
-  ok('公式被解析成 4 步', (els.moves.innerHTML.match(/data-k/g) || []).length === 4);
-  ok('停在末尾（4 / 4）', els.pos.textContent === '4 / 4', els.pos.textContent);
+  // 现在的模型是「输入 -> 提交 -> 播放」，所以刚载入时不该有任何步骤
+  ok('载入后没有步骤', (els.moves.innerHTML.match(/data-k/g) || []).length === 0);
+  ok('载入后步骤区显示 —', els.pos.textContent === '\u2014', els.pos.textContent);
+  ok('载入后是复原态（提交前不动魔方）', /class="on /.test(els.cube.innerHTML));
 
   const html = els.cube.innerHTML;
   const pos = [...html.matchAll(/data-pos="([^"]+)"/g)].map(m => m[1]);
@@ -142,7 +144,7 @@ console.log('\n[5] 真跑一遍 calc.html 的脚本（DOM 桩）');
       got[m[1]][N2[x[1]]] = x[2];
     }
   }
-  const st = S.apply(S.solved(), "R U R' U'");
+  const st = S.solved();                     // 载入后是复原态
   let bad = 0, n = 0;
   for (const k of Object.keys(st)) {
     const [p, nn] = k.split('|'); n++;
@@ -344,5 +346,94 @@ console.log('\n[11] 动画转的角度必须和这一步实际转的角度一致
   ok('时长按角度缩放', /var dur = DUR \* Math\.abs\(deg\) \/ 90/.test(html));
 }
 
-console.log('\n结果: ' + pass + ' 通过, ' + fail + ' 失败');
-process.exit(fail ? 1 : 0);
+console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
+{
+  // 这一节要跑动画，所以是异步的：末尾再汇总退出。
+  const vm = require('vm');
+  const mkEl = (t, init) => {
+    const e = { tagName: t, children: [], style: {}, dataset: {},
+      classList: { _s: new Set(), add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); },
+        toggle(c, v) { v === undefined ? (this._s.has(c) ? this._s.delete(c) : this._s.add(c)) : (v ? this._s.add(c) : this._s.delete(c)); },
+        contains(c) { return this._s.has(c); } },
+      _handlers: {},
+      addEventListener(ev, fn) { (this._handlers[ev] = this._handlers[ev] || []).push(fn); },
+      fire(ev, arg) { (this._handlers[ev] || []).forEach(f => f(arg || {})); },
+      appendChild(c) { this.children.push(c); return c; },
+      querySelectorAll() { return []; }, querySelector() { return null; },
+      setPointerCapture() {}, closest() { return null; }, focus() {}, offsetWidth: 1,
+      value: init || '',
+      set innerHTML(v) { this._h = v; }, get innerHTML() { return this._h || ''; },
+      set textContent(v) { this._t = v; }, get textContent() { return this._t === undefined ? '' : this._t; },
+      set disabled(v) { this._d = v; }, get disabled() { return this._d; } };
+    return e;
+  };
+  const els = { alg: mkEl('input', 'R U') };
+  els.cube = mkEl('div');
+  const ctx = { console, navigator: {}, window: { addEventListener() {} },
+    setTimeout, clearTimeout, localStorage: { getItem: () => null, setItem() {} },
+    CubeSim: S,
+    document: { getElementById: id => els[id] || (els[id] = mkEl('div')),
+                documentElement: mkEl('html'), createElement: mkEl,
+                body: { appendChild() {} }, addEventListener() {} } };
+  ctx.globalThis = ctx;
+  vm.createContext(ctx);
+  const src = fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')
+    .match(/<script>([\s\S]*?)<\/script>/g).map(x => x.replace(/<\/?script>/g, ''))
+    .filter(x => x.includes('M3'))[0];
+  vm.runInContext(src, ctx);
+
+  ok('起步是复原态、历史为空', String(els.hcount.textContent) === '0' &&
+    els.pos.textContent === '—', els.hcount.textContent + ' / ' + els.pos.textContent);
+  // reset() 会把示例公式预填进输入框，所以这里再设一次要测的公式
+  els.alg.value = 'R U';
+
+  // 解析画出来的贴纸，还原成「位置|法向 -> 颜色字母」，再和模拟器比
+  const C2 = {};
+  for (const x of fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')
+           .match(/var COLOR = \{([^}]+)\}/)[1].matchAll(/([UDFBRL]):\s*'(#[0-9A-Fa-f]{6})'/g)) {
+    C2[x[2].toUpperCase()] = x[1];
+  }
+  const N2 = { px: '1,0,0', nx: '-1,0,0', py: '0,1,0', ny: '0,-1,0', pz: '0,0,1', nz: '0,0,-1' };
+  const readCube = () => {
+    const out = {};
+    for (const m of els.cube.innerHTML.matchAll(/data-pos="([^"]+)"[^>]*>([\s\S]*?)<\/div>/g)) {
+      for (const x of m[2].matchAll(/class="on (\w+)"[^>]*--c:(#[0-9A-Fa-f]{6})/g)) {
+        out[m[1] + '|' + N2[x[1]]] = C2[x[2].toUpperCase()];
+      }
+    }
+    return out;
+  };
+  const sameState = (a, b) => {
+    const ka = Object.keys(a).sort(), kb = Object.keys(b).sort();
+    return ka.length === kb.length && ka.every((k, i) => k === kb[i] && a[k] === b[k]);
+  };
+
+  // 点两次提交，第二次必须接着第一次的结果往下转
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  (async () => {
+    els.submit.fire('click');
+    await wait(1200);                     // 2 步 × (340+80)ms = 840ms，留足余量
+    ok('第一次提交后历史有 1 条', String(els.hcount.textContent) === '1', els.hcount.textContent);
+    ok('第一次提交后局面 = R U',
+      sameState(readCube(), S.apply(S.solved(), 'R U')),
+      JSON.stringify(readCube()).slice(0, 60));
+
+    els.submit.fire('click');
+    await wait(1200);
+    ok('第二次提交后历史有 2 条', String(els.hcount.textContent) === '2', els.hcount.textContent);
+    ok('第二次是从上一次的结果继续（= R U R U）',
+      sameState(readCube(), S.apply(S.solved(), 'R U R U')),
+      JSON.stringify(readCube()).slice(0, 60));
+
+    els.reset.fire('click');
+    ok('复原后历史清空', String(els.hcount.textContent) === '0', els.hcount.textContent);
+    ok('复原后回到初始态', sameState(readCube(), S.solved()));
+
+    els.scramble.fire('click');
+    await wait(120);
+    ok('打乱会把随机公式填进输入框', els.alg.value.split(/\s+/).length >= 18, els.alg.value);
+
+    console.log('\n结果: ' + pass + ' 通过, ' + fail + ' 失败');
+    process.exit(fail ? 1 : 0);
+  })();
+}

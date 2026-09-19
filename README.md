@@ -12,7 +12,7 @@
 |---|---|
 | `index.html` | **导航主页**，五张卡片通往下面五页（文案压到最少） |
 | `editor.html` | 配色编辑器：调色板、矩阵面板、相机/样式滑块、导出 |
-| `calc.html` | **魔方计算器**：输入公式，立体魔方逐步回放转动（CSS 3D + 动画），可拖拽转视角 |
+| `calc.html` | **魔方计算器**：输入公式点提交，立体魔方按公式转动并记入历史，可接着输入下一条；另有打乱/复原，可用来模拟还原魔方 |
 | `cubesim.js` | **浏览器端三阶模拟器**，`calc.html` 用；与 `tools/cubesim.py` 是同一套模型 |
 | `nav.css` `nav.js` | 顶部导航条 + 回到顶部按钮（五个页面共用，标记由 `nav.js` 注入，只此一份） |
 | `cube-64x64.ico` | 网页图标（favicon），由本工具导出 |
@@ -410,7 +410,7 @@ node test/geometry.js      # 几何：铺满、不重叠、方位、颜色
 node test/interaction.js   # 交互：用极简 DOM 桩真跑一遍 editor.html 的内联脚本
 node test/pll.js           # PLL 模型：颜色/箭头/拖拽的不变量（纯逻辑，17 条）
 node test/links.js         # 链接检查 + 导航覆盖 + 回到顶部按钮 + 分节计数编号（40 条）
-node test/cubesim.js       # 魔方模拟器：不变量 + 与 Python 版对拍 + 真跑一遍页面脚本（36 条）
+node test/cubesim.js       # 魔方模拟器 + 计算器页面（含端到端点提交，77 条）
 ```
 
 `test/pll.js` 里最重要的一条是**「颜色能从块的身份唯一反解出来」**。

@@ -88,6 +88,22 @@
   #alg.bad{border-color:#c0392b}
 
   .ctrl{display:flex;gap:6px;margin-bottom:9px}
+  .go{flex:none;padding:0 13px;border-radius:7px;cursor:pointer;font:inherit;font-size:12.5px;
+      background:var(--accent);border:1px solid var(--accent);color:#fff;transition:.12s}
+  .go:hover{filter:brightness(1.08)}
+  .go:disabled{opacity:.4;cursor:default;filter:none}
+
+  /* 历史记录 */
+  .hist{display:flex;flex-direction:column;gap:5px}
+  .hist .e{display:flex;align-items:baseline;gap:7px;background:var(--field);
+           border:1px solid var(--line);border-radius:7px;padding:6px 8px;
+           font:12px/1.45 ui-monospace,Menlo,Consolas,monospace;color:var(--muted);
+           word-break:break-all}
+  .hist .e b{flex:none;font-weight:600;color:var(--muted);opacity:.7;
+             font-variant-numeric:tabular-nums}
+  .hist .e.sc{color:#a3711f}
+  .hist .e.cur{border-color:var(--accent);color:var(--text)}
+  .hist .empty{color:var(--muted);font-size:12.5px;opacity:.7}
   .ctrl button{flex:1;height:32px;padding:0;border-radius:7px;cursor:pointer;
                background:var(--field);border:1px solid var(--line);color:var(--text);
                font-size:13px;line-height:1;transition:.12s}
@@ -123,19 +139,32 @@
   <aside class="panel">
     <section class="sec">
       <h2>公式</h2>
-      <div class="row"><input id="alg" type="text" spellcheck="false" autocomplete="off" value="R U R' U'"></div>
+      <div class="row">
+        <input id="alg" type="text" spellcheck="false" autocomplete="off"
+               value="R U R' U'" placeholder="例如 R U R' U'">
+        <button class="go" id="submit" type="button">提交</button>
+      </div>
+      <div class="ctrl">
+        <button id="scramble" type="button">打乱</button>
+        <button id="reset" type="button">复原</button>
+      </div>
+      <div class="err" id="err"></div>
+    </section>
+
+    <section class="sec">
+      <h2>步骤<span class="pos" id="pos">—</span></h2>
       <div class="ctrl">
         <button id="first" type="button" title="回到开头">⏮</button>
         <button id="prev"  type="button" title="上一步">◀</button>
         <button id="next"  type="button" title="下一步">▶</button>
         <button id="last"  type="button" title="到最后">⏭</button>
       </div>
-      <div class="err" id="err"></div>
+      <div class="moves" id="moves"></div>
     </section>
 
     <section class="sec">
-      <h2>步骤<span class="pos" id="pos">0 / 0</span></h2>
-      <div class="moves" id="moves"></div>
+      <h2>历史<span class="pos" id="hcount">0</span></h2>
+      <div class="hist" id="hist"></div>
     </section>
   </aside>
 </div>
@@ -187,13 +216,26 @@
   var stageEl = document.getElementById('stage');
   var posEl = document.getElementById('pos');
   var errEl = document.getElementById('err');
+  var histEl = document.getElementById('hist');
 
-  var steps = [], frames = [], at = 0;
-  var view = { x: -24, y: -32 };      // 观察角度，可拖动
-  var busy = false;                   // 动画进行中不接受新的单步
-  var CS = 46;                        // 小方块边长，随舞台尺寸自适应
+  var steps = [], frames = [], at = 0;   // 最近一次提交的步骤与各阶段局面
+  var cur = CubeSim.solved();            // 当前局面（累积的）
+  var hist = [];                         // 历史：{kind:'alg'|'scramble', alg}
+  var view = { x: -24, y: -32 };         // 观察角度，可拖动
+  var busy = false;                      // 播放中不接受新操作
+  var CS = 46;                           // 小方块边长，随舞台尺寸自适应
 
-  /* ---------- 尺寸自适应：让魔方在舞台里撑满（和编辑器一样大） ---------- */
+  function esc(t) {
+    return String(t).replace(/[&<>]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c];
+    });
+  }
+  function mvLabel(s) {
+    var t = s.times;
+    return s.mv + (t === 2 ? '2' : t === -2 ? "2'" : t === -1 ? "'" : '');
+  }
+
+  /* ---------- 尺寸自适应：让魔方在舞台里撑满 ---------- */
   function fit() {
     var w = stageEl.clientWidth, h = stageEl.clientHeight;
     if (!w || !h) return;
@@ -202,7 +244,7 @@
     CS = Math.max(12, Math.min(w, h) / 6.15);
     cubeEl.style.setProperty('--cs', CS + 'px');
     cubeEl.style.setProperty('--half', (CS / 2) + 'px');
-    repaint();
+    paint(cur);
   }
 
   /* ---------- 画魔方 ---------- */
@@ -240,7 +282,6 @@
     }).join('');
     applyView();
   }
-  function repaint() { paint(frames[at] || CubeSim.solved()); }
   function applyView() {
     cubeEl.style.transform = 'rotateX(' + view.x + 'deg) rotateY(' + view.y + 'deg)';
   }
@@ -285,80 +326,170 @@
     setTimeout(finish, dur + 80);      // 兜底：transitionend 偶尔不触发
   }
 
-  /* ---------- 主流程 ---------- */
-  function rebuild() {
-    errEl.textContent = '';
-    algEl.classList.remove('bad');
-    try {
-      steps = CubeSim.steps(algEl.value);
-    } catch (e) {
-      steps = [];
-      algEl.classList.add('bad');
-      errEl.textContent = e.message;
-    }
-    frames = [CubeSim.solved()];
-    var st = frames[0];
-    steps.forEach(function (s) {
-      st = CubeSim.turn(CubeSim.clone(st), s.mv, s.times);
-      frames.push(st);
-    });
-    at = frames.length - 1;
-    movesEl.innerHTML = steps.map(function (s, i) {
-      var t = s.times;
-      return '<span data-k="' + (i + 1) + '">' + s.mv +
-             (t === 2 ? '2' : t === -2 ? "2'" : t === -1 ? "'" : '') + '</span>';
-    }).join('');
-    paint(frames[at]);
+  /* ---------- 依次播放一串步骤 ---------- */
+  function play(list, from, onDone) {
+    steps = list;
+    frames = [from];
+    at = 0;
+    paint(from);
     chrome();
+    var st = from, i = 0;
+    (function next() {
+      if (i >= list.length) { onDone(st); return; }
+      var mv = list[i];
+      animate(mv, function () {
+        st = CubeSim.turn(CubeSim.clone(st), mv.mv, mv.times);
+        frames.push(st);
+        i++;
+        at = i;
+        paint(st);
+        chrome();
+        next();
+      });
+    })();
   }
 
+  /* ---------- 界面状态 ---------- */
   function chrome() {
     Array.prototype.forEach.call(movesEl.children, function (el) {
       var k = +el.dataset.k;
       el.classList.toggle('cur', k === at);
       el.classList.toggle('done', k < at);
     });
-    posEl.textContent = at + ' / ' + steps.length;
-    ['first', 'prev'].forEach(function (id) { document.getElementById(id).disabled = at === 0; });
-    ['next', 'last'].forEach(function (id) { document.getElementById(id).disabled = at >= steps.length; });
+    posEl.textContent = steps.length ? (at + ' / ' + steps.length) : '—';
+    var noSteps = steps.length === 0;
+    ['first', 'prev'].forEach(function (id) {
+      document.getElementById(id).disabled = noSteps || at === 0;
+    });
+    ['next', 'last'].forEach(function (id) {
+      document.getElementById(id).disabled = noSteps || at >= steps.length;
+    });
+    document.getElementById('submit').disabled = busy;
+    document.getElementById('scramble').disabled = busy;
+    document.getElementById('reset').disabled = busy;
   }
 
-  // 单步：带动画
-  function step(dir) {
+  function renderHist() {
+    document.getElementById('hcount').textContent = hist.length;
+    histEl.innerHTML = hist.length ? hist.map(function (h, i) {
+      return '<div class="e' + (h.kind === 'scramble' ? ' sc' : '') +
+             (i === hist.length - 1 ? ' cur' : '') +
+             '" data-i="' + i + '" title="点一下填回输入框">' +
+             '<b>' + (i + 1) + '</b><span>' + esc(h.alg) + '</span></div>';
+    }).join('') : '<div class="empty">还没有记录</div>';
+  }
+
+  /* ---------- 提交一条公式 ---------- */
+  function submit(kind) {
     if (busy) return;
-    var next = at + dir;
-    if (next < 0 || next > steps.length) return;
+    var alg = algEl.value.trim();
+    errEl.textContent = '';
+    algEl.classList.remove('bad');
+    if (!alg) return;
+    var list;
+    try {
+      list = CubeSim.steps(alg);
+    } catch (e) {
+      algEl.classList.add('bad');
+      errEl.textContent = e.message;
+      return;
+    }
+    if (!list.length) return;
+
     busy = true;
-    var mv = steps[dir > 0 ? at : next];           // 前进用这一步，后退用它的逆
-    animate({ mv: mv.mv, times: dir > 0 ? mv.times : -mv.times }, function () {
-      at = next;
-      paint(frames[at]);
-      chrome();
+    chrome();
+    movesEl.innerHTML = list.map(function (x, i) {
+      return '<span data-k="' + (i + 1) + '">' + mvLabel(x) + '</span>';
+    }).join('');
+
+    var from = cur;
+    play(list, from, function (end) {
+      cur = end;
+      hist.push({ kind: kind || 'alg', alg: alg });
+      renderHist();
+      if (kind === 'scramble') algEl.value = "R U R' U'";
       busy = false;
+      chrome();
     });
   }
 
-  // 跳转：不动画
-  function jump(k) {
+  /* ---------- 打乱 / 复原 ---------- */
+  function scramble() {
     if (busy) return;
+    var faces = ['U', 'D', 'R', 'L', 'F', 'B'], suff = ['', "'", '2'];
+    var out = [], last = '';
+    for (var i = 0; i < 22; i++) {
+      var f;
+      do { f = faces[Math.floor(Math.random() * 6)]; } while (f === last);
+      last = f;
+      out.push(f + suff[Math.floor(Math.random() * 3)]);
+    }
+    algEl.value = out.join(' ');
+    submit('scramble');
+  }
+
+  function reset() {
+    if (busy) return;
+    hist = [];
+    steps = [];
+    frames = [CubeSim.solved()];
+    at = 0;
+    cur = CubeSim.solved();
+    algEl.value = "R U R' U'";
+    algEl.classList.remove('bad');
+    errEl.textContent = '';
+    movesEl.innerHTML = '';
+    paint(cur);
+    chrome();
+    renderHist();
+  }
+
+  // 回放最近一次提交的某一步（不影响累积局面）
+  function jump(k) {
+    if (busy || !steps.length) return;
     at = Math.max(0, Math.min(steps.length, k));
     paint(frames[at]);
     chrome();
   }
+  function stepBy(dir) {
+    if (busy || !steps.length) return;
+    jump(at + dir);
+  }
 
-  algEl.addEventListener('input', rebuild);
+  /* ---------- 事件 ---------- */
+  var submitBtn = document.getElementById('submit');
+  submitBtn.addEventListener('click', function () { submit('alg'); });
+  algEl.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); submit('alg'); }
+  });
+  algEl.addEventListener('input', function () {
+    algEl.classList.remove('bad');
+    errEl.textContent = '';
+  });
+  document.getElementById('scramble').addEventListener('click', scramble);
+  document.getElementById('reset').addEventListener('click', reset);
   document.getElementById('first').addEventListener('click', function () { jump(0); });
   document.getElementById('last').addEventListener('click', function () { jump(steps.length); });
-  document.getElementById('prev').addEventListener('click', function () { step(-1); });
-  document.getElementById('next').addEventListener('click', function () { step(1); });
+  document.getElementById('prev').addEventListener('click', function () { stepBy(-1); });
+  document.getElementById('next').addEventListener('click', function () { stepBy(1); });
   movesEl.addEventListener('click', function (e) {
     var el = e.target.closest ? e.target.closest('span[data-k]') : null;
-    if (el) jump(+el.dataset.k);
+    if (!el) return;
+    if (busy) return;
+    at = +el.dataset.k;
+    paint(frames[at]);
+    chrome();
+  });
+  histEl.addEventListener('click', function (e) {
+    var el = e.target.closest ? e.target.closest('.e') : null;
+    if (!el) return;
+    algEl.value = hist[+el.dataset.i].alg;
+    algEl.focus();
   });
   document.addEventListener('keydown', function (e) {
     if (e.target === algEl) return;
-    if (e.key === 'ArrowLeft') step(-1);
-    else if (e.key === 'ArrowRight') step(1);
+    if (e.key === 'ArrowLeft') stepBy(-1);
+    else if (e.key === 'ArrowRight') stepBy(1);
   });
 
   /* 拖拽转动视角 */
@@ -397,7 +528,7 @@
   });
 
   fit();
-  rebuild();
+  reset();
 })();
 </script>
 </body>
