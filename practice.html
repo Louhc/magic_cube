@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>魔方练习</title>
+<link rel="icon" type="image/x-icon" href="cube-64x64.ico">
+<link rel="stylesheet" href="nav.css">
+<style>
+  :root{
+    color-scheme: light;
+    --bg:#e9edf2; --stage:#f6f8fa; --panel:#ffffff; --line:#dce2ea;
+    --text:#16202b; --muted:#5d6b7c; --accent:#2f6bd8;
+    --field:#f1f4f8; --field-hover:#e5eaf1;
+    --line-strong:#c3ccd8; --chip:#eef1f6; --chip-hover:#e1e7ee;
+    --scroll:#cdd5e0; --cubie:#16181c; --ok:#1e8449;
+  }
+  html[data-theme="dark"]{
+    color-scheme: dark;
+    --bg:#0f1319; --stage:#151a22; --panel:#181e27; --line:#2a3340;
+    --text:#e7edf5; --muted:#8a98aa; --accent:#4c8dff;
+    --field:#202836; --field-hover:#2a3547;
+    --line-strong:#3d4c61; --chip:#1a212b; --chip-hover:#232c39;
+    --scroll:#2b3542; --cubie:#0c0e11; --ok:#3fbf74;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{background:var(--bg);color:var(--text);overflow:hidden;
+       font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+       -webkit-font-smoothing:antialiased}
+  .app{display:flex;height:calc(100% - var(--nav-h))}
+
+  .stage{flex:1;min-width:0;position:relative;display:flex;align-items:center;justify-content:center;
+         background:var(--stage);perspective:1400px;perspective-origin:50% 48%;
+         cursor:grab;user-select:none;touch-action:none;overflow:hidden}
+  .stage.drag{cursor:grabbing}
+  .themebtn{position:absolute;right:16px;top:14px;z-index:5;
+            width:34px;height:34px;padding:0;display:grid;place-items:center;
+            background:var(--chip);border:1px solid var(--line);color:var(--muted);
+            border-radius:9px;cursor:pointer;transition:.12s;font-size:15px;line-height:1}
+  .themebtn:hover{color:var(--text);border-color:var(--line-strong);background:var(--chip-hover)}
+
+  .cube{position:relative;width:0;height:0;transform-style:preserve-3d}
+  .layer{position:absolute;left:0;top:0;width:0;height:0;transform-style:preserve-3d}
+  .cubie{position:absolute;left:0;top:0;width:var(--cs);height:var(--cs);
+         margin:calc(var(--cs) / -2) 0 0 calc(var(--cs) / -2);transform-style:preserve-3d}
+  .cubie i{position:absolute;width:var(--cs);height:var(--cs);
+           border-radius:calc(var(--cs) * 0.035);background:var(--cubie);
+           backface-visibility:hidden}
+  .cubie i.on::after{content:'';position:absolute;inset:calc(var(--cs) * 0.042);
+    border-radius:calc(var(--cs) * 0.095);background:var(--c);
+    box-shadow:inset 0 calc(var(--cs) * 0.16) calc(var(--cs) * 0.28) calc(var(--cs) * -0.17) #fff5}
+  .cubie i.px{transform:rotateY(90deg)  translateZ(var(--half))}
+  .cubie i.nx{transform:rotateY(-90deg) translateZ(var(--half))}
+  .cubie i.py{transform:rotateX(90deg)  translateZ(var(--half))}
+  .cubie i.ny{transform:rotateX(-90deg) translateZ(var(--half))}
+  .cubie i.pz{transform:translateZ(var(--half))}
+  .cubie i.nz{transform:rotateY(180deg) translateZ(var(--half))}
+
+  .panel{width:322px;flex:none;background:var(--panel);border-left:1px solid var(--line);
+         overflow-y:auto;padding:16px 16px 40px}
+  .panel::-webkit-scrollbar{width:10px}
+  .panel::-webkit-scrollbar-thumb{background:var(--scroll);border-radius:6px;border:2px solid var(--panel)}
+  .sec{margin-bottom:20px}
+  .sec > h2{margin:0 0 9px;font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;
+            color:var(--muted);font-weight:600}
+
+  .scope{display:flex;gap:6px}
+  .scope button{flex:1;height:32px;border-radius:8px;cursor:pointer;font:inherit;font-size:12.5px;
+                background:var(--field);border:1px solid var(--line);color:var(--muted);transition:.12s}
+  .scope button:hover{color:var(--text);border-color:var(--line-strong)}
+  .scope button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+
+  .qid{font:600 22px/1.2 ui-monospace,Menlo,Consolas,monospace;
+       text-align:center;margin:4px 0 2px;letter-spacing:.02em}
+  .qhint{text-align:center;color:var(--muted);font-size:12.5px;margin-bottom:12px}
+
+  .act{display:flex;gap:8px}
+  .act button{flex:1;height:34px;border-radius:8px;cursor:pointer;font:inherit;font-size:12.5px;
+              background:var(--field);border:1px solid var(--line);color:var(--text);transition:.12s}
+  .act button:hover{border-color:var(--accent);color:var(--accent);background:var(--field-hover)}
+  .act button.main{background:var(--accent);border-color:var(--accent);color:#fff}
+  .act button.main:hover{filter:brightness(1.08);color:#fff}
+
+  .ans{display:none;margin-top:14px;padding:11px 12px;border-radius:9px;
+       background:var(--field);border:1px solid var(--line)}
+  .ans.on{display:block}
+  .ans .lb{color:var(--muted);font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;
+           margin-bottom:6px}
+  .ans code{font:13px/1.6 ui-monospace,Menlo,Consolas,monospace;word-break:break-all}
+  .playtip{margin-top:8px;color:var(--muted);font-size:12px}
+
+  @media (max-width:760px){
+    .app{flex-direction:column}
+    .panel{width:auto;border-left:none;border-top:1px solid var(--line);max-height:52vh}
+    .stage{min-height:38vh}
+  }
+  @media print{ .themebtn,.panel{display:none} }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <main class="stage" id="stage">
+    <button class="themebtn" id="themebtn" type="button" title="切到夜晚">☾</button>
+    <div class="cube" id="cube"></div>
+  </main>
+
+  <aside class="panel">
+    <section class="sec">
+      <h2>范围</h2>
+      <div class="scope" id="scope">
+        <button data-scope="f2l" type="button">F2L</button>
+        <button data-scope="oll" type="button">OLL</button>
+        <button data-scope="pll" type="button">PLL</button>
+      </div>
+    </section>
+
+    <section class="sec">
+      <h2>题目</h2>
+      <div class="qid" id="qid">—</div>
+      <div class="qhint">拿拼好的魔方做这个情况的公式<br>做完应当得到左边的图形</div>
+      <div class="act">
+        <button id="next" type="button">换一题</button>
+        <button id="reveal" class="main" type="button">看答案</button>
+      </div>
+      <div class="ans" id="ans">
+        <div class="lb">表里那条公式</div>
+        <code id="ansalg"></code>
+        <div class="playtip">已从复原态播了一遍 —— 对着它核对你的结果</div>
+      </div>
+    </section>
+  </aside>
+</div>
+
+<script src="cubesim.js"></script>
+<script src="alglist.js"></script>
+<script src="nav.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  // 配色与计算器一致：F 面红
+  var COLOR = { U: '#FFE600', D: '#F4F4F4', F: '#C41E3A',
+                B: '#FF8C1A', R: '#00A651', L: '#0051BA' };
+  var DUR = 340;
+
+  // 整体旋转在 CSS 里绕哪根轴、正向多少度（模型 y 朝上、CSS y 朝下，差一次镜像）
+  var M3 = {
+    U: ['Y', -90, function (p) { return p[1] === 1; }],
+    D: ['Y',  90, function (p) { return p[1] === -1; }],
+    R: ['X',  90, function (p) { return p[0] === 1; }],
+    L: ['X', -90, function (p) { return p[0] === -1; }],
+    F: ['Z',  90, function (p) { return p[2] === 1; }],
+    B: ['Z', -90, function (p) { return p[2] === -1; }],
+    M: ['X', -90, function (p) { return p[0] === 0; }],
+    E: ['Y',  90, function (p) { return p[1] === 0; }],
+    S: ['Z',  90, function (p) { return p[2] === 0; }],
+    r: ['X',  90, function (p) { return p[0] >= 0; }],
+    l: ['X', -90, function (p) { return p[0] <= 0; }],
+    u: ['Y', -90, function (p) { return p[1] >= 0; }],
+    d: ['Y',  90, function (p) { return p[1] <= 0; }],
+    f: ['Z',  90, function (p) { return p[2] >= 0; }],
+    b: ['Z', -90, function (p) { return p[2] <= 0; }],
+    x: ['X',  90, function () { return true; }],
+    y: ['Y', -90, function () { return true; }],
+    z: ['Z',  90, function () { return true; }]
+  };
+  var NCLS = { '1,0,0': 'px', '-1,0,0': 'nx', '0,1,0': 'py',
+               '0,-1,0': 'ny', '0,0,1': 'pz', '0,0,-1': 'nz' };
+  var NALL = ['1,0,0', '-1,0,0', '0,1,0', '0,-1,0', '0,0,1', '0,0,-1'];
+
+  var stageEl = document.getElementById('stage');
+  var cubeEl = document.getElementById('cube');
+  var view = { x: -24, y: -32 };
+  var CS = 46;
+  var busy = false;
+
+  function byPos(state) {
+    var out = {};
+    for (var k in state) {
+      if (!state.hasOwnProperty(k)) continue;
+      var parts = k.split('|');
+      (out[parts[0]] = out[parts[0]] || {})[parts[1]] = state[k];
+    }
+    return out;
+  }
+  function cubieHTML(faces) {
+    return NALL.map(function (n) {
+      var col = faces[n];
+      if (!col) return '<i class="' + NCLS[n] + '"></i>';
+      return '<i class="on ' + NCLS[n] + '" style="--c:' + COLOR[col] + '"></i>';
+    }).join('');
+  }
+  function paint(state) {
+    var map = byPos(state);
+    cubeEl.innerHTML = Object.keys(map).map(function (pos) {
+      var p = pos.split(',').map(Number);
+      return '<div class="cubie" data-pos="' + pos + '" style="transform:translate3d(' +
+             (p[0] * CS) + 'px,' + (-p[1] * CS) + 'px,' + (p[2] * CS) + 'px)">' +
+             cubieHTML(map[pos]) + '</div>';
+    }).join('');
+    applyView();
+  }
+  function applyView() {
+    cubeEl.style.transform = 'rotateX(' + view.x + 'deg) rotateY(' + view.y + 'deg)';
+  }
+  function fit() {
+    var w = stageEl.clientWidth, h = stageEl.clientHeight;
+    if (!w || !h) return;
+    CS = Math.max(12, Math.min(w, h) / 6.15);
+    cubeEl.style.setProperty('--cs', CS + 'px');
+    cubeEl.style.setProperty('--half', (CS / 2) + 'px');
+  }
+
+  function animate(step, done) {
+    var cfg = M3[step.mv];
+    if (!cfg) { done(); return; }
+    var ax = cfg[0], base = cfg[1], inLayer = cfg[2];
+    var deg = base * step.times;
+    var dur = DUR * Math.abs(deg) / 90;
+    var layer = document.createElement('div');
+    layer.className = 'layer';
+    var moving = [];
+    Array.prototype.forEach.call(cubeEl.querySelectorAll('.cubie'), function (el) {
+      var p = el.dataset.pos.split(',').map(Number);
+      if (inLayer(p)) moving.push(el);
+    });
+    layer.style.transition = 'transform ' + dur + 'ms cubic-bezier(.34,.86,.32,1)';
+    layer.style.transform = 'rotate' + ax + '(0deg)';
+    cubeEl.appendChild(layer);
+    moving.forEach(function (el) { layer.appendChild(el); });
+    void layer.offsetWidth;
+    layer.style.transform = 'rotate' + ax + '(' + deg + 'deg)';
+    var finished = false;
+    function finish() { if (finished) return; finished = true; done(); }
+    layer.addEventListener('transitionend', finish);
+    setTimeout(finish, dur + 80);
+  }
+
+  /* ---------- 题目 ---------- */
+  var scope = 'oll', cur = null;
+
+  function pick() {
+    var list = (typeof ALG_LIST !== 'undefined' && ALG_LIST[scope]) || [];
+    if (!list.length) return;
+    var r = list[Math.floor(Math.random() * list.length)];
+    // 目标图形 = 从【复原态】执行这条公式的结果 ——
+    // 用户手里是拼好的魔方，做完得到的正是这个
+    cur = { id: r[0], alg: r[1], state: CubeSim.apply(CubeSim.solved(), r[1]) };
+    document.getElementById('qid').textContent = scope.toUpperCase() + ' ' + r[0];
+    document.getElementById('ans').classList.remove('on');
+    document.getElementById('ansalg').textContent = '';
+    paint(cur.state);
+  }
+
+  function reveal() {
+    if (!cur || busy) return;
+    document.getElementById('ansalg').textContent = cur.alg;
+    document.getElementById('ans').classList.add('on');
+    // 从复原态一步步播一遍，方便对着核对自己手上的结果
+    busy = true;
+    var list = CubeSim.steps(cur.alg);
+    var st = CubeSim.solved();
+    paint(st);
+    var i = 0;
+    (function next() {
+      if (i >= list.length) { busy = false; paint(cur.state); return; }
+      var mv = list[i++];
+      animate(mv, function () {
+        st = CubeSim.turn(CubeSim.clone(st), mv.mv, mv.times);
+        paint(st);
+        next();
+      });
+    })();
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll('#scope button'), function (b) {
+    b.addEventListener('click', function () {
+      if (busy) return;
+      scope = b.dataset.scope;
+      Array.prototype.forEach.call(document.querySelectorAll('#scope button'), function (o) {
+        o.classList.toggle('on', o === b);
+      });
+      pick();
+    });
+  });
+  document.getElementById('next').addEventListener('click', function () { if (!busy) pick(); });
+  document.getElementById('reveal').addEventListener('click', reveal);
+
+  /* 拖拽转视角 */
+  var drag = null;
+  stageEl.addEventListener('pointerdown', function (e) {
+    if (e.target.closest && e.target.closest('.themebtn')) return;
+    drag = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y };
+    stageEl.classList.add('drag');
+    if (stageEl.setPointerCapture) stageEl.setPointerCapture(e.pointerId);
+  });
+  stageEl.addEventListener('pointermove', function (e) {
+    if (!drag) return;
+    view.x = Math.max(-88, Math.min(88, drag.vx - (e.clientY - drag.y) * 0.55));
+    view.y = drag.vy + (e.clientX - drag.x) * 0.55;
+    applyView();
+  });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (ev) {
+    stageEl.addEventListener(ev, function () { drag = null; stageEl.classList.remove('drag'); });
+  });
+  window.addEventListener('resize', fit);
+
+  /* 夜晚模式 */
+  var root = document.documentElement, btn = document.getElementById('themebtn');
+  function applyTheme(t) {
+    root.dataset.theme = t;
+    btn.textContent = t === 'dark' ? '\u2600' : '\u263e';
+    btn.title = t === 'dark' ? '切到白天' : '切到夜晚';
+    try { localStorage.setItem('cube-theme', t); } catch (e) {}
+  }
+  var saved = null;
+  try { saved = localStorage.getItem('cube-theme'); } catch (e) {}
+  applyTheme(saved === 'dark' ? 'dark' : 'light');
+  btn.addEventListener('click', function () {
+    applyTheme(root.dataset.theme === 'dark' ? 'light' : 'dark');
+  });
+
+  fit();
+  Array.prototype.forEach.call(document.querySelectorAll('#scope button'), function (o) {
+    o.classList.toggle('on', o.dataset.scope === scope);
+  });
+  pick();
+})();
+</script>
+</body>
+</html>

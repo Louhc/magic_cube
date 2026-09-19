@@ -15,6 +15,7 @@
     ['index.html',  '首页'],
     ['editor.html', '编辑器'],
     ['calc.html',   '计算器'],
+    ['practice.html', '练习'],
     ['f2l.html',    'F2L 公式', 1],
     ['oll.html',    'OLL 公式', 1],
     ['pll.html',    'PLL 公式', 1]

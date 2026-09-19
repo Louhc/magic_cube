@@ -351,6 +351,74 @@ console.log('\n[11] 动画转的角度必须和这一步实际转的角度一致
   ok('时长按角度缩放', /var dur = DUR \* Math\.abs\(deg\) \/ 90/.test(html));
 }
 
+console.log('\n[13] 练习页：显示的图形必须是「从复原态执行该公式」的结果');
+{
+  // 这是整页的核心语义：用户手里是拼好的魔方，做完公式应当得到这个图形。
+  // 所以题目图形 = apply(solved, 公式)，
+  // 而不是公式表里那张「待解局面」图（两者互为逆）。
+  const html = fs.readFileSync(path.join(__dirname, '..', 'practice.html'), 'utf8');
+  ok('练习页有 F2L/OLL/PLL 三个范围',
+    ['f2l', 'oll', 'pll'].every(k => html.includes('data-scope="' + k + '"')));
+  ok('题目图形取自 apply(solved, 公式)',
+    /CubeSim\.apply\(CubeSim\.solved\(\), r\[1\]\)/.test(html), '不是从复原态算的');
+  ok('看答案会从复原态播一遍',
+    /function reveal\(\)/.test(html) && /var st = CubeSim\.solved\(\);/.test(html));
+  ok('导航里有练习页',
+    /\['practice\.html'/.test(fs.readFileSync(path.join(__dirname, '..', 'nav.js'), 'utf8')));
+
+  const vm5 = require('vm');
+  const mk = (t) => ({ tagName: t, children: [], style: {}, dataset: {},
+    classList: { _s: new Set(), add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); },
+      toggle(c, v) { v === undefined ? (this._s.has(c) ? this._s.delete(c) : this._s.add(c)) : (v ? this._s.add(c) : this._s.delete(c)); },
+      contains(c) { return this._s.has(c); } },
+    _h: {}, addEventListener(ev, fn) { (this._h[ev] = this._h[ev] || []).push(fn); },
+    appendChild(c) { this.children.push(c); return c; },
+    querySelectorAll() { return []; }, querySelector() { return null; },
+    setPointerCapture() {}, closest() { return null; }, offsetWidth: 1,
+    set innerHTML(v) { this._hh = v; }, get innerHTML() { return this._hh || ''; },
+    set textContent(v) { this._t = v; }, get textContent() { return this._t === undefined ? '' : this._t; } });
+  const els5 = { cube: mk('div'), stage: mk('div') };
+  const scopeBtns = ['f2l', 'oll', 'pll'].map(k => { const b = mk('button'); b.dataset.scope = k; return b; });
+  const ctx5 = { console, navigator: {}, window: { addEventListener() {} },
+    setTimeout, clearTimeout, localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
+    CubeSim: S, location: { hash: '' },
+    document: { getElementById: id => els5[id] || (els5[id] = mk('div')),
+                querySelectorAll: sel => sel === '#scope button' ? scopeBtns : [],
+                documentElement: mk('html'), createElement: mk,
+                body: { appendChild() {} }, addEventListener() {} } };
+  ctx5.globalThis = ctx5;
+  vm5.createContext(ctx5);
+  vm5.runInContext(fs.readFileSync(path.join(__dirname, '..', 'alglist.js'), 'utf8'), ctx5);
+  const page = html.match(/<script>([\s\S]*?)<\/script>/g).map(x => x.replace(/<\/?script>/g, ''))
+    .filter(x => x.includes('M3'))[0];
+  let err5 = null;
+  try { vm5.runInContext(page, ctx5); } catch (e) { err5 = e; }
+  ok('练习页脚本能跑通', !err5, err5 && err5.message);
+  if (!err5) {
+    ok('抽到题了（题号不是占位符）', els5.qid.textContent !== '\u2014', els5.qid.textContent);
+    const C5 = {};
+    for (const x of html.match(/var COLOR = \{([^}]+)\}/)[1].matchAll(/([UDFBRL]):\s*'(#[0-9A-Fa-f]{6})'/g)) {
+      C5[x[2].toUpperCase()] = x[1];
+    }
+    const N5 = { px: '1,0,0', nx: '-1,0,0', py: '0,1,0', ny: '0,-1,0', pz: '0,0,1', nz: '0,0,-1' };
+    const got5 = {};
+    for (const m of els5.cube.innerHTML.matchAll(/data-pos="([^"]+)"[^>]*>([\s\S]*?)<\/div>/g)) {
+      for (const x of m[2].matchAll(/class="on (\w+)"[^>]*--c:(#[0-9A-Fa-f]{6})/g)) {
+        got5[m[1] + '|' + N5[x[1]]] = C5[x[2].toUpperCase()];
+      }
+    }
+    const parts = els5.qid.textContent.split(' ');
+    const row = ctx5.ALG_LIST[parts[0].toLowerCase()].find(r => r[0] === parts[1]);
+    // sameState 定义在 [12] 的块作用域里，这里自己比
+    const eqState = (a, b) => {
+      const ka = Object.keys(a).sort(), kb = Object.keys(b).sort();
+      return ka.length === kb.length && ka.every((k, i) => k === kb[i] && a[k] === b[k]);
+    };
+    ok('画出来的就是 apply(solved, 公式)（题目 ' + els5.qid.textContent + '）',
+      !!row && eqState(got5, S.apply(S.solved(), row[1])), JSON.stringify(got5).slice(0, 60));
+  }
+}
+
 console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
 {
   // 这一节要跑动画，所以是异步的：末尾再汇总退出。
