@@ -617,6 +617,58 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
       /function jump\(k\)[\s\S]*?paint\(frames\[at\]\)/.test(src2) &&
       !/function jump\(k\)[\s\S]{0,120}animate\(/.test(src2));
 
+    // ---- 离开页面再回来，保住现场 ----
+    ok('会把状态存进 localStorage', /localStorage\.setItem\(STORE/.test(src2) &&
+      /var STORE = 'calc-state-v1'/.test(src2));
+    ok('启动时尝试恢复', /var d = loadSaved\(\)/.test(src2));
+    ok('复原会清掉存档', /localStorage\.removeItem\(STORE\)/.test(src2));
+    {
+      // 用一个真会存取的 localStorage 桩，预置一份存档，看能否恢复
+      const vm4 = require('vm');
+      const store = {};
+      const saved = {
+        cur: S.apply(S.solved(), "R U R' U' F"),
+        hist: [{ kind: 'alg', alg: "R U R' U' F", rev: false }],
+        alg: "R U R' U' F",
+        steps: [{ mv: 'R', times: 1 }],
+        base: S.solved()
+      };
+      store['calc-state-v1'] = JSON.stringify(saved);
+      const els4 = { alg: mkEl('input', '') };
+      els4.cube = mkEl('div');
+      const ctx4 = { console, navigator: {}, window: { addEventListener() {} },
+        setTimeout, clearTimeout,
+        localStorage: { getItem: k => (k in store ? store[k] : null),
+                       setItem: (k, v) => { store[k] = String(v); },
+                       removeItem: k => { delete store[k]; } },
+        CubeSim: S, location: { hash: '' },
+        document: { getElementById: id => els4[id] || (els4[id] = mkEl('div')),
+                    querySelectorAll: () => [],
+                    documentElement: mkEl('html'), createElement: mkEl,
+                    body: { appendChild() {} }, addEventListener() {} } };
+      ctx4.globalThis = ctx4;
+      vm4.createContext(ctx4);
+      vm4.runInContext(fs.readFileSync(path.join(__dirname, '..', 'alglist.js'), 'utf8'), ctx4);
+      vm4.runInContext(src, ctx4);
+      ok('回来时输入框恢复了', els4.alg.value === "R U R' U' F", els4.alg.value);
+      ok('回来时历史恢复了', String(els4.hcount.textContent) === '1', els4.hcount.textContent);
+      // 画面上的贴纸应当等于存档里的局面
+      const C3 = {};
+      for (const x of fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')
+               .match(/var COLOR = \{([^}]+)\}/)[1].matchAll(/([UDFBRL]):\s*'(#[0-9A-Fa-f]{6})'/g)) {
+        C3[x[2].toUpperCase()] = x[1];
+      }
+      const N3 = { px: '1,0,0', nx: '-1,0,0', py: '0,1,0', ny: '0,-1,0', pz: '0,0,1', nz: '0,0,-1' };
+      const got4 = {};
+      for (const m of els4.cube.innerHTML.matchAll(/data-pos="([^"]+)"[^>]*>([\s\S]*?)<\/div>/g)) {
+        for (const x of m[2].matchAll(/class="on (\w+)"[^>]*--c:(#[0-9A-Fa-f]{6})/g)) {
+          got4[m[1] + '|' + N3[x[1]]] = C3[x[2].toUpperCase()];
+        }
+      }
+      ok('回来时魔方局面恢复了', sameState(got4, saved.cur),
+        JSON.stringify(got4).slice(0, 50));
+    }
+
     // 打乱放在最后：22 步要播约 9 秒，放在前面会把后面的提交全挡在 busy 外面
     els.scramble.fire('click');
     await wait(120);

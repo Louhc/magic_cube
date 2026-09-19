@@ -361,6 +361,29 @@
     }).join('') : '';
   }
 
+  /* 离开页面再回来（导航点是普通链接，会重新加载）时保住现场：
+     存当前局面、历史、输入框，以及最近一次提交的步骤和它的起始局面 ——
+     这样连「步骤条」的位置都能恢复（frames 由 base + steps 重算）。 */
+  var STORE = 'calc-state-v1';
+  function saveState() {
+    try {
+      localStorage.setItem(STORE, JSON.stringify({
+        cur: cur, hist: hist, alg: algEl.value,
+        steps: steps, base: frames[0] || cur
+      }));
+    } catch (e) {}
+  }
+  function loadSaved() {
+    var raw = null;
+    try { raw = localStorage.getItem(STORE); } catch (e) { return null; }
+    if (!raw) return null;
+    try {
+      var d = JSON.parse(raw);
+      if (!d || !d.cur || typeof d.cur !== 'object') return null;
+      return d;
+    } catch (e) { return null; }
+  }
+
   function esc(t) {
     return String(t).replace(/[&<>]/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c];
@@ -522,6 +545,7 @@
     if (pi) pi.textContent = playing ? '\u23f8' : '\u25b7';
     document.getElementById('scramble').disabled = lock;
     document.getElementById('reset').disabled = lock;
+    saveState();
   }
 
   function renderHist() {
@@ -608,6 +632,7 @@
     if (pausedFirst()) return;
     if (busy) return;
     playing = false;
+    try { localStorage.removeItem(STORE); } catch (e) {}
     hist = [];
     steps = [];
     frames = [CubeSim.solved()];
@@ -794,7 +819,27 @@
   });
 
   fit();
-  reset();
+
+  // 有存档就恢复现场，否则从头开始
+  (function () {
+    var d = loadSaved();
+    if (!d) { reset(); return; }
+    cur = d.cur;
+    hist = Array.isArray(d.hist) ? d.hist : [];
+    algEl.value = typeof d.alg === 'string' ? d.alg : '';
+    steps = Array.isArray(d.steps) ? d.steps : [];
+    frames = [d.base || cur];
+    steps.forEach(function (x) {
+      frames.push(CubeSim.turn(CubeSim.clone(frames[frames.length - 1]), x.mv, x.times));
+    });
+    at = frames.length - 1;
+    movesEl.innerHTML = steps.map(function (x, i) {
+      return '<span data-k="' + (i + 1) + '">' + mvLabel(x) + '</span>';
+    }).join('');
+    paint(cur);
+    renderHist();
+    chrome();
+  })();
 
   // 公式表里的「↗ 在计算器里打开」会把公式放在 URL hash 里带过来
   // （用 hash 而不是查询串：file:// 下也能用）
