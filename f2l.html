@@ -194,8 +194,10 @@ function formulas(text) {
 }
 function pic(name, alt) {
   if (!name) return '<td class="empty"></td>';
+  // 角标去掉前导 0（01a -> 1a）；文件名不能动，磁盘上就叫 01a
+  var label = name.replace(/^0+/, '');
   return '<td class="pic"><span class="box"><img src="' + IMG(name) + '" alt="' +
-         esc(alt) + '" loading="lazy"><span class="no">' + esc(name) +
+         esc(alt) + '" loading="lazy"><span class="no">' + esc(label) +
          '</span></span></td>';
 }
 

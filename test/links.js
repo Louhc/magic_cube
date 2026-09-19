@@ -88,5 +88,19 @@ console.log('\n[7] 三个公式页都有分节计数与编号角标');
   });
 }
 
+console.log('\n[8] F2L 角标：显示去掉前导 0，文件名不动');
+{
+  // 角标是给人看的、文件名是给磁盘的，两者不能一起改 ——
+  // 所以这里同时盯住「角标没有 0 开头」和「文件名仍带 0」。
+  const h = fs.readFileSync(path.join(ROOT, 'f2l.html'), 'utf8');
+  ok('角标做了去前导 0', /name\.replace\(\/\^0\+\//.test(h));
+  ok('文件名仍用原名（未被去 0 波及）', /IMG\(name\)/.test(h));
+  const imgs = fs.readdirSync(path.join(ROOT, 'f2l'))
+    .filter(f => f.endsWith('.png'));
+  ok('磁盘上仍是 01a 这种命名（' + imgs.length + ' 张）',
+    imgs.includes('f2l-01a-512x515.png') && imgs.includes('f2l-21b-512x515.png'),
+    imgs.slice(0, 3).join(','));
+}
+
 console.log('\n结果: ' + pass + ' 通过, ' + fail + ' 失败');
 process.exit(fail ? 1 : 0);
