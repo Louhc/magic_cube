@@ -530,13 +530,14 @@ console.log('\n[13] 练习页：显示的图形必须是「从复原态执行该
     // 洗牌袋：切到 PLL（21 题）连点 20 次，应把 21 题各出一次、无一重复
     (scopeBtns[2]._h.click || []).forEach(function (f) { f({}); });
     const seen = [els5.qid.textContent];
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 21; i++) {          // 21 次 + 初始那道 = 22 条
       (els5.next._h.click || []).forEach(function (f) { f({}); });
       seen.push(els5.qid.textContent);
     }
+    // PLL 现在有 22 条（Z 收了两条写法），所以按题库实际条数断言
     ok('一轮内不重复出题（连出 ' + seen.length + ' 题）',
       new Set(seen).size === seen.length, seen.join(' '));
-    ok('一轮覆盖整个范围（21 题）', new Set(seen).size === 21, String(new Set(seen).size));
+    ok('一轮覆盖整个题库（22 条）', seen.length === 22, String(seen.length));
     (els5.next._h.click || []).forEach(function (f) { f({}); });
     ok('换轮时不紧接着重复上一题', els5.qid.textContent !== seen[seen.length - 1],
       seen[seen.length - 1] + ' -> ' + els5.qid.textContent);

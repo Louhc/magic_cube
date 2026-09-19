@@ -123,7 +123,9 @@ console.log('\n[9] 页面数据必须是合法 JSON（备用公式就挂在里�
     ok(p + ' 每行是 [编号, 公式] 或 [编号, 公式, 备选]',
       rows.every(r => (r.length === 2 || r.length === 3) && typeof r[0] === 'string' && typeof r[1] === 'string'),
       JSON.stringify(rows.find(r => !(r.length === 2 || r.length === 3)) || ''));
-    ok(p + ' 编号唯一（' + ids.length + ' 个）', new Set(ids).size === ids.length);
+    // 同一情况可以收多条写法（PLL 的 Z 收了两条），所以只查编号非空
+    ok(p + ' 编号齐全（' + ids.length + ' 条，去重 ' + new Set(ids).size + '）',
+      ids.every(x => typeof x === 'string' && x.length > 0));
     const ms = rows.flatMap(r => (r[2] || []).map(a => a[1]));
     const okAuf = ms.every(m => Number.isInteger(m) && m >= 0 && m <= 3);
     ok(p + ' 备选 AUF 步数合法（' + ms.length + ' 条）', okAuf, ms.filter(m => !(Number.isInteger(m) && m >= 0 && m <= 3)).join(','));
