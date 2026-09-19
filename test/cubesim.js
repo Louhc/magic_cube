@@ -713,9 +713,14 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
       /overflow:hidden/.test(src2) && /\.picker > \.inner\{width:300px/.test(src2));
     ok('列表项带缩略图', /function thumb\(kind, id\)/.test(src2) && /<img src="' \+ thumb/.test(src2));
     // 只填入、不执行 —— 让用户自己确认方向再按
+    // F2L 的 b 版要以绿面为 F —— 选到它时视角也要跟着转
+    ok('公式行带编号（才能区分 a/b）', /data-id="' \+ esc\(r\[0\]\)/.test(src2));
+    ok('选到 b 版时切到绿面视角',
+      /pickKind === 'f2l' && \/b\$\/\.test\(el\.dataset\.id/.test(src2) &&
+      /view\.y = VIEW\.y \+ \(isB \? -90 : 0\)/.test(src2));
     ok('点某一条只填入输入框',
-      /algEl\.value = el\.dataset\.alg;\s*algEl\.focus\(\)/.test(src2) &&
-      !/algEl\.value = el\.dataset\.alg;\s*submit/.test(src2));
+      /algEl\.value = el\.dataset\.alg;[\s\S]{0,400}?algEl\.focus\(\)/.test(src2) &&
+      !/algEl\.value = el\.dataset\.alg;[\s\S]{0,400}?submit\('alg'/.test(src2));
     // 共享数据必须和三个公式表一致 —— 否则面板会显示过期的公式
     {
       const vm3 = require('vm');

@@ -363,7 +363,10 @@
   var steps = [], frames = [], at = 0;   // 最近一次提交的步骤与各阶段局面
   var cur = CubeSim.solved();            // 当前局面（累积的）
   var hist = [];                         // 历史：{kind:'alg'|'scramble', alg}
-  var view = { x: -24, y: -32 };         // 观察角度，可拖动
+  // 观察角度（可拖动）。F2L 的 b 版是「绿色为 F 面」，
+  // 选到它时要把绿面转到左可见位，否则公式的 L/U 等动作会与看到的面对不上。
+  var VIEW = { x: -24, y: -32 };
+  var view = { x: VIEW.x, y: VIEW.y };
   var busy = false;                      // 播放中不接受新操作
   var playing = false;                   // 是否在自动连播
   var epoch = 0;                         // 跳转时 +1，用来作废进行中的那一步
@@ -381,7 +384,7 @@
   var openBtn = document.getElementById('openpick');
   function renderPick() {
     pickEl.innerHTML = pickKind ? (ALG_LIST[pickKind] || []).map(function (r) {
-      return '<div class="p" data-alg="' + esc(r[1]) + '">' +
+      return '<div class="p" data-alg="' + esc(r[1]) + '" data-id="' + esc(r[0]) + '">' +
              '<img src="' + thumb(pickKind, r[0]) + '" alt="" loading="lazy">' +
              '<b>' + esc(r[0]) + '</b><code>' + esc(r[1]) + '</code></div>';
     }).join('') : '';
@@ -788,6 +791,11 @@
     if (pausedFirst() || busy) return;
     // 只填入，不执行 —— 让用户自己确认方向（正向/反向）再按
     algEl.value = el.dataset.alg;
+    // b 版按绿面朝前看（-90 度，已用投影算过：默认时红面左可见，转后绿面左可见）
+    var isB = (pickKind === 'f2l' && /b$/.test(el.dataset.id || ''));
+    view.x = VIEW.x;
+    view.y = VIEW.y + (isB ? -90 : 0);
+    applyView();
     algEl.focus();
   });
 
