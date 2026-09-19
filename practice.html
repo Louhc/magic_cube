@@ -177,9 +177,11 @@
 
   var stageEl = document.getElementById('stage');
   var cubeEl = document.getElementById('cube');
-  // 展示一律以红色面为 F（和公式表 a 列同一朝向）。
-  // 注意「执行」是另一回事：b 版公式按绿面为 F 写的，
-  // 那个在计算器里选到 b 版公式时会把绿面转过来（见 calc.html）。
+  // F2L 表里 a 列是「红色为 F 面」、b 列是「绿色为 F 面」。
+  // 立体魔方必须和面板里那张缩略图同朝向，否则两者镜像、没法对照：
+  //   a 版 -> 默认视角（红面在左可见位）
+  //   b 版 -> 绕竖轴转 -90 度（绿面在左可见位）
+  // 角度是算出来的：默认时 F(红) 左可见、R(绿) 右可见；转 -90 后 R(绿) 左可见。
   var VIEW = { x: -24, y: -32 };
   var view = { x: VIEW.x, y: VIEW.y };
   var CS = 46;
@@ -292,8 +294,10 @@
     // 目标图形 = 从【复原态】执行这条公式的结果 ——
     // 用户手里是拼好的魔方，做完得到的正是这个
     cur = { id: r[0], alg: r[1], state: CubeSim.apply(CubeSim.solved(), r[1]) };
+    // b 版把绿面转到前面来，和缩略图对齐
+    var greenFront = (scope === 'f2l' && /b$/.test(r[0]));
     view.x = VIEW.x;
-    view.y = VIEW.y;
+    view.y = VIEW.y + (greenFront ? -90 : 0);
     document.getElementById('qid').textContent = scope.toUpperCase() + ' ' + r[0];
     var img = document.getElementById('qimg');
     img.src = thumbOf(scope, r[0]);

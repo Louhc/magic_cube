@@ -440,8 +440,9 @@ console.log('\n[13] 练习页：显示的图形必须是「从复原态执行该
         else if (!sawA) sawA = t;
         (els8.next._h.click || []).forEach(f => f({}));
       }
-      ok('展示时 a 版红面朝前（rotateY -32）', /rotateY\(-32deg\)/.test(sawA || ''), String(sawA));
-      ok('展示时 b 版也是红面朝前（rotateY -32）', /rotateY\(-32deg\)/.test(sawB || ''), String(sawB));
+      // a 列红面为 F、b 列绿面为 F —— 立体魔方要和各自的缩略图同朝向
+      ok('a 版红面朝前（rotateY -32）', /rotateY\(-32deg\)/.test(sawA || ''), String(sawA));
+      ok('b 版绿面朝前（rotateY -122）', /rotateY\(-122deg\)/.test(sawB || ''), String(sawB));
     }
 
     // 范围选择要持久化
