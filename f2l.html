@@ -53,10 +53,6 @@
   code:hover{background:var(--field)}
   code.copied{background:var(--accent);color:#fff}
 
-  .note{margin:26px 0 0;color:var(--muted);font-size:12px;line-height:1.8}
-  .note code{cursor:auto;font-size:12px}
-  .note code:hover{background:none}
-
   /* 复制提示 */
   #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(12px);
          background:#111a;color:#fff;padding:8px 16px;border-radius:8px;font-size:13px;
@@ -86,7 +82,6 @@
 
 <main id="app"></main>
 
-<p class="note" id="note"></p>
 <div id="toast"></div>
 
 <script>
@@ -187,7 +182,6 @@ function pic(name, alt) {
 }
 
 var html = '';
-var total = 0;
 SECTIONS.forEach(function (sec) {
   html += '<section><h2>' + esc(sec.title) + '</h2><table>' +
           '<colgroup><col class="side"><col class="formula">' +
@@ -197,8 +191,6 @@ SECTIONS.forEach(function (sec) {
           '<th class="green">绿色为 F 面</th><th>公式</th>' +
           '</tr></thead><tbody>';
   sec.rows.forEach(function (r) {
-    if (r.a) total++;
-    if (r.b) total++;
     html += '<tr>' +
       pic(r.a, r.af) + '<td class="f">' + formulas(r.af) + '</td>' +
       pic(r.b, r.bf) + '<td class="f">' + formulas(r.bf) + '</td>' +
@@ -207,11 +199,6 @@ SECTIONS.forEach(function (sec) {
   html += '</tbody></table></section>';
 });
 document.getElementById('app').innerHTML = html;
-document.getElementById('note').innerHTML =
-  '共 ' + SECTIONS.length + ' 节、' + total + ' 个情况，图片来自 <code>f2l/</code> 目录。' +
-  '公式按原表誊录 —— 原表中的 <code>U\'2</code>、<code>L\'2</code> 这类写法也照原样保留' +
-  '（通常记作 <code>U2</code> / <code>L2</code>）。';
-
 /* 点公式复制 */
 var toastEl = document.getElementById('toast'), toastTimer = null;
 function toast(msg) {
