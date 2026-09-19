@@ -138,7 +138,7 @@ console.log('\n[5] 真跑一遍 calc.html 的脚本（DOM 桩）');
   const got = {};
   for (const m of html.matchAll(/data-pos="([^"]+)"[^>]*>([\s\S]*?)<\/div>/g)) {
     got[m[1]] = {};
-    for (const x of m[2].matchAll(/class="on (\w+)"[^>]*background:(#[0-9A-Fa-f]{6})/g)) {
+    for (const x of m[2].matchAll(/class="on (\w+)"[^>]*--c:(#[0-9A-Fa-f]{6})/g)) {
       got[m[1]][N2[x[1]]] = x[2];
     }
   }
@@ -290,6 +290,27 @@ console.log('\n[9] 布局：和编辑器一样（左边画布铺满，操作区�
   ok('魔方投影后不超过舞台的 ' + Math.round(spanX * 100) + '%（宽）/ ' +
      Math.round(spanY * 100) + '%（高）', spanX <= 0.8 && spanY <= 0.8,
      'div=' + div);
+}
+
+console.log('\n[10] 方块必须是实心的（不能有镂空感）');
+{
+  // 这是为一个观感问题加的：原来把贴纸直接当成方块的六个面，
+  // 贴纸是圆角方形，六个圆角面在角上拼不严 -> 角上留孔 -> 看着是镂空的。
+  // 真实魔方是「实心塑料方块 + 贴在上面的圆角贴纸」，所以：
+  //   1. 面本体近乎方角（圆角必须小），拼起来才严实
+  //   2. 面本体必须有实心背景色（不能透出背景）
+  //   3. 贴纸是叠加层（::after），不是面本身
+  const html = fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8');
+  const body = html.match(/\.cubie i\{([^}]*)\}/);
+  ok('面的样式能读到', !!body);
+  const css = body ? body[1] : '';
+  ok('面本体是实心的（有 background）', /background:var\(--cubie\)/.test(css), css);
+  const r = css.match(/border-radius:calc\(var\(--cs\) \* ([\d.]+)\)/);
+  const rad = r ? +r[1] : 1;
+  ok('面本体圆角足够小（' + rad + ' <= 0.06），角上拼得严',
+    rad <= 0.06, '圆角系数 ' + rad + ' 太大，角上会露孔');
+  ok('贴纸是叠加层（::after）而不是面本身', /\.cubie i\.on::after\{/.test(html));
+  ok('贴纸色通过 --c 传入', /style="--c:' \+ COLOR\[col\]/.test(html));
 }
 
 console.log('\n结果: ' + pass + ' 通过, ' + fail + ' 失败');
