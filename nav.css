@@ -1,0 +1,35 @@
+/* 顶部导航条 —— 五个页面共用。
+   标记由 nav.js 注入，这里只管样子。
+   颜色一律取各页已有的 CSS 变量（编辑器是深色、表格页是浅色），所以导航条
+   会自动跟随当前页的主题，不需要额外配置。变量名不统一的地方给了兜底值。 */
+
+:root{ --nav-h: 42px; }
+
+.topnav{
+  display:flex; align-items:center; gap:12px;
+  height:var(--nav-h); padding:0 14px;
+  background:var(--panel, var(--card, #fff));
+  border-bottom:1px solid var(--line, #ddd);
+  color:var(--text, #222);
+  font:13px/1 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  position:relative; z-index:10;
+}
+.topnav .brand{font-weight:600;white-space:nowrap}
+.topnav .links{margin-left:auto;display:flex;gap:3px;flex-wrap:wrap;justify-content:flex-end}
+.topnav a{
+  color:var(--muted, #8a98aa); text-decoration:none;
+  padding:7px 10px; border-radius:7px; white-space:nowrap;
+  transition:background .12s,color .12s;
+}
+.topnav a:hover{color:var(--text, #222); background:var(--field, rgba(127,127,127,.14))}
+.topnav a.on{background:var(--accent, #2f6bd8); color:#fff}
+
+/* 编辑器是「整页高度」的 flex 布局（body > .app 撑满 100%），
+   导航条插在它前面，所以要给它让出一条的高度。 */
+body > .app{height:calc(100% - var(--nav-h))}
+
+@media (max-width:620px){
+  .topnav{gap:8px; padding:0 10px; font-size:12.5px}
+  .topnav .brand{display:none}
+  .topnav a{padding:6px 8px}
+}

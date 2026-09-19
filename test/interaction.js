@@ -1,5 +1,5 @@
-/* 交互校验：用极简 DOM 桩真跑 index.html 的内联脚本。
-   脚本是**实时从 index.html 抽取**的，不存副本，避免测试和源码不同步。
+/* 交互校验：用极简 DOM 桩真跑 editor.html 的内联脚本。
+   脚本是**实时从 editor.html 抽取**的，不存副本，避免测试和源码不同步。
    用法: node test/interaction.js                                   */
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const Cube = require(path.join(__dirname, '..', 'cube.js'));
@@ -96,9 +96,9 @@ const ctx = {
 };
 ctx.globalThis = ctx;
 vm.createContext(ctx);
-const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+const html = fs.readFileSync(path.join(__dirname, '..', 'editor.html'), 'utf8');
 const inline = html.match(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/)[1];
-console.log('(已从 index.html 实时抽取内联脚本 ' + inline.length + ' 字节)');
+console.log('(已从 editor.html 实时抽取内联脚本 ' + inline.length + ' 字节)');
 
 /* 桩不解析 HTML，所以把 <input> 的初始 value / checked 从真实标记里读出来灌进去。
    这样"默认文件名是 cube""默认尺寸 1080"这类断言才是有效的 ——
@@ -132,7 +132,7 @@ console.log('(已从 index.html 实时抽取内联脚本 ' + inline.length + ' �
   }
   console.log('(已补出 ' + mb.children.length + ' 个模式按钮)');
 }
-vm.runInContext(inline, ctx, {filename:'index.html:inline'});
+vm.runInContext(inline, ctx, {filename:'editor.html:inline'});
 
 /* ---------------- 断言工具 ---------------- */
 let pass = 0, fail = 0;
