@@ -35,6 +35,7 @@
           border-radius:12px;overflow:hidden}
   section > h2{margin:0;padding:11px 16px;font-size:14px;font-weight:600;
                background:var(--head-band);border-bottom:1px solid var(--line)}
+  section > h2 .cnt{float:right;color:var(--muted);font-weight:400;font-size:12.5px}
 
   table{width:100%;border-collapse:collapse;table-layout:fixed}
   col.side{width:110px}
@@ -48,8 +49,14 @@
   tr:last-child td{border-bottom:none}
   /* 图片是透明底 PNG，这一格就不铺底色，整页保持纯白 */
   td.pic{padding:6px;text-align:center}
+  td.pic .box{position:relative;display:inline-block;line-height:0}
   td.pic img{width:96px;height:auto;display:block;margin:0 auto;
              image-rendering:auto;border-radius:6px}
+  /* 编号角标，和 oll/pll 一致 */
+  td.pic .no{position:absolute;left:3px;top:1px;font-size:11px;font-weight:600;
+             color:var(--muted);line-height:1;background:#ffffffb3;
+             padding:1px 3px;border-radius:4px}
+  html[data-theme="dark"] td.pic .no{background:#00000080}
   td.f{padding:10px 14px}
   td.empty{background:var(--field)}
 
@@ -187,12 +194,15 @@ function formulas(text) {
 }
 function pic(name, alt) {
   if (!name) return '<td class="empty"></td>';
-  return '<td class="pic"><img src="' + IMG(name) + '" alt="' + esc(alt) + '" loading="lazy"></td>';
+  return '<td class="pic"><span class="box"><img src="' + IMG(name) + '" alt="' +
+         esc(alt) + '" loading="lazy"><span class="no">' + esc(name) +
+         '</span></span></td>';
 }
 
 var html = '';
 SECTIONS.forEach(function (sec) {
-  html += '<section><h2>' + esc(sec.title) + '</h2><table>' +
+  html += '<section><h2>' + esc(sec.title) +
+          '<span class="cnt">' + sec.rows.length + '</span></h2><table>' +
           '<colgroup><col class="side"><col class="formula">' +
           '<col class="side"><col class="formula"></colgroup>' +
           '<thead><tr>' +

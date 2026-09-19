@@ -378,7 +378,7 @@ python3 tools/verify.py --find 7 oll # 朝向对不上时，去公式库里搜�
 node test/geometry.js      # 几何：铺满、不重叠、方位、颜色
 node test/interaction.js   # 交互：用极简 DOM 桩真跑一遍 editor.html 的内联脚本
 node test/pll.js           # PLL 模型：颜色/箭头/拖拽的不变量（纯逻辑，17 条）
-node test/links.js         # 链接检查：五个页面的内部链接都指向真实文件、导航覆盖完整
+node test/links.js         # 链接检查 + 导航覆盖 + 回到顶部按钮 + 分节计数编号（25 条）
 ```
 
 `test/pll.js` 里最重要的一条是**「颜色能从块的身份唯一反解出来」**。

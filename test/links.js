@@ -75,5 +75,18 @@ console.log('\n[6] 回到顶部按钮');
     withBtn.join(',') === 'f2l.html,oll.html,pll.html', withBtn.join(','));
 }
 
+console.log('\n[7] 三个公式页都有分节计数与编号角标');
+{
+  // 只做静态检查：确认样式和渲染代码都还在。
+  // 真渲染另由 test/interaction.js 那套 DOM 桩覆盖（那是给编辑器用的）。
+  ['f2l.html', 'oll.html', 'pll.html'].forEach(p => {
+    const h = fs.readFileSync(path.join(ROOT, p), 'utf8');
+    ok(p + ' 样式里有 .cnt 与 .no',
+      /section > h2 \.cnt\{/.test(h) && /td\.pic \.no\{/.test(h));
+    ok(p + ' 渲染时会输出计数与编号',
+      /class="cnt"/.test(h) && /class="no"/.test(h));
+  });
+}
+
 console.log('\n结果: ' + pass + ' 通过, ' + fail + ' 失败');
 process.exit(fail ? 1 : 0);
