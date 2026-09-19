@@ -60,13 +60,20 @@
   .orbit .z2{left:56px;top:56px}
 
   .cube{position:relative;width:0;height:0;transform-style:preserve-3d}
-  /* F 面浮标：贴在前面外侧 1.55 格处，跟着魔方一起转，
-     所以做了 x/y/z 之后它仍然指着当前的前面 */
-  .fmark{position:absolute;left:0;top:0;width:22px;height:22px;
-         margin:-11px 0 0 -11px;border-radius:50%;display:grid;place-items:center;
-         font:700 12px/1 system-ui,sans-serif;letter-spacing:0;
-         background:var(--accent);color:#fff;box-shadow:0 2px 8px #0005;
-         transform:translate3d(0,0,calc(var(--cs) * 1.55))}
+  /* F 面标牌：挂在前面左下角的外侧，跟着魔方一起转，
+     所以做了 x/y/z 之后它仍然指着当前的前面。
+     放在角上而不是正中 —— 正中会挡住一张贴纸。
+     尺寸、圆角都按 --cs 算，和方块同步缩放，看着像魔方的一部分。 */
+  .fmark{position:absolute;left:0;top:0;
+         width:calc(var(--cs) * 0.46);height:calc(var(--cs) * 0.46);
+         margin:calc(var(--cs) * -0.23) 0 0 calc(var(--cs) * -0.23);
+         border-radius:calc(var(--cs) * 0.13);display:grid;place-items:center;
+         font:700 calc(var(--cs) * 0.26)/1 system-ui,-apple-system,sans-serif;
+         background:var(--accent);color:#fff;
+         box-shadow:0 2px 10px #0006,inset 0 0 0 1px #ffffff30;
+         transform:translate3d(calc(var(--cs) * -1.02),
+                               calc(var(--cs) * 1.02),
+                               calc(var(--cs) * 1.52))}
   .layer{position:absolute;left:0;top:0;width:0;height:0;transform-style:preserve-3d}
   .cubie{position:absolute;left:0;top:0;width:var(--cs);height:var(--cs);
          margin:calc(var(--cs) / -2) 0 0 calc(var(--cs) / -2);transform-style:preserve-3d}

@@ -477,8 +477,11 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
     // F 浮标必须在 #cube 里面，才会跟着魔方一起转
     ok('F 面浮标在魔方内部（跟着一起转）', /class="fmark"|fmark/.test(src2) &&
       /'<div class="fmark"/.test(src2));
-    ok('浮标贴在前面外侧（1.55 格）',
-      /translate3d\(0,0,calc\(var\(--cs\) \* 1\.55\)\)/.test(src2));
+    // 挂在前面外侧（z = 1.52 格），且偏到左下角 —— 放正中会挡住一张贴纸
+    ok('标牌挂在前面外侧、偏在角上',
+      /translate3d\(calc\(var\(--cs\) \* -1\.02\),[\s\S]*?calc\(var\(--cs\) \* 1\.52\)\)/.test(src2));
+    ok('标牌尺寸随方块缩放（--cs）',
+      /\.fmark\{[^}]*width:calc\(var\(--cs\) \* 0\.46\)/.test(src2));
 
     // 点一下 ← （y）：局面应当等于整体左转一次，并记进历史
     els.reset.fire('click');
