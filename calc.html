@@ -44,7 +44,7 @@
   .themebtn:hover{color:var(--text);border-color:var(--line-strong);background:var(--chip-hover)}
 
   /* 四周的整体旋转按钮：不参与 3D，所以不会跟着魔方一起转 */
-  .orbit{position:absolute;inset:0;pointer-events:none}
+  .orbit{position:absolute;inset:0;pointer-events:none;z-index:4}
   .orbit button{position:absolute;pointer-events:auto;width:34px;height:34px;padding:0;
     border-radius:9px;cursor:pointer;font-size:14px;line-height:1;
     background:var(--chip);border:1px solid var(--line);color:var(--muted);
@@ -189,7 +189,7 @@
       <h2>公式</h2>
       <div class="row">
         <input id="alg" type="text" spellcheck="false" autocomplete="off"
-               value="R U R' U'" placeholder="例如 R U R' U'">
+               placeholder="输入公式，例如 R U R' U'">
       </div>
       <div class="run">
         <button id="fwd" type="button" title="按公式正向转动（在输入框里按回车同此）"><i>↻</i>正向</button>
@@ -483,7 +483,6 @@
       cur = end;
       hist.push({ kind: kind || 'alg', alg: label, rev: !!rev });
       renderHist();
-      if (kind === 'scramble') algEl.value = "R U R' U'";
       busy = false;
       chrome();
     });
@@ -511,7 +510,7 @@
     frames = [CubeSim.solved()];
     at = 0;
     cur = CubeSim.solved();
-    algEl.value = "R U R' U'";
+    algEl.value = '';
     algEl.classList.remove('bad');
     errEl.textContent = '';
     movesEl.innerHTML = '';
@@ -578,7 +577,9 @@
   /* 拖拽转动视角 */
   var drag = null;
   stageEl.addEventListener('pointerdown', function (e) {
-    if (e.target.closest && e.target.closest('.themebtn')) return;
+    // 箭头和主题按钮都不能触发拖拽 —— 一旦 setPointerCapture，
+    // 后续指针事件会被重定向到舞台，click 就落不到按钮上了
+    if (e.target.closest && e.target.closest('.orbit button, .themebtn')) return;
     drag = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y };
     stageEl.classList.add('drag');
     if (stageEl.setPointerCapture) stageEl.setPointerCapture(e.pointerId);

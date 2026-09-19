@@ -492,6 +492,14 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
     ok('整体旋转记进了历史', String(els.hcount.textContent) === '1', els.hcount.textContent);
     ok('历史里标为旋转类', /class="e rt/.test(els.hist.innerHTML), els.hist.innerHTML.slice(0, 80));
 
+    // 箭头要能点：拖拽视角的 pointerdown 必须放过它们。
+    // 否则 setPointerCapture 会把后续指针事件重定向到舞台，click 落不到按钮上
+    // —— 这正是「箭头毫无反应」的原因。
+    ok('拖拽视角时放过箭头按钮',
+      /closest\('\.orbit button, \.themebtn'\)/.test(fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')));
+    ok('输入框里没有默认值',
+      !/id="alg"[^>]*value="/.test(fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')));
+
     // 打乱放在最后：22 步要播约 9 秒，放在前面会把后面的提交全挡在 busy 外面
     els.scramble.fire('click');
     await wait(120);
