@@ -661,7 +661,11 @@
     // 必须先判 playing：播放中 busy 也是 true，先判 busy 就永远暂停不了
     if (playing) { playing = false; chrome(); return; }
     if (busy || !steps.length) return;
-    if (at >= steps.length) return;
+    // 已经播到底了，再按就从头来一遍
+    if (at >= steps.length) {
+      at = 0;
+      paint(frames[0]);
+    }
     playing = true;
     busy = true;
     chrome();
