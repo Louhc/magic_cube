@@ -549,8 +549,10 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
     ok('有 F2L / OLL / PLL 三个来源按钮',
       /\.pick button/.test(src2) && ['f2l', 'oll', 'pll'].every(k => src2.includes('data-pick="' + k + '"')));
     ok('列表项带缩略图', /function thumb\(kind, id\)/.test(src2) && /<img src="' \+ thumb/.test(src2));
-    ok('点某一条会填进输入框并执行',
-      /algEl\.value = el\.dataset\.alg;\s*submit\('alg', false\)/.test(src2));
+    // 只填入、不执行 —— 让用户自己确认方向再按
+    ok('点某一条只填入输入框',
+      /algEl\.value = el\.dataset\.alg;\s*algEl\.focus\(\)/.test(src2) &&
+      !/algEl\.value = el\.dataset\.alg;\s*submit/.test(src2));
     // 共享数据必须和三个公式表一致 —— 否则面板会显示过期的公式
     {
       const vm3 = require('vm');

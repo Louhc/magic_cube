@@ -618,8 +618,9 @@
   pickEl.addEventListener('click', function (e) {
     var el = e.target.closest ? e.target.closest('.p') : null;
     if (!el || busy) return;
+    // 只填入，不执行 —— 让用户自己确认方向（正向/反向）再按
     algEl.value = el.dataset.alg;
-    submit('alg', false);
+    algEl.focus();
   });
 
   document.getElementById('scramble').addEventListener('click', scramble);
