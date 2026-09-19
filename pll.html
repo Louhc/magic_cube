@@ -85,8 +85,7 @@
 </head>
 <body>
 <header>
-  <h1>PLL 公式合集</h1>
-  <p>共 21 个情况。点公式即可复制。</p>
+  <h1>PLL</h1>
   <button class="themebtn" id="themebtn" type="button" title="切到夜晚">☾</button>
 </header>
 <main id="app"></main>
@@ -97,7 +96,7 @@
    图片取自 pll/ 目录。公式来自知乎「小狼啊小狼」系列，
    逐条用 tools/verify.py 校验过「照图摆好直接就能用」。 */
 var SECTIONS = [
-  { title: "21 种情况", cnt: 21, rows: [
+  { title: "21 种", cnt: 21, rows: [
     [1, "(R U' R) (U R) (U R U' R' U' R'2)"],
     [2, "(R2 U) (R U R' U' R' U') (R' U R')"],
     [3, "x' R2 D2 (R' U' R) D2 (R' U R')"],
@@ -132,7 +131,7 @@ function esc(s) {
 }
 function row(n, alg) {
   var body = alg ? '<code>' + esc(alg) + '</code>'
-                 : '<span class="todo">朝向与图不符，暂缺</span>';
+                 : '<span class="todo">—</span>';
   return '<tr><td class="pic"><span class="box"><img src="' + IMG(n) + '" alt="' + n +
          '" loading="lazy"><span class="no">' + n + '</span></span></td>' +
          '<td class="f">' + body + '</td></tr>';
@@ -140,7 +139,7 @@ function row(n, alg) {
 var html = '';
 SECTIONS.forEach(function (sec) {
   html += '<section><h2>' + esc(sec.title) +
-          '<span class="cnt">' + sec.cnt + ' 个</span></h2><table>' +
+          '<span class="cnt">' + sec.cnt + '</span></h2><table>' +
           '<colgroup><col class="pic"><col></colgroup><tbody>';
   sec.rows.forEach(function (r) { html += row(r[0], r[1]); });
   html += '</tbody></table></section>';
@@ -173,7 +172,7 @@ function fallbackCopy(text) {
   var ta = document.createElement('textarea');
   ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
   document.body.appendChild(ta); ta.select();
-  try { document.execCommand('copy'); toast('已复制：' + text); }
+  try { document.execCommand('copy'); toast(text); }
   catch (e) { toast('复制失败，请手动选择'); }
   ta.remove();
 }
@@ -184,7 +183,7 @@ document.getElementById('app').addEventListener('click', function (e) {
   function done() { el.classList.add('copied');
     setTimeout(function () { el.classList.remove('copied'); }, 600); }
   if (navigator.clipboard && window.isSecureContext) {
-    navigator.clipboard.writeText(compact).then(function () { done(); toast('已复制：' + compact); },
+    navigator.clipboard.writeText(compact).then(function () { done(); toast(compact); },
                                                 function () { fallbackCopy(compact); done(); });
   } else { fallbackCopy(compact); done(); }
 });

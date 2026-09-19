@@ -85,8 +85,7 @@
 </head>
 <body>
 <header>
-  <h1>F2L 公式合集</h1>
-  <p>左列「红色为 F 面」，右列「绿色为 F 面」。点公式即可复制。</p>
+  <h1>F2L</h1>
   <button class="themebtn" id="themebtn" type="button" title="切到夜晚">☾</button>
 </header>
 
@@ -197,8 +196,8 @@ SECTIONS.forEach(function (sec) {
           '<colgroup><col class="side"><col class="formula">' +
           '<col class="side"><col class="formula"></colgroup>' +
           '<thead><tr>' +
-          '<th class="red">红色为 F 面</th><th>公式</th>' +
-          '<th class="green">绿色为 F 面</th><th>公式</th>' +
+          '<th class="red">红 F</th><th></th>' +
+          '<th class="green">绿 F</th><th></th>' +
           '</tr></thead><tbody>';
   sec.rows.forEach(function (r) {
     html += '<tr>' +
@@ -237,7 +236,7 @@ function fallbackCopy(text) {
   ta.value = text;
   ta.style.position = 'fixed'; ta.style.opacity = '0';
   document.body.appendChild(ta); ta.select();
-  try { document.execCommand('copy'); toast('已复制：' + text); }
+  try { document.execCommand('copy'); toast(text); }
   catch (e) { toast('复制失败，请手动选择'); }
   ta.remove();
 }
@@ -252,7 +251,7 @@ document.getElementById('app').addEventListener('click', function (e) {
     setTimeout(function () { el.classList.remove('copied'); }, 600);
   }
   if (navigator.clipboard && window.isSecureContext) {
-    navigator.clipboard.writeText(compact).then(function () { done(); toast('已复制：' + compact); },
+    navigator.clipboard.writeText(compact).then(function () { done(); toast(compact); },
                                                 function () { fallbackCopy(compact); done(); });
   } else {
     fallbackCopy(compact); done();

@@ -33,3 +33,17 @@ body > .app{height:calc(100% - var(--nav-h))}
   .topnav .brand{display:none}
   .topnav a{padding:6px 8px}
 }
+
+/* 回到顶部：纯图标，无文字。长表格页才注入（见 nav.js 的表）。 */
+.totop{
+  position:fixed; right:18px; bottom:18px; width:40px; height:40px; padding:0;
+  border-radius:50%; cursor:pointer; font-size:17px; line-height:1;
+  background:var(--panel, var(--card, #fff));
+  border:1px solid var(--line, #ddd); color:var(--text, #222);
+  box-shadow:0 4px 16px #0003; z-index:20;
+  opacity:0; pointer-events:none; transform:translateY(8px);
+  transition:opacity .18s, transform .18s, border-color .12s;
+}
+.totop.on{opacity:1; pointer-events:auto; transform:none}
+.totop:hover{border-color:var(--line-strong, #aaa)}
+@media print{ .totop{display:none} }

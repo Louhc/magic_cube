@@ -62,5 +62,18 @@ console.log('\n[5] 导航样式表存在且定义了当前页高亮');
     /body > \.app\{height:calc\(100% - var\(--nav-h\)\)\}/.test(css), '缺少 .app 高度补偿');
 }
 
+console.log('\n[6] 回到顶部按钮');
+{
+  const js = fs.readFileSync(path.join(ROOT, 'nav.js'), 'utf8');
+  const css = fs.readFileSync(path.join(ROOT, 'nav.css'), 'utf8');
+  ok('nav.css 定义了 .totop', /\.totop\{/.test(css));
+  ok('按钮是纯图标（无可见文字）', /textContent = '\\u2191'/.test(js),
+    '按钮文字不是 ↑');
+  ok('滚动事件驱动显隐', /\.totop\.on/.test(css) && /classList\.toggle\('on'/.test(js));
+  const withBtn = [...js.matchAll(/\['([^']+)',\s*'[^']*',\s*1\]/g)].map(m => m[1]);
+  ok('只有三个公式页需要它（' + withBtn.join(',') + '）',
+    withBtn.join(',') === 'f2l.html,oll.html,pll.html', withBtn.join(','));
+}
+
 console.log('\n结果: ' + pass + ' 通过, ' + fail + ' 失败');
 process.exit(fail ? 1 : 0);

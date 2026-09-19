@@ -9,12 +9,14 @@
 (function () {
   'use strict';
 
+  // [文件名, 导航文字, 需要「回到顶部」]
+  // 第三项给长表格页用 —— 那几页要翻很久才到底。
   var PAGES = [
     ['index.html',  '首页'],
     ['editor.html', '编辑器'],
-    ['f2l.html',    'F2L 公式'],
-    ['oll.html',    'OLL 公式'],
-    ['pll.html',    'PLL 公式']
+    ['f2l.html',    'F2L 公式', 1],
+    ['oll.html',    'OLL 公式', 1],
+    ['pll.html',    'PLL 公式', 1]
   ];
 
   // 当前页文件名；直接访问目录（结尾是 /）时按首页算
@@ -44,4 +46,25 @@
   nav.appendChild(links);
 
   document.body.insertBefore(nav, document.body.firstChild);
+
+  // 长表格页：右下角一个纯图标的「回到顶部」，滚过一屏才出现
+  var me = PAGES.filter(function (p) { return p[0] === here; })[0];
+  if (me && me[2]) {
+    var top = document.createElement('button');
+    top.type = 'button';
+    top.className = 'totop';
+    top.textContent = '\u2191';                 // ↑
+    top.title = '回到顶部';
+    top.setAttribute('aria-label', '回到顶部');
+    top.addEventListener('click', function () {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+    document.body.appendChild(top);
+    var sync = function () {
+      top.classList.toggle('on',
+        (window.pageYOffset || document.documentElement.scrollTop || 0) > 320);
+    };
+    window.addEventListener('scroll', sync, { passive: true });
+    sync();
+  }
 })();
