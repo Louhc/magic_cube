@@ -215,7 +215,8 @@
   function fit() {
     var w = stageEl.clientWidth, h = stageEl.clientHeight;
     if (!w || !h) return;
-    CS = Math.max(12, Math.min(w, h) / 6.15);
+    // 除数 3.075 = 6.15 / 2 —— 练习页的魔方按计算器的两倍大
+    CS = Math.max(12, Math.min(w, h) / 3.075);
     cubeEl.style.setProperty('--cs', CS + 'px');
     cubeEl.style.setProperty('--half', (CS / 2) + 'px');
   }
