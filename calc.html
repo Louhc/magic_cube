@@ -252,7 +252,11 @@
     var cfg = M3[step.mv];
     if (!cfg) { done(); return; }
     var ax = cfg[0], base = cfg[1], inLayer = cfg[2];
-    var deg = step.times === 2 ? base * 2 : (step.times < 0 ? -base : base);
+    // times 只可能是 ±1 或 ±2，直接乘即可。
+    // 之前写成 (times === 2 ? base*2 : times < 0 ? -base : base)，
+    // U'2 的 times 是 -2，判不进第一个分支，就只转了 90° —— 动画比结果少半圈。
+    var deg = base * step.times;
+    var dur = DUR * Math.abs(deg) / 90;      // 半圈转久一点，看着才像转了两次
 
     var layer = document.createElement('div');
     layer.className = 'layer';
@@ -262,7 +266,7 @@
       if (inLayer(p)) moving.push(el);
     });
 
-    layer.style.transition = 'transform ' + DUR + 'ms cubic-bezier(.34,.86,.32,1)';
+    layer.style.transition = 'transform ' + dur + 'ms cubic-bezier(.34,.86,.32,1)';
     layer.style.transform = 'rotate' + ax + '(0deg)';
     cubeEl.appendChild(layer);
     moving.forEach(function (el) { layer.appendChild(el); });
@@ -278,7 +282,7 @@
       done();
     }
     layer.addEventListener('transitionend', finish);
-    setTimeout(finish, DUR + 80);      // 兜底：transitionend 偶尔不触发
+    setTimeout(finish, dur + 80);      // 兜底：transitionend 偶尔不触发
   }
 
   /* ---------- 主流程 ---------- */

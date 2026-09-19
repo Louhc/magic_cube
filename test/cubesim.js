@@ -313,5 +313,36 @@ console.log('\n[10] 方块必须是实心的（不能有镂空感）');
   ok('贴纸色通过 --c 传入', /style="--c:' \+ COLOR\[col\]/.test(html));
 }
 
+console.log('\n[11] 动画转的角度必须和这一步实际转的角度一致');
+{
+  // 这是为一个真 bug 加的：U'2 解析出 times=-2，但动画里写成
+  //   times === 2 ? base*2 : times < 0 ? -base : base
+  // -2 判不进第一个分支，于是只转 90°，比结果少半圈。
+  // 而且 U'2 与 U2 等价，两者动画也该一样。
+  const html = fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8');
+  const m = html.match(/var deg = ([^;]+);/);
+  ok('能读到角度计算式', !!m, String(m));
+  if (m) {
+    const calc = new Function('step', 'base', 'return (' + m[1] + ');');
+    // 角度应当等于「该动作的正向角度 × times」。
+    // 正向角度取 +90 / -90 两种都试（U 与 D 的正向就是相反的）。
+    const wrong = [];
+    [90, -90].forEach(base => {
+      [1, -1, 2, -2].forEach(times => {
+        const want = base * times;
+        if (Math.abs(calc({ times: times }, base) - want) > 1e-9) {
+          wrong.push('base=' + base + ' times=' + times + ' -> ' + calc({ times: times }, base));
+        }
+      });
+    });
+    ok('8 组（正向角度 × times=±1/±2）角度都对', wrong.length === 0, wrong.join(', '));
+    // U'2 与 U2 必须给出同样的角度（两者本来就等价）
+    ok("U'2 与 U2 动画一致", Math.abs(calc({ times: -2 }, 90)) === Math.abs(calc({ times: 2 }, 90)),
+      calc({ times: -2 }, 90) + ' vs ' + calc({ times: 2 }, 90));
+  }
+  // 时长按角度缩放，半圈转久一点
+  ok('时长按角度缩放', /var dur = DUR \* Math\.abs\(deg\) \/ 90/.test(html));
+}
+
 console.log('\n结果: ' + pass + ' 通过, ' + fail + ' 失败');
 process.exit(fail ? 1 : 0);
