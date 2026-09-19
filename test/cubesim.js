@@ -596,6 +596,9 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
     ok('自动播放一步步走到末尾',
       /function autoPlay\(\)[\s\S]*?stepAnimated\(1, nextStep\)/.test(src2));
     ok('播放中按钮变暂停', /playing \? '暂停' : '自动播放'/.test(src2));
+    ok('播到底后再按自动播放会从头开始',
+      /if \(at >= steps\.length\) \{\s*at = 0;\s*paint\(frames\[0\]\)/.test(src2),
+      '到底后按播放没有回到开头');
     // 播放中 busy 也是 true，所以必须先判 playing，否则永远暂停不了
     {
       const i = src2.indexOf('function autoPlay');
