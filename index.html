@@ -31,9 +31,10 @@
 
   main{max-width:900px;margin:0 auto;padding:6px 16px 52px}
   .cards{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-top:24px}
-  .card{display:flex;align-items:center;gap:15px;text-decoration:none;color:inherit;
+  /* 卡片只留标题和缩略图，不再有说明文字 */
+  .card{display:flex;align-items:center;gap:16px;text-decoration:none;color:inherit;
         background:var(--card);border:1px solid var(--line);border-radius:12px;
-        padding:15px;transition:border-color .14s, transform .14s}
+        padding:16px;transition:border-color .14s, transform .14s}
   .card:hover{border-color:var(--line-strong);transform:translateY(-2px)}
   .card .thumb{flex:none;width:96px;height:96px;display:flex;align-items:center;justify-content:center}
   .card .thumb img{max-width:100%;max-height:100%;border-radius:8px}
@@ -61,42 +62,36 @@
       <span class="thumb"><img src="preview.png" alt="配色编辑器预览"></span>
       <span>
         <h2>编辑器</h2>
-        <p>透视三维 + OLL / PLL 二维 · 导出 PNG / SVG / JPEG / ICO</p>
       </span>
     </a>
     <a class="card" href="calc.html">
       <span class="thumb"><img src="oll/oll-27-512x512.png" alt="魔方计算器"></span>
       <span>
         <h2>计算器</h2>
-        <p>输入公式 · 逐步回放 · 六面展开图</p>
       </span>
     </a>
     <a class="card" href="practice.html">
       <span class="thumb"><img src="pll/pll-T-512x512.png" alt="魔方练习"></span>
       <span>
         <h2>练习</h2>
-        <p>随机出题 · 拿真魔方做 · 对着核对</p>
       </span>
     </a>
     <a class="card" href="f2l.html">
       <span class="thumb"><img src="f2l/f2l-01a-512x515.png" alt="F2L"></span>
       <span>
         <h2>F2L<span class="n">39</span></h2>
-        <p>红 / 绿为 F 面</p>
       </span>
     </a>
     <a class="card" href="oll.html">
       <span class="thumb"><img src="oll/oll-01-512x512.png" alt="OLL"></span>
       <span>
         <h2>OLL<span class="n">57</span></h2>
-        <p>十字 · 单点 · 一字 · 拐角</p>
       </span>
     </a>
     <a class="card" href="pll.html">
       <span class="thumb"><img src="pll/pll-Aa-512x512.png" alt="PLL"></span>
       <span>
         <h2>PLL<span class="n">21</span></h2>
-        <p>带侧面色带与置换箭头</p>
       </span>
     </a>
   </div>
