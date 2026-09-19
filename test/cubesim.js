@@ -416,6 +416,34 @@ console.log('\n[13] 练习页：显示的图形必须是「从复原态执行该
     };
     ok('画出来的就是 apply(solved, 公式)（题目 ' + els5.qid.textContent + '）',
       !!row && eqState(got5, S.apply(S.solved(), row[1])), JSON.stringify(got5).slice(0, 60));
+    // 范围选择要持久化
+    ok('范围会存进 localStorage', /practice-scope-v1/.test(html) &&
+      /localStorage\.setItem\(SCOPE_KEY/.test(html));
+    ok('载入时读回范围', /SCOPES\.indexOf\(sv\)/.test(html));
+    {
+      // 预置「上次练 PLL」，打开页面应当直接是 PLL
+      const vm6 = require('vm');
+      const mk6 = mk;
+      const st6 = { 'practice-scope-v1': 'pll' };
+      const els6 = { cube: mk6('div'), stage: mk6('div'), next: mk6('button') };
+      const btns6 = ['f2l', 'oll', 'pll'].map(k => { const b = mk6('button'); b.dataset.scope = k; return b; });
+      const ctx6 = { console, navigator: {}, window: { addEventListener() {} },
+        setTimeout, clearTimeout,
+        localStorage: { getItem: k => (k in st6 ? st6[k] : null),
+                       setItem: (k, v) => { st6[k] = String(v); }, removeItem: k => { delete st6[k]; } },
+        CubeSim: S, location: { hash: '' },
+        document: { getElementById: id => els6[id] || (els6[id] = mk6('div')),
+                    querySelectorAll: sel => sel === '#scope button' ? btns6 : [],
+                    documentElement: mk6('html'), createElement: mk6,
+                    body: { appendChild() {} }, addEventListener() {} } };
+      ctx6.globalThis = ctx6;
+      vm6.createContext(ctx6);
+      vm6.runInContext(fs.readFileSync(path.join(__dirname, '..', 'alglist.js'), 'utf8'), ctx6);
+      vm6.runInContext(page, ctx6);
+      ok('回来时范围是上次选的（pll）', /^PLL /.test(els6.qid.textContent), els6.qid.textContent);
+      ok('对应的范围按钮也是选中态', btns6[2].classList.contains('on'));
+    }
+
     // 洗牌袋：切到 PLL（21 题）连点 20 次，应把 21 题各出一次、无一重复
     (scopeBtns[2]._h.click || []).forEach(function (f) { f({}); });
     const seen = [els5.qid.textContent];

@@ -244,8 +244,18 @@
   }
 
   /* ---------- 题目 ---------- */
+  // 范围选择也持久化，离开再回来还是上次练的那个
+  var SCOPE_KEY = 'practice-scope-v1';
+  var SCOPES = ['f2l', 'oll', 'pll'];
   var scope = 'oll', cur = null;
   var bag = [], lastIdx = -1;
+  try {
+    var sv = localStorage.getItem(SCOPE_KEY);
+    if (SCOPES.indexOf(sv) >= 0) scope = sv;
+  } catch (e) {}
+  function saveScope() {
+    try { localStorage.setItem(SCOPE_KEY, scope); } catch (e) {}
+  }
 
   /* 洗牌袋：把该范围的题洗一遍，逐个取出，取完再洗一轮。
      这样每一题都会出现一次才可能重复；并且换轮时避免第一题和上一题撞。 */
@@ -312,6 +322,7 @@
     b.addEventListener('click', function () {
       if (busy) return;
       scope = b.dataset.scope;
+      saveScope();
       bag = []; lastIdx = -1;          // 换范围就重开一轮
       Array.prototype.forEach.call(document.querySelectorAll('#scope button'), function (o) {
         o.classList.toggle('on', o === b);
