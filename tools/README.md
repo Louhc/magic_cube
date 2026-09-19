@@ -10,7 +10,8 @@
 
 ```bash
 python3 tools/verify.py              # 校验仓库里的 oll.html / pll.html
-python3 tools/verify.py --find 7 oll # 第 7 条朝向对不上时，去公式库里搜能用的写法
+python3 tools/verify.py --find 7  oll   # OLL 7 朝向对不上时，去公式库里搜能用的写法
+python3 tools/verify.py --find T  pll   # PLL 用字母编号（Aa..Z）
 ```
 
 输出示例：
