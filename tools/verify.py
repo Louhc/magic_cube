@@ -96,7 +96,12 @@ def page_data(page):
     out = []
     for sec in json.loads(m.group(1)):
         for r in sec.get('rows', []):
-            out.append((str(r[0]), r[1], [tuple(a) for a in (r[2] if len(r) > 2 else [])]))
+            alts = [tuple(a) for a in (r[2] if len(r) > 2 else [])]
+            # 同一个格子里可能有好几条写法（用换行分隔），要逐条校验 ——
+            # 拼在一起会变成一条无效公式
+            for line in str(r[1]).split('\n'):
+                if line.strip():
+                    out.append((str(r[0]), line.strip(), alts))
     return out
 
 

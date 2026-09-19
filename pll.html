@@ -122,7 +122,7 @@
    图片取自 pll/ 目录。公式来自知乎「小狼啊小狼」系列，
    逐条用 tools/verify.py 校验过「照图摆好直接就能用」。 */
 var SECTIONS = [
-  { "title": "21 种", "cnt": 22, "rows": [
+  { "title": "21 种", "cnt": 21, "rows": [
     ["Aa", "x' R2 D2 (R' U' R) D2 (R' U R')"],
     ["Ab", "x' (R U' R) D2 (R' U R) D2 R'2"],
     ["E", "x' (R U' R' D) (R U R' D') (R U R' D) (R U' R' D')"],
@@ -143,8 +143,7 @@ var SECTIONS = [
     ["Ub", "(R2 U) (R U R' U' R' U') (R' U R')"],
     ["V", "R' U R' d' R' F' R2 U' R' U R' F R F"],
     ["Y", "F (R U' R' U' R U R') F' (R U R' U') (R' F R F')"],
-    ["Z", "U (R' U' R U') (R U R U') (R' U R U) (R2 U' R' U)"],
-    ["Z", "M' U' M2 U' M2 U' M' U'2 M2 U"]
+    ["Z", "U (R' U' R U') (R U R U') (R' U R U) (R2 U' R' U)\nM' U' M2 U' M2 U' M' U'2 M2 U"]
   ] }
 ];
 
@@ -163,8 +162,12 @@ function toCalc(alg) {
          '" title="在计算器里打开这条公式">↗</a>';
 }
 function row(n, alg, alts) {
-  var body = alg ? '<code>' + esc(alg) + '</code>' + toCalc(alg)
-                 : '<span class="todo">—</span>';
+  // 一条公式里可能有换行 —— 表示同一格内的多条写法，逐行渲染
+  var body = alg ? alg.split('
+').map(function (line) {
+      return '<code>' + esc(line) + '</code>' + toCalc(line);
+    }).join('<br>')
+    : '<span class="todo">—</span>';
   if (alts && alts.length) {
     body += '<div class="alts">';
     alts.forEach(function (a) {

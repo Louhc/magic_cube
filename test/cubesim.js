@@ -798,7 +798,11 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
       ['oll', 'pll'].forEach(k => {
         const h = fs.readFileSync(path.join(__dirname, '..', pages[k]), 'utf8');
         const data = JSON.parse(h.match(/var SECTIONS = (\[[\s\S]*?\n\]);/)[1]);
-        const want = data.flatMap(sec => sec.rows.map(r => r[1])).sort();
+        // 页面里同一格的多条写法（换行分隔）在 alglist 里是拆开的，这里同样拆
+        const want = data.flatMap(sec => sec.rows
+          .flatMap(r => String(r[1]).split('\n'))
+          .filter(x => x.trim())
+          .map(x => x.trim())).sort();
         const got = A[k].map(r => r[1]).sort();
         ok('alglist 的 ' + k.toUpperCase() + ' 与页面一致（' + got.length + ' 条）',
           JSON.stringify(want) === JSON.stringify(got), '条数 ' + want.length + ' vs ' + got.length);
