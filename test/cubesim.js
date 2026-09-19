@@ -596,6 +596,19 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
     ok('自动播放一步步走到末尾',
       /function autoPlay\(\)[\s\S]*?stepAnimated\(1, nextStep\)/.test(src2));
     ok('播放中按钮变暂停', /playing \? '暂停' : '自动播放'/.test(src2));
+    // 播放中 busy 也是 true，所以必须先判 playing，否则永远暂停不了
+    {
+      const i = src2.indexOf('function autoPlay');
+      ok('暂停判断排在 busy 之前',
+        src2.indexOf('if (playing) { playing = false', i) < src2.indexOf('if (busy || !steps.length)', i),
+        'autoPlay 里先判了 busy，会导致按暂停无效');
+    }
+    // 播放中别的按钮不能禁用，否则点不到，也就无从「自动暂停」
+    ok('播放中按钮保持可用（只有非播放的忙才锁）',
+      /var lock = busy && !playing;/.test(src2) && /\.disabled = lock;/.test(src2));
+    ok('其他动作入口会先暂停播放',
+      (src2.match(/pausedFirst\(\)/g) || []).length >= 8,
+      '只有 ' + (src2.match(/pausedFirst\(\)/g) || []).length + ' 处');
     // 只有「跳到开头/末尾」和点某一步是瞬移
     ok('jump 保持瞬移（不带动画）',
       /function jump\(k\)[\s\S]*?paint\(frames\[at\]\)/.test(src2) &&

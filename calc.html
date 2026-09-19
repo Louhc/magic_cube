@@ -498,19 +498,21 @@
     });
     posEl.textContent = steps.length ? (at + ' / ' + steps.length) : '—';
     var noSteps = steps.length === 0;
+    // 播放中这些按钮要保持可用 —— 否则点不到，也就没法「点别的按钮自动暂停」
+    var lock = busy && !playing;
     ['first', 'prev'].forEach(function (id) {
-      document.getElementById(id).disabled = noSteps || at === 0;
+      document.getElementById(id).disabled = lock || noSteps || at === 0;
     });
     ['next', 'last'].forEach(function (id) {
-      document.getElementById(id).disabled = noSteps || at >= steps.length;
+      document.getElementById(id).disabled = lock || noSteps || at >= steps.length;
     });
-    fwdEl.disabled = busy;
-    revEl.disabled = busy;
+    fwdEl.disabled = lock;
+    revEl.disabled = lock;
     Array.prototype.forEach.call(document.querySelectorAll('.orbit button'), function (b) {
-      b.disabled = busy;
+      b.disabled = lock;
     });
     Array.prototype.forEach.call(document.querySelectorAll('.pick button'), function (b) {
-      b.disabled = !!(busy && !playing);
+      b.disabled = lock;
     });
     var playBtn = document.getElementById('play');
     playBtn.classList.toggle('playing', playing);
@@ -518,8 +520,8 @@
     document.getElementById('playtxt').textContent = playing ? '暂停' : '自动播放';
     var pi = playBtn.querySelector('i');
     if (pi) pi.textContent = playing ? '\u23f8' : '\u25b7';
-    document.getElementById('scramble').disabled = busy;
-    document.getElementById('reset').disabled = busy;
+    document.getElementById('scramble').disabled = lock;
+    document.getElementById('reset').disabled = lock;
   }
 
   function renderHist() {
@@ -546,6 +548,7 @@
 
   /* ---------- 提交一条公式 ---------- */
   function submit(kind, rev) {
+    if (pausedFirst()) return;
     if (busy) return;
     var alg = algEl.value.trim();
     errEl.textContent = '';
@@ -587,6 +590,7 @@
 
   /* ---------- 打乱 / 复原 ---------- */
   function scramble() {
+    if (pausedFirst()) return;
     if (busy) return;
     var faces = ['U', 'D', 'R', 'L', 'F', 'B'], suff = ['', "'", '2'];
     var out = [], last = '';
@@ -601,6 +605,7 @@
   }
 
   function reset() {
+    if (pausedFirst()) return;
     if (busy) return;
     playing = false;
     hist = [];
@@ -633,7 +638,17 @@
     });
   }
 
+  // 播放中点任何别的按钮：先暂停；再点一次才真正执行。
+  // 这样不会在动画中途插进新动作，行为可预期。
+  function pausedFirst() {
+    if (!playing) return false;
+    playing = false;
+    chrome();
+    return true;
+  }
+
   function stepBy(dir) {
+    if (pausedFirst()) return;
     if (busy || !steps.length) return;
     if (at + dir < 0 || at + dir > steps.length) return;
     busy = true;
@@ -643,8 +658,9 @@
 
   // 从当前位置一步步自动播到末尾，每一步都有动画
   function autoPlay() {
+    // 必须先判 playing：播放中 busy 也是 true，先判 busy 就永远暂停不了
+    if (playing) { playing = false; chrome(); return; }
     if (busy || !steps.length) return;
-    if (playing) { playing = false; chrome(); return; }   // 再按一次暂停
     if (at >= steps.length) return;
     playing = true;
     busy = true;
@@ -661,6 +677,7 @@
   }
 
   function jump(k) {
+    if (pausedFirst()) return;
     if (busy || !steps.length) return;
     at = Math.max(0, Math.min(steps.length, k));
     paint(frames[at]);
@@ -680,6 +697,7 @@
   // 选公式：点来源按钮展开列表，点某一条就填进输入框并直接执行
   Array.prototype.forEach.call(document.querySelectorAll('.pick button'), function (b) {
     b.addEventListener('click', function () {
+      if (pausedFirst()) return;
       var k = b.dataset.pick;
       pickKind = (pickKind === k) ? null : k;
       Array.prototype.forEach.call(document.querySelectorAll('.pick button'), function (o) {
@@ -693,7 +711,8 @@
   });
   pickEl.addEventListener('click', function (e) {
     var el = e.target.closest ? e.target.closest('.p') : null;
-    if (!el || busy) return;
+    if (!el) return;
+    if (pausedFirst() || busy) return;
     // 只填入，不执行 —— 让用户自己确认方向（正向/反向）再按
     algEl.value = el.dataset.alg;
     algEl.focus();
@@ -703,7 +722,7 @@
   // 整体旋转：动画 + 记进历史（它确实改变了哪一面是 F）
   Array.prototype.forEach.call(document.querySelectorAll('.orbit button'), function (b) {
     b.addEventListener('click', function () {
-      if (busy) return;
+      if (pausedFirst() || busy) return;
       run(CubeSim.steps(b.dataset.mv), b.dataset.mv, 'rotate', false);
     });
   });
