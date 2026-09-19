@@ -339,9 +339,11 @@
       return '<div class="cubie" data-pos="' + pos + '" style="transform:translate3d(' +
              (p[0] * CS) + 'px,' + (-p[1] * CS) + 'px,' + (p[2] * CS) + 'px)">' +
              cubieHTML(map[pos]) + '</div>';
-    // 字用 F 面本身的颜色；底色是魔方的塑料色，深底彩字足够清楚
+    // 「F」指的是当前朝向的前面 —— 做了 x/y/z 之后前面会换成别的面，
+    // 所以字色取「前面那张中心贴纸」的颜色，而不是固定用 COLOR.F。
+    // 底色是魔方的塑料色，深底彩字足够清楚。
     }).join('') + '<div class="fmark" title="当前的前面" style="color:' +
-      COLOR.F + '">F</div>';
+      (COLOR[state['0,0,1|0,0,1']] || COLOR.F) + '">F</div>';
     applyView();
   }
   function applyView() {

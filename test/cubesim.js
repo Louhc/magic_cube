@@ -482,10 +482,11 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
       /translate3d\(calc\(var\(--cs\) \* -1\.02\),[\s\S]*?calc\(var\(--cs\) \* 1\.52\)\)/.test(src2));
     ok('标牌尺寸随方块缩放（--cs）',
       /\.fmark\{[^}]*width:calc\(var\(--cs\) \* 0\.46\)/.test(src2));
-    // 「F」这个字的颜色要取 F 面本身的颜色（从配色表来，改配色时自动跟着变）
-    ok('"F" 字用 F 面的颜色',
-      /class="fmark"[^>]*style="color:' \+\s*COLOR\.F/.test(src2) ||
-      /style="color:' \+\s*COLOR\.F/.test(src2), '标牌字色不是 COLOR.F');
+    // 「F」指的是当前朝向的前面，做完 x/y/z 会换成别的面，
+    // 所以字色要取「前面中心贴纸」的颜色，不能固定写 COLOR.F
+    ok('"F" 字色跟随前面中心贴纸',
+      /COLOR\[state\['0,0,1\|0,0,1'\]\]/.test(src2),
+      '字色没有跟随整体旋转变化');
     ok('标牌底色是魔方塑料色，CSS 里没写死别的颜色',
       /\.fmark\{[^}]*background:var\(--cubie\)/.test(src2) &&
       !/\.fmark\{[^}]*background:var\(--accent\)/.test(src2));
