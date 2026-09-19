@@ -60,20 +60,20 @@
   .orbit .z2{left:56px;top:56px}
 
   .cube{position:relative;width:0;height:0;transform-style:preserve-3d}
-  /* F 面标牌：挂在前面左下角的外侧，跟着魔方一起转，
+  /* F 面标牌：贴在前面的中心方块上，跟着魔方一起转，
      所以做了 x/y/z 之后它仍然指着当前的前面。
-     放在角上而不是正中 —— 正中会挡住一张贴纸。
-     尺寸、圆角都按 --cs 算，和方块同步缩放，看着像魔方的一部分。 */
+     做成比方块略小的圆角小牌（塑料底 + 彩字）：
+     底色必须和贴纸不同色 —— 因为字色就等于前面那个颜色，
+     透明底的话字会淹没在同色贴纸里看不见。
+     尺寸、圆角都按 --cs 算，和魔方同步缩放。 */
   .fmark{position:absolute;left:0;top:0;
-         width:calc(var(--cs) * 0.46);height:calc(var(--cs) * 0.46);
-         margin:calc(var(--cs) * -0.23) 0 0 calc(var(--cs) * -0.23);
-         border-radius:calc(var(--cs) * 0.13);display:grid;place-items:center;
-         font:700 calc(var(--cs) * 0.26)/1 system-ui,-apple-system,sans-serif;
-         background:var(--cubie);            /* 魔方的塑料色 */
+         width:calc(var(--cs) * 0.52);height:calc(var(--cs) * 0.52);
+         margin:calc(var(--cs) * -0.26) 0 0 calc(var(--cs) * -0.26);
+         border-radius:calc(var(--cs) * 0.14);display:grid;place-items:center;
+         font:700 calc(var(--cs) * 0.3)/1 system-ui,-apple-system,sans-serif;
+         background:var(--cubie);
          box-shadow:0 2px 10px #0006,inset 0 0 0 1px #ffffff18;
-         transform:translate3d(calc(var(--cs) * -1.02),
-                               calc(var(--cs) * 1.02),
-                               calc(var(--cs) * 1.52))}
+         transform:translate3d(0, 0, calc(var(--cs) * 1.52))}
   .layer{position:absolute;left:0;top:0;width:0;height:0;transform-style:preserve-3d}
   .cubie{position:absolute;left:0;top:0;width:var(--cs);height:var(--cs);
          margin:calc(var(--cs) / -2) 0 0 calc(var(--cs) / -2);transform-style:preserve-3d}
