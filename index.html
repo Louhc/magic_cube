@@ -164,7 +164,6 @@
              padding:9px 10px;font:inherit;font-size:12.5px;cursor:pointer;transition:background .1s}
   button.act:hover:not(:disabled){background:var(--field-hover);border-color:var(--line-strong)}
   button.act:disabled{opacity:.38;cursor:default}
-  button.act.wide{grid-column:1 / -1}
 
   #toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,14px);
          background:var(--toast-bg);color:var(--toast-fg);border:1px solid var(--toast-line);border-radius:9px;
@@ -227,7 +226,7 @@
       <h2>操作</h2>
       <div class="btns">
         <button class="act" id="btn-reset">恢复默认配色</button>
-        <button class="act wide" id="btn-clear">全部清除为灰色</button>
+        <button class="act" id="btn-clear">全部清除为灰色</button>
         <button class="act" id="btn-undo">撤销</button>
         <button class="act" id="btn-redo">重做</button>
       </div>

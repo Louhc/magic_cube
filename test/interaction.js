@@ -747,6 +747,24 @@ check('导出的 SVG 含网格 + 划线 + 箭头',
   }
 }
 
+// —— 操作区的排版 ——
+// btns 是两列网格；如果有按钮带跨列的类，它前面的按钮右边会空一格，
+// 后面的按钮被挤到下一行。这里直接盯住"四个按钮都是普通 act"。
+{
+  const sec = html.match(/<h2>操作<\/h2>[\s\S]*?<\/section>/);
+  check('找得到操作区', !!sec);
+  if (sec) {
+    const btns = sec[0].match(/<button[^>]*>/g) || [];
+    check('操作区有 4 个按钮', btns.length === 4, btns.length + ' 个');
+    check('四个按钮都只带 act（没有跨列独占整行的）',
+      btns.every(t => (t.match(/class="([^"]*)"/) || [])[1] === 'act'),
+      btns.map(t => (t.match(/class="([^"]*)"/) || [])[1]).join(' | '));
+    check('按钮顺序：恢复 / 清除 / 撤销 / 重做',
+      ['btn-reset', 'btn-clear', 'btn-undo', 'btn-redo'].every((id, i) => btns[i].includes(id)),
+      btns.map(t => (t.match(/id="([^"]*)"/) || [])[1]).join(','));
+  }
+}
+
 console.log('\n[15] 模式互不干扰');
 mb[0]._ev.click[0]({});
 check('切回 F2L 是 3D 视图（27 格）', (svg().match(/<g class="cell"/g) || []).length === 27);
