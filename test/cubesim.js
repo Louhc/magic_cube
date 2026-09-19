@@ -452,6 +452,53 @@ console.log('\n[13] 练习页：显示的图形必须是「从复原态执行该
       ok('展示一律默认视角（b 版 rotateY -32）', /rotateY\(-32deg\)/.test(sawB || ''), String(sawB));
     }
 
+    // 切走再回来，题目不能变
+    ok('会存本轮进度', /practice-round-v1/.test(html) && /function saveRound\(\)/.test(html));
+    ok('载入时优先恢复上次那一题', /localStorage\.getItem\(ROUND_KEY\)/.test(html) &&
+      /r\[0\] === d\.id/.test(html));
+    {
+      const vm9 = require('vm');
+      const st9 = {
+        'practice-scope-v1': 'oll',
+        'practice-round-v1': JSON.stringify({ scope: 'oll', id: '33', bag: [5, 6], last: 33 })
+      };
+      const els9 = { cube: mk('div'), stage: mk('div'), next: mk('button') };
+      const btns9 = ['f2l', 'oll', 'pll'].map(k => { const b = mk('button'); b.dataset.scope = k; return b; });
+      const ctx9 = { console, navigator: {}, window: { addEventListener() {} },
+        setTimeout, clearTimeout,
+        localStorage: { getItem: k => (k in st9 ? st9[k] : null),
+                       setItem: (k, v) => { st9[k] = String(v); }, removeItem: k => { delete st9[k]; } },
+        CubeSim: S, location: { hash: '' },
+        document: { getElementById: id => els9[id] || (els9[id] = mk('div')),
+                    querySelectorAll: sel => sel === '#scope button' ? btns9 : [],
+                    documentElement: mk('html'), createElement: mk,
+                    body: { appendChild() {} }, addEventListener() {} } };
+      ctx9.globalThis = ctx9;
+      vm9.createContext(ctx9);
+      vm9.runInContext(fs.readFileSync(path.join(__dirname, '..', 'alglist.js'), 'utf8'), ctx9);
+      vm9.runInContext(page, ctx9);
+      ok('回来时还是上次那一题（OLL 33）', els9.qid.textContent === 'OLL 33', els9.qid.textContent);
+      // 局面也应当是 OLL 33 那条公式的（不是随便抽的）
+      const row9 = ctx9.ALG_LIST.oll.filter(r => r[0] === '33')[0];
+      const C9 = {};
+      for (const x of html.match(/var COLOR = \{([^}]+)\}/)[1].matchAll(/([UDFBRL]):\s*'(#[0-9A-Fa-f]{6})'/g)) {
+        C9[x[2].toUpperCase()] = x[1];
+      }
+      const N9 = { px: '1,0,0', nx: '-1,0,0', py: '0,1,0', ny: '0,-1,0', pz: '0,0,1', nz: '0,0,-1' };
+      const got9 = {};
+      for (const m of els9.cube.innerHTML.matchAll(/data-pos="([^"]+)"[^>]*>([\s\S]*?)<\/div>/g)) {
+        for (const x of m[2].matchAll(/class="on (\w+)"[^>]*--c:(#[0-9A-Fa-f]{6})/g)) {
+          got9[m[1] + '|' + N9[x[1]]] = C9[x[2].toUpperCase()];
+        }
+      }
+      const want9 = S.apply(S.solved(), row9[1]);
+      const same9 = (() => {
+        const ka = Object.keys(got9).sort(), kb = Object.keys(want9).sort();
+        return ka.length === kb.length && ka.every((k, i) => k === kb[i] && got9[k] === want9[k]);
+      })();
+      ok('恢复的那一题，局面也对得上', same9, JSON.stringify(got9).slice(0, 50));
+    }
+
     // 范围选择要持久化
     ok('范围会存进 localStorage', /practice-scope-v1/.test(html) &&
       /localStorage\.setItem\(SCOPE_KEY/.test(html));

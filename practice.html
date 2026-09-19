@@ -283,10 +283,23 @@
     return kind + '/' + kind + '-' + f + '-' + (kind === 'f2l' ? '512x515' : '512x512') + '.png';
   }
 
+  // 本轮进度也要留住 —— 否则切回来重开一轮，"不重复出题"就断了
+  var ROUND_KEY = 'practice-round-v1';
+  function saveRound() {
+    try {
+      localStorage.setItem(ROUND_KEY, JSON.stringify({ scope: scope, id: cur && cur.id,
+                                                       bag: bag, last: lastIdx }));
+    } catch (e) {}
+  }
+
   function pick() {
     var list = (typeof ALG_LIST !== 'undefined' && ALG_LIST[scope]) || [];
     if (!list.length) return;
-    var r = list[drawIndex(list.length)];
+    show(list[drawIndex(list.length)]);
+  }
+
+  // 把一道题摆出来（抽到新题、或从存档恢复）
+  function show(r) {
     // F2L 的 b 版是按「绿色为 F 面」写的，等价于在公式前后各加一个整体旋转：
     //     y + 公式 + y'
     // 这样算出来的局面，才和用户照 b 列（绿面朝自己）做出来的结果一致。
@@ -305,6 +318,7 @@
     document.getElementById('ans').classList.remove('on');
     document.getElementById('ansalg').textContent = '';
     paint(cur.state);
+    saveRound();
   }
 
   function reveal() {
@@ -381,7 +395,28 @@
   Array.prototype.forEach.call(document.querySelectorAll('#scope button'), function (o) {
     o.classList.toggle('on', o.dataset.scope === scope);
   });
-  pick();
+
+  // 切到别的页面再回来时，题目不该变 —— 优先恢复上次那一题
+  (function restore() {
+    var raw = null;
+    try { raw = localStorage.getItem(ROUND_KEY); } catch (e) {}
+    if (raw) {
+      try {
+        var d = JSON.parse(raw);
+        if (d && d.scope === scope && typeof d.id === 'string') {
+          var row = ((typeof ALG_LIST !== 'undefined' && ALG_LIST[scope]) || [])
+            .filter(function (r) { return r[0] === d.id; })[0];
+          if (row) {
+            bag = Array.isArray(d.bag) ? d.bag : [];
+            lastIdx = typeof d.last === 'number' ? d.last : -1;
+            show(row);
+            return;
+          }
+        }
+      } catch (e) {}
+    }
+    pick();
+  })();
 })();
 </script>
 </body>
