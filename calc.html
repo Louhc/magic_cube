@@ -164,6 +164,29 @@
   .moves span.done{color:var(--text);border-color:var(--line-strong)}
   .moves span.cur{background:var(--accent);border-color:var(--accent);color:#fff}
 
+  /* 选公式：三个来源按钮一排，下面是可滚动的公式表 */
+  .pick{display:flex;gap:6px;margin-bottom:8px}
+  .pick button{flex:1;height:28px;border-radius:7px;cursor:pointer;font:inherit;font-size:12px;
+               letter-spacing:.03em;background:var(--field);border:1px solid var(--line);
+               color:var(--muted);transition:.12s}
+  .pick button:hover:not(:disabled){color:var(--text);border-color:var(--line-strong)}
+  .pick button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .pick button:disabled{opacity:.4;cursor:default}
+  .plist{display:none;max-height:230px;overflow-y:auto;border:1px solid var(--line);
+         border-radius:9px;background:var(--field);padding:5px}
+  .plist.on{display:block}
+  .plist::-webkit-scrollbar{width:8px}
+  .plist::-webkit-scrollbar-thumb{background:var(--scroll);border-radius:5px}
+  .plist .p{display:flex;align-items:center;gap:8px;padding:4px 5px;border-radius:6px;
+            cursor:pointer;transition:.1s}
+  .plist .p:hover{background:var(--field-hover)}
+  .plist .p img{flex:none;width:30px;height:30px;border-radius:4px;background:#fff8}
+  .plist .p b{flex:none;width:22px;font:600 11px/1 ui-monospace,Menlo,monospace;
+              color:var(--muted);font-variant-numeric:tabular-nums}
+  .plist .p code{font:11.5px/1.4 ui-monospace,Menlo,Consolas,monospace;
+                 word-break:break-all;color:var(--text)}
+  .plist .none{padding:8px;color:var(--muted);font-size:12px}
+
   .err{margin-top:9px;color:#c0392b;font-size:12.5px;min-height:17px}
 
   @media (max-width:760px){
@@ -202,6 +225,12 @@
         <button id="fwd" type="button" title="按公式正向转动（在输入框里按回车同此）"><i>↻</i>正向</button>
         <button id="rev" type="button" title="取逆执行：顺序倒过来，每一步再取反"><i>↺</i>反向</button>
       </div>
+      <div class="pick">
+        <button data-pick="f2l" type="button">F2L</button>
+        <button data-pick="oll" type="button">OLL</button>
+        <button data-pick="pll" type="button">PLL</button>
+      </div>
+      <div class="plist" id="plist"></div>
       <div class="ctrl">
         <button id="scramble" type="button">打乱</button>
         <button id="reset" type="button">复原</button>
@@ -228,6 +257,7 @@
 </div>
 
 <script src="cubesim.js"></script>
+<script src="alglist.js"></script>
 <script src="nav.js"></script>
 <script>
 (function () {
@@ -277,6 +307,7 @@
   var histEl = document.getElementById('hist');
   var revEl = document.getElementById('rev');
   var fwdEl = document.getElementById('fwd');
+  var pickEl = document.getElementById('plist');
 
   var steps = [], frames = [], at = 0;   // 最近一次提交的步骤与各阶段局面
   var cur = CubeSim.solved();            // 当前局面（累积的）
@@ -284,6 +315,23 @@
   var view = { x: -24, y: -32 };         // 观察角度，可拖动
   var busy = false;                      // 播放中不接受新操作
   var CS = 46;                           // 小方块边长，随舞台尺寸自适应
+
+  // 公式缩略图：和公式表用同一套文件命名
+  function thumb(kind, id) {
+    var f = kind === 'f2l' ? id
+          : (/^\d+$/.test(id) && id.length < 2 ? '0' + id : id);
+    var size = kind === 'f2l' ? '512x515' : '512x512';
+    return kind + '/' + kind + '-' + f + '-' + size + '.png';
+  }
+
+  var pickKind = null;
+  function renderPick() {
+    pickEl.innerHTML = pickKind ? (ALG_LIST[pickKind] || []).map(function (r) {
+      return '<div class="p" data-alg="' + esc(r[1]) + '">' +
+             '<img src="' + thumb(pickKind, r[0]) + '" alt="" loading="lazy">' +
+             '<b>' + esc(r[0]) + '</b><code>' + esc(r[1]) + '</code></div>';
+    }).join('') : '';
+  }
 
   function esc(t) {
     return String(t).replace(/[&<>]/g, function (c) {
@@ -433,6 +481,9 @@
     Array.prototype.forEach.call(document.querySelectorAll('.orbit button'), function (b) {
       b.disabled = busy;
     });
+    Array.prototype.forEach.call(document.querySelectorAll('.pick button'), function (b) {
+      b.disabled = busy;
+    });
     document.getElementById('scramble').disabled = busy;
     document.getElementById('reset').disabled = busy;
   }
@@ -552,6 +603,25 @@
     algEl.classList.remove('bad');
     errEl.textContent = '';
   });
+  // 选公式：点来源按钮展开列表，点某一条就填进输入框并直接执行
+  Array.prototype.forEach.call(document.querySelectorAll('.pick button'), function (b) {
+    b.addEventListener('click', function () {
+      var k = b.dataset.pick;
+      pickKind = (pickKind === k) ? null : k;
+      Array.prototype.forEach.call(document.querySelectorAll('.pick button'), function (o) {
+        o.classList.toggle('on', o.dataset.pick === pickKind);
+      });
+      pickEl.classList.toggle('on', !!pickKind);
+      renderPick();
+    });
+  });
+  pickEl.addEventListener('click', function (e) {
+    var el = e.target.closest ? e.target.closest('.p') : null;
+    if (!el || busy) return;
+    algEl.value = el.dataset.alg;
+    submit('alg', false);
+  });
+
   document.getElementById('scramble').addEventListener('click', scramble);
   // 整体旋转：动画 + 记进历史（它确实改变了哪一面是 F）
   Array.prototype.forEach.call(document.querySelectorAll('.orbit button'), function (b) {
@@ -624,6 +694,16 @@
 
   fit();
   reset();
+
+  // 公式表里的「↗ 在计算器里打开」会把公式放在 URL hash 里带过来
+  // （用 hash 而不是查询串：file:// 下也能用）
+  (function () {
+    var h = location.hash || '';
+    if (h.length > 1) {
+      try { h = decodeURIComponent(h.slice(1)); } catch (e) { h = h.slice(1); }
+      if (h) { algEl.value = h; algEl.focus(); }
+    }
+  })();
 })();
 </script>
 </body>

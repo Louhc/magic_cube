@@ -104,8 +104,9 @@ console.log('\n[5] 真跑一遍 calc.html 的脚本（DOM 桩）');
     // 页面里会挂 resize 监听，桩也得有
     window: { addEventListener() {} }, setTimeout, clearTimeout,
     localStorage: { getItem: () => null, setItem() {} }, CubeSim: S,
+    location: { hash: '' },
     document: { getElementById: id => els[id] || (els[id] = mkEl('div')),
-                // 这一节不需要箭头
+                // 这一节不需要箭头和选公式
                 querySelectorAll: () => [],
                 documentElement: mkEl('html'), createElement: mkEl,
                 body: { appendChild() {} }, addEventListener() {} } };
@@ -114,6 +115,8 @@ console.log('\n[5] 真跑一遍 calc.html 的脚本（DOM 桩）');
   const src = fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')
     .match(/<script>([\s\S]*?)<\/script>/g).map(x => x.replace(/<\/?script>/g, ''))
     .filter(x => x.includes('M3'))[0];
+  // 页面依赖 alglist.js（选公式面板的数据），先注入
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'alglist.js'), 'utf8'), ctx);
   let threw = null;
   try { vm.runInContext(src, ctx); } catch (e) { threw = e; }
   ok('脚本执行不报错', !threw, threw && (threw.message + ' @ ' + String(threw.stack).split('\n')[1]));
@@ -380,6 +383,7 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
   const ctx = { console, navigator: {}, window: { addEventListener() {} },
     setTimeout, clearTimeout, localStorage: { getItem: () => null, setItem() {} },
     CubeSim: S,
+    location: { hash: '' },   // 页面会读 hash 取公式
     document: { getElementById: id => els[id] || (els[id] = mkEl('div')),
                 querySelectorAll: sel => sel === '.orbit button' ? els.arrows : [],
                 documentElement: mkEl('html'), createElement: mkEl,
@@ -389,6 +393,7 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
   const src = fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')
     .match(/<script>([\s\S]*?)<\/script>/g).map(x => x.replace(/<\/?script>/g, ''))
     .filter(x => x.includes('M3'))[0];
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'alglist.js'), 'utf8'), ctx);
   vm.runInContext(src, ctx);
 
   ok('起步是复原态、历史为空', String(els.hcount.textContent) === '0' &&
@@ -512,6 +517,67 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
       /closest\('\.orbit button, \.themebtn'\)/.test(fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')));
     ok('输入框里没有默认值',
       !/id="alg"[^>]*value="/.test(fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')));
+
+    // ---- 从公式表快速选公式 ----
+    const tables = ['f2l.html', 'oll.html', 'pll.html'];
+    tables.forEach(f => {
+      const t = fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
+      ok(f + ' 里每条公式都有「在计算器里打开」',
+        /class="tocalc"/.test(t) && /calc\.html#/.test(t));
+    });
+    ok('计算器会读取 hash 里的公式',
+      /location\.hash/.test(fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')));
+    // 带上 hash 打开时，输入框应当被填好
+    {
+      const vm2 = require('vm');
+      const els2 = { alg: mkEl('input', '') };
+      els2.cube = mkEl('div');
+      const ctx2 = { console, navigator: {}, window: { addEventListener() {} },
+        setTimeout, clearTimeout, localStorage: { getItem: () => null, setItem() {} },
+        CubeSim: S, location: { hash: '#' + encodeURIComponent("R U R' U' F") },
+        document: { getElementById: id => els2[id] || (els2[id] = mkEl('div')),
+                    querySelectorAll: () => [],
+                    documentElement: mkEl('html'), createElement: mkEl,
+                    body: { appendChild() {} }, addEventListener() {} } };
+      ctx2.globalThis = ctx2;
+      vm2.createContext(ctx2);
+      vm2.runInContext(src, ctx2);
+      ok('带 hash 打开时输入框已填好', els2.alg.value === "R U R' U' F", els2.alg.value);
+    }
+
+    // ---- 选公式面板 ----
+    ok('有 F2L / OLL / PLL 三个来源按钮',
+      /\.pick button/.test(src2) && ['f2l', 'oll', 'pll'].every(k => src2.includes('data-pick="' + k + '"')));
+    ok('列表项带缩略图', /function thumb\(kind, id\)/.test(src2) && /<img src="' \+ thumb/.test(src2));
+    ok('点某一条会填进输入框并执行',
+      /algEl\.value = el\.dataset\.alg;\s*submit\('alg', false\)/.test(src2));
+    // 共享数据必须和三个公式表一致 —— 否则面板会显示过期的公式
+    {
+      const vm3 = require('vm');
+      const c3 = {}; vm3.createContext(c3); c3.globalThis = c3;
+      vm3.runInContext(fs.readFileSync(path.join(__dirname, '..', 'alglist.js'), 'utf8'), c3);
+      const A = c3.ALG_LIST;
+      ok('alglist 覆盖 f2l/oll/pll', ['f2l', 'oll', 'pll'].every(k => A[k] && A[k].length));
+      // 逐条和页面里的公式比对
+      const pages = { oll: 'oll.html', pll: 'pll.html', f2l: 'f2l.html' };
+      ['oll', 'pll'].forEach(k => {
+        const h = fs.readFileSync(path.join(__dirname, '..', pages[k]), 'utf8');
+        const data = JSON.parse(h.match(/var SECTIONS = (\[[\s\S]*?\n\]);/)[1]);
+        const want = data.flatMap(sec => sec.rows.map(r => r[1])).sort();
+        const got = A[k].map(r => r[1]).sort();
+        ok('alglist 的 ' + k.toUpperCase() + ' 与页面一致（' + got.length + ' 条）',
+          JSON.stringify(want) === JSON.stringify(got), '条数 ' + want.length + ' vs ' + got.length);
+      });
+      // 缩略图必须都存在
+      let missing = [];
+      ['f2l', 'oll', 'pll'].forEach(k => A[k].forEach(r => {
+        const id = k === 'f2l' ? r[0] : (/^\d+$/.test(r[0]) && r[0].length < 2 ? '0' + r[0] : r[0]);
+        const f = k + '/' + k + '-' + id + '-' + (k === 'f2l' ? '512x515' : '512x512') + '.png';
+        if (!fs.existsSync(path.join(__dirname, '..', f))) missing.push(f);
+      }));
+      ok('缩略图文件都存在（' + (A.f2l.length + A.oll.length + A.pll.length) + ' 张）',
+        missing.length === 0, missing.slice(0, 3).join(', '));
+    }
 
     // 打乱放在最后：22 步要播约 9 秒，放在前面会把后面的提交全挡在 busy 外面
     els.scramble.fire('click');

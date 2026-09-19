@@ -65,6 +65,13 @@
        cursor:pointer;word-break:break-word;border-radius:5px;padding:2px 5px;margin:-2px -5px}
   code:hover{background:var(--field)}
   code.copied{background:var(--accent);color:#fff}
+  /* 「在计算器里打开」：把公式带过去，省得手抄 */
+  a.tocalc{flex:none;display:inline-block;margin-left:7px;padding:2px 7px;border-radius:5px;
+           text-decoration:none;font:11.5px/1.5 ui-monospace,Menlo,monospace;
+           color:var(--muted);background:var(--field);border:1px solid var(--line);
+           transition:.12s}
+  a.tocalc:hover{color:var(--accent);border-color:var(--accent)}
+  .fw{display:flex;flex-wrap:wrap;align-items:baseline;margin:2px 0}
 
   /* 复制提示 */
   #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(12px);
@@ -186,11 +193,15 @@ function esc(s) {
   });
 }
 /* 一行里可能有多条公式（换行分隔），逐条渲染成可点的 code */
+function toCalc(alg) {
+  return '<a class="tocalc" href="calc.html#' + encodeURIComponent(alg) +
+         '" title="在计算器里打开这条公式">\u2197</a>';
+}
 function formulas(text) {
   if (!text) return '';
   return text.split('\n').map(function (line) {
-    return '<code>' + esc(line) + '</code>';
-  }).join('<br>');
+    return '<span class="fw"><code>' + esc(line) + '</code>' + toCalc(line) + '</span>';
+  }).join('');
 }
 function pic(name, alt) {
   if (!name) return '<td class="empty"></td>';

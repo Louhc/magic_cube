@@ -60,6 +60,13 @@
        cursor:pointer;word-break:break-word;border-radius:5px;padding:2px 5px;margin:-2px -5px}
   code:hover{background:var(--field)}
   code.copied{background:var(--accent);color:#fff}
+  /* 「在计算器里打开」：把公式带过去，省得手抄 */
+  a.tocalc{flex:none;display:inline-block;margin-left:8px;padding:2px 7px;border-radius:5px;
+           text-decoration:none;font:11.5px/1.5 ui-monospace,Menlo,monospace;
+           color:var(--muted);background:var(--field);border:1px solid var(--line);
+           transition:.12s}
+  a.tocalc:hover{color:var(--accent);border-color:var(--accent)}
+  td.f{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 0}
 
   /* 有备用写法时，图片可点开。展开后每条备选配一张"对应朝向"的图
      （就是原图顺时针转 m*90 度 —— 已用模拟器验证过，等价于把局面做 U^m）。 */
@@ -189,8 +196,12 @@ function esc(s) {
     return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c];
   });
 }
+function toCalc(alg) {
+  return '<a class="tocalc" href="calc.html#' + encodeURIComponent(alg) +
+         '" title="在计算器里打开这条公式">↗</a>';
+}
 function row(n, alg, alts) {
-  var body = alg ? '<code>' + esc(alg) + '</code>'
+  var body = alg ? '<code>' + esc(alg) + '</code>' + toCalc(alg)
                  : '<span class="todo">—</span>';
   if (alts && alts.length) {
     body += '<div class="alts">';
@@ -198,7 +209,8 @@ function row(n, alg, alts) {
       // a[1] 是相对本图要转的 AUF 步数；图顺时针转 m*90 度即"对应的朝向"
       body += '<div class="r"><span class="th"><img src="' + IMG(n) + '" alt="" loading="lazy"' +
               (a[1] ? ' style="transform:rotate(' + (a[1] * 90) + 'deg)"' : '') +
-              '></span><span class="f1"><code>' + esc(a[0]) + '</code></span></div>';
+              '></span><span class="f1"><code>' + esc(a[0]) + '</code>' + toCalc(a[0]) +
+              '</span></div>';
     });
     body += '</div>';
   }
