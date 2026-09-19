@@ -360,7 +360,11 @@ console.log('\n[13] 练习页：显示的图形必须是「从复原态执行该
   ok('练习页有 F2L/OLL/PLL 三个范围',
     ['f2l', 'oll', 'pll'].every(k => html.includes('data-scope="' + k + '"')));
   ok('题目图形取自 apply(solved, 公式)',
-    /CubeSim\.apply\(CubeSim\.solved\(\), r\[1\]\)/.test(html), '不是从复原态算的');
+    /CubeSim\.apply\(CubeSim\.solved\(\), exec\)/.test(html), '不是从复原态算的');
+  // F2L 的 b 版按「绿色为 F 面」写，等价于 y + 公式 + y'（共轭，会真的改局面）
+  ok('F2L 的 b 版按 y+公式+y\' 执行',
+    /scope === 'f2l' && \/b\$\/\.test\(r\[0\]\)\) \? \('y ' \+ r\[1\] \+ " y'"\)/.test(html),
+    'b 版没有做共轭');
   ok('看答案会从复原态播一遍',
     /function reveal\(\)/.test(html) && /var st = CubeSim\.solved\(\);/.test(html));
   ok('导航里有练习页',
@@ -408,14 +412,18 @@ console.log('\n[13] 练习页：显示的图形必须是「从复原态执行该
       }
     }
     const parts = els5.qid.textContent.split(' ');
-    const row = ctx5.ALG_LIST[parts[0].toLowerCase()].find(r => r[0] === parts[1]);
+    const kind5 = parts[0].toLowerCase();
+    const row = ctx5.ALG_LIST[kind5].find(r => r[0] === parts[1]);
+    // b 版要按共轭执行，期望值同样处理
+    const want5 = (kind5 === 'f2l' && /b$/.test(parts[1]))
+      ? ('y ' + row[1] + " y'") : row[1];
     // sameState 定义在 [12] 的块作用域里，这里自己比
     const eqState = (a, b) => {
       const ka = Object.keys(a).sort(), kb = Object.keys(b).sort();
       return ka.length === kb.length && ka.every((k, i) => k === kb[i] && a[k] === b[k]);
     };
     ok('画出来的就是 apply(solved, 公式)（题目 ' + els5.qid.textContent + '）',
-      !!row && eqState(got5, S.apply(S.solved(), row[1])), JSON.stringify(got5).slice(0, 60));
+      !!row && eqState(got5, S.apply(S.solved(), want5)), JSON.stringify(got5).slice(0, 60));
     // 展示一律红面为 F（执行才按 a/b 切，那是计算器的事）
     {
       const vm8 = require('vm');
@@ -709,9 +717,6 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
     // 只填入、不执行 —— 让用户自己确认方向再按
     // F2L 的 b 版要以绿面为 F —— 选到它时视角也要跟着转
     ok('公式行带编号（才能区分 a/b）', /data-id="' \+ esc\(r\[0\]\)/.test(src2));
-    ok('选到 b 版时切到绿面视角',
-      /pickKind === 'f2l' && \/b\$\/\.test\(el\.dataset\.id/.test(src2) &&
-      /view\.y = VIEW\.y \+ \(isB \? -90 : 0\)/.test(src2));
     ok('点某一条只填入输入框',
       /algEl\.value = el\.dataset\.alg;[\s\S]{0,400}?algEl\.focus\(\)/.test(src2) &&
       !/algEl\.value = el\.dataset\.alg;[\s\S]{0,400}?submit\('alg'/.test(src2));

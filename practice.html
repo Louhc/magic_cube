@@ -287,9 +287,15 @@
     var list = (typeof ALG_LIST !== 'undefined' && ALG_LIST[scope]) || [];
     if (!list.length) return;
     var r = list[drawIndex(list.length)];
+    // F2L 的 b 版是按「绿色为 F 面」写的，等价于在公式前后各加一个整体旋转：
+    //     y + 公式 + y'
+    // 这样算出来的局面，才和用户照 b 列（绿面朝自己）做出来的结果一致。
+    // 注意这不是转视角 —— 共轭会真的改变局面。
+    var exec = (scope === 'f2l' && /b$/.test(r[0])) ? ('y ' + r[1] + " y'") : r[1];
     // 目标图形 = 从【复原态】执行这条公式的结果 ——
     // 用户手里是拼好的魔方，做完得到的正是这个
-    cur = { id: r[0], alg: r[1], state: CubeSim.apply(CubeSim.solved(), r[1]) };
+    cur = { id: r[0], alg: r[1], exec: exec,
+            state: CubeSim.apply(CubeSim.solved(), exec) };
     view.x = VIEW.x;
     view.y = VIEW.y;
     document.getElementById('qid').textContent = scope.toUpperCase() + ' ' + r[0];
@@ -307,7 +313,7 @@
     document.getElementById('ans').classList.add('on');
     // 从复原态一步步播一遍，方便对着核对自己手上的结果
     busy = true;
-    var list = CubeSim.steps(cur.alg);
+    var list = CubeSim.steps(cur.exec || cur.alg);
     var st = CubeSim.solved();
     paint(st);
     var i = 0;
