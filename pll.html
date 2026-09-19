@@ -97,32 +97,34 @@
    逐条用 tools/verify.py 校验过「照图摆好直接就能用」。 */
 var SECTIONS = [
   { title: "21 种", cnt: 21, rows: [
-    [1, "x' R2 D2 (R' U' R) D2 (R' U R')"],
-    [2, "x' (R U' R) D2 (R' U R) D2 R'2"],
-    [3, "x' (R U' R' D) (R U R' D') (R U R' D) (R U' R' D')"],
-    [4, "R' U' F' (R U R' U' R' F R2 U' R' U' R U R' F') F U R"],
-    [5, "(R2 u) (R' U R' U' R u' R'2) y' (R' U R)"],
-    [6, "(R' U' R) y (R2 u) (R' U R U') (R u' R'2)"],
-    [7, "(R'2 u' R U' R) (U R' u R2) y (R U' R')"],
-    [8, "(R U R') y' (R'2 u' R U') (R' U R' u R2)"],
-    [9, "M'2 U M'2 U2 M'2 U M'2"],
-    [10, "(L' U' L F) (L' U' L U) (L F') (L2 U L U)"],
-    [11, "(R U R' F') (R U R' U') (R' F) (R2 U' R' U')"],
-    [12, "R U R' U (R U R' F' R U R' U' R' F R2 U' R' U') U' R U' R'"],
-    [13, "R' U R U' R' F' U' F R U R' F R' F' R U' R"],
-    [14, "(R U R' F') (R U'2 R' U2) (R' F R U) (R U'2 R' U')"],
-    [15, "(L' U' L F) (L' U2 L U'2) (L F' L' U') (L' U2 L U)"],
-    [16, "(R U R' U') (R' F R2 U' R' U') (R U R' F')"],
-    [17, "(R U' R) (U R) (U R U' R' U' R'2)"],
-    [18, "(R2 U) (R U R' U' R' U') (R' U R')"],
-    [19, "R' U R' d' R' F' R2 U' R' U R' F R F"],
-    [20, "F (R U' R' U' R U R') F' (R U R' U') (R' F R F')"],
-    [21, "U (R' U' R U') (R U R U') (R' U R U) (R2 U' R' U)"],
+    ["Aa", "x' R2 D2 (R' U' R) D2 (R' U R')"],
+    ["Ab", "x' (R U' R) D2 (R' U R) D2 R'2"],
+    ["E", "x' (R U' R' D) (R U R' D') (R U R' D) (R U' R' D')"],
+    ["F", "R' U' F' (R U R' U' R' F R2 U' R' U' R U R' F') F U R"],
+    ["Ga", "(R2 u) (R' U R' U' R u' R'2) y' (R' U R)"],
+    ["Gb", "(R' U' R) y (R2 u) (R' U R U') (R u' R'2)"],
+    ["Gc", "(R'2 u' R U' R) (U R' u R2) y (R U' R')"],
+    ["Gd", "(R U R') y' (R'2 u' R U') (R' U R' u R2)"],
+    ["H", "M'2 U M'2 U2 M'2 U M'2"],
+    ["Ja", "(L' U' L F) (L' U' L U) (L F') (L2 U L U)"],
+    ["Jb", "(R U R' F') (R U R' U') (R' F) (R2 U' R' U')"],
+    ["Na", "R U R' U (R U R' F' R U R' U' R' F R2 U' R' U') U' R U' R'"],
+    ["Nb", "R' U R U' R' F' U' F R U R' F R' F' R U' R"],
+    ["Ra", "(R U R' F') (R U'2 R' U2) (R' F R U) (R U'2 R' U')"],
+    ["Rb", "(L' U' L F) (L' U2 L U'2) (L F' L' U') (L' U2 L U)"],
+    ["T", "(R U R' U') (R' F R2 U' R' U') (R U R' F')"],
+    ["Ua", "(R U' R) (U R) (U R U' R' U' R'2)"],
+    ["Ub", "(R2 U) (R U R' U' R' U') (R' U R')"],
+    ["V", "R' U R' d' R' F' R2 U' R' U R' F R F"],
+    ["Y", "F (R U' R' U' R U R') F' (R U R' U') (R' F R F')"],
+    ["Z", "U (R' U' R U') (R U R U') (R' U R U) (R2 U' R' U)"],
   ] },
 ];
 
-var IMG = function (n) {
-  return 'pll/pll-' + (n < 10 ? '0' + n : n) + '-512x512.png';
+var IMG = function (id) {
+  // 编号统一是字符串：OLL 是 '1'..'57'（文件名补零成 01），PLL 是 'Aa'..'Z'
+  var f = /^\d+$/.test(id) && id.length < 2 ? '0' + id : id;
+  return 'pll/pll-' + f + '-512x512.png';
 };
 function esc(s) {
   return String(s).replace(/[&<>]/g, function (c) {

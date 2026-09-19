@@ -14,7 +14,8 @@
 
 用法:
     python3 tools/verify.py                 # 校验仓库里的 oll.html / pll.html
-    python3 tools/verify.py --find 04        # 去公式库里搜第 4 条能用的写法
+    python3 tools/verify.py --find 16 oll    # OLL 16 有没有别的写法
+    python3 tools/verify.py --find T  pll    # PLL T（编号用字母）
 """
 import json
 import os
@@ -67,13 +68,20 @@ def lib_algs(libfile):
     return out
 
 
+def img_name(kind, ident):
+    """编号 -> 图文件名。OLL 是 1..57（补零），PLL 是 Aa..Z"""
+    f = ident if not ident.isdigit() else ident.zfill(2)
+    return '%s-%s-512x512.png' % (kind, f)
+
+
 def page_data(page):
-    """从页面里读出 [编号, 公式]（编号与公式是数据区前两项）"""
+    """从页面里读出 [编号, 公式]（编号与公式是数据区前两项）
+
+       编号统一是字符串：OLL 是 '1'..'57'，PLL 是 'Aa'..'Z'。
+    """
     h = open(page, encoding='utf-8').read()
-    out = []
-    for m in re.finditer(r'\[(\d+), "([^"]*)"', h):
-        out.append((int(m.group(1)), m.group(2)))
-    return out
+    return [(m.group(1), m.group(2))
+            for m in re.finditer(r'\["([^"]+)", "([^"]*)"', h)]
 
 
 def check(kind, page, imgdir, libfile):
@@ -84,21 +92,20 @@ def check(kind, page, imgdir, libfile):
         return 1
     bad = 0
     for n, alg in rows:
-        img = S.read(kind, os.path.join(imgdir, '%s-%02d-512x512.png'
-                                        % (kind, n)))
+        img = S.read(kind, os.path.join(imgdir, img_name(kind, n)))
         if not alg:
-            print('  %02d  留空（未填公式）' % n)
+            print('  %-4s 留空（未填公式）' % n)
             bad += 1
             continue
         ss = sigs(alg, kind)
         if ss is None:
-            print('  %02d  公式算不出合法局面 ← 公式有问题' % n)
+            print('  %-4s 公式算不出合法局面 ← 公式有问题' % n)
             bad += 1
             continue
         if ss[0] == img:
             continue
         k = ss.index(img) if img in ss else None
-        print('  %02d  %s' % (n, ('差 %d 步 AUF' % k) if k is not None else '对不上'))
+        print('  %-4s %s' % (n, ('差 %d 步 AUF' % k) if k is not None else '对不上'))
         print('       图   %s' % (img if kind == 'pll'
                                  else '%s %s %s  %s' % (img[0][:3], img[0][3:6], img[0][6:9], img[1])))
         g = ss[0]
@@ -109,10 +116,10 @@ def check(kind, page, imgdir, libfile):
     return bad
 
 
-def find(kind, n, imgdir, libfile):
-    """去公式库里搜第 n 条能用的写法"""
-    img = S.read(kind, os.path.join(imgdir, '%s-%02d-512x512.png' % (kind, n)))
-    print('图 %02d 的签名: %s' % (n, img))
+def find(kind, ident, imgdir, libfile):
+    """去公式库里搜这个情况能用的写法。ident: OLL 用数字(16)，PLL 用字母(T)"""
+    img = S.read(kind, os.path.join(imgdir, img_name(kind, ident)))
+    print('图 %s 的签名: %s' % (ident, img))
     hits = []
     for cid, name, alg in lib_algs(libfile):
         ss = sigs(alg, kind)
@@ -136,9 +143,9 @@ def main(argv):
     kind = None
     if '--find' in argv:
         i = argv.index('--find')
-        n = int(argv[i + 1])
+        ident = argv[i + 1]
         kind = argv[i + 2] if len(argv) > i + 2 else 'oll'
-        return find(kind, n, os.path.join(ROOT, kind),
+        return find(kind, ident, os.path.join(ROOT, kind),
                     os.path.join(ROOT, 'tools/data/%s.js' % kind))
     bad = 0
     for kind in ('oll', 'pll'):

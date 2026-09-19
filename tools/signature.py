@@ -80,9 +80,10 @@ if __name__ == '__main__':
     d = sys.argv[1] if len(sys.argv) > 1 else '.'
     kind = 'oll' if 'oll' in os.path.basename(d.rstrip('/')) else 'pll'
     for f in sorted(glob.glob(os.path.join(d, '*.png'))):
-        n = int(re.search(r'-(\d+)-', f).group(1))
+        n = re.search(r'-[^-]+-\d+x\d+\.png$', os.path.basename(f))
+        n = os.path.basename(f).split('-')[1]
         v = read(kind, f)
         if kind == 'oll':
-            print('%02d  %s %s %s   %s' % (n, v[0][0:3], v[0][3:6], v[0][6:9], v[1]))
+            print('%-4s %s %s %s   %s' % (n, v[0][0:3], v[0][3:6], v[0][6:9], v[1]))
         else:
-            print('%02d  %s' % (n, v))
+            print('%-4s %s' % (n, v))
