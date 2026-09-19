@@ -1,0 +1,15 @@
+# Python 虚拟环境：体积大且可重建，不入库
+venv/
+__pycache__/
+*.py[cod]
+
+# 浏览器下载留下的 Windows 附属数据流（Linux 上会显示成一个带冒号的普通文件）
+*:Zone.Identifier
+
+# 系统垃圾
+.DS_Store
+Thumbs.db
+
+# 临时渲染/对比图
+_*.png
+/tmp_*.png
