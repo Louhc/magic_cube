@@ -29,7 +29,7 @@
             color:var(--text);font-size:15px;line-height:1;cursor:pointer;transition:.12s}
   .themebtn:hover{border-color:var(--line-strong)}
 
-  main{max-width:900px;margin:0 auto;padding:6px 16px 0}
+  main{max-width:900px;margin:0 auto;padding:6px 16px 52px}
   .cards{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-top:24px}
   .card{display:flex;align-items:center;gap:15px;text-decoration:none;color:inherit;
         background:var(--card);border:1px solid var(--line);border-radius:12px;
@@ -40,11 +40,6 @@
   .card h2{margin:0 0 5px;font-size:15px}
   .card h2 .n{color:var(--accent);font-weight:600;font-size:12.5px;margin-left:6px}
   .card p{margin:0;color:var(--muted);font-size:12.5px;line-height:1.6}
-
-  footer{max-width:900px;margin:30px auto 0;padding:0 16px 46px;
-         color:var(--muted);font-size:12px;line-height:1.9;text-align:center}
-  footer code{font:12px ui-monospace,Menlo,Consolas,monospace;background:var(--field);
-              padding:1px 5px;border-radius:4px}
 
   @media (max-width:720px){
     .cards{grid-template-columns:1fr}
@@ -92,10 +87,6 @@
     </a>
   </div>
 </main>
-
-<footer>
-  公式来自知乎「小狼啊小狼」CFOP 系列，已逐条做朝向校验 · <code>tools/verify.py</code>
-</footer>
 
 <script src="nav.js"></script>
 <script>
