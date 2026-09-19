@@ -177,8 +177,9 @@
 
   var stageEl = document.getElementById('stage');
   var cubeEl = document.getElementById('cube');
-  // F2L 的 b 版是「绿色为 F 面」，所以看的时候要把绿面转到左可见位，
-  // 才能和面板里那张缩略图对得上。转 -90 度即可（已用投影算过）。
+  // 展示一律以红色面为 F（和公式表 a 列同一朝向）。
+  // 注意「执行」是另一回事：b 版公式按绿面为 F 写的，
+  // 那个在计算器里选到 b 版公式时会把绿面转过来（见 calc.html）。
   var VIEW = { x: -24, y: -32 };
   var view = { x: VIEW.x, y: VIEW.y };
   var CS = 46;
@@ -291,10 +292,8 @@
     // 目标图形 = 从【复原态】执行这条公式的结果 ——
     // 用户手里是拼好的魔方，做完得到的正是这个
     cur = { id: r[0], alg: r[1], state: CubeSim.apply(CubeSim.solved(), r[1]) };
-    // b 版（F2L）把绿面转到前面来
-    var greenFront = (scope === 'f2l' && /b$/.test(r[0]));
     view.x = VIEW.x;
-    view.y = VIEW.y + (greenFront ? -90 : 0);
+    view.y = VIEW.y;
     document.getElementById('qid').textContent = scope.toUpperCase() + ' ' + r[0];
     var img = document.getElementById('qimg');
     img.src = thumbOf(scope, r[0]);
