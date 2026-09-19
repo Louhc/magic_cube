@@ -34,12 +34,14 @@
   /* 卡片只留标题和缩略图，不再有说明文字 */
   .card{display:flex;align-items:center;gap:16px;text-decoration:none;color:inherit;
         background:var(--card);border:1px solid var(--line);border-radius:12px;
-        padding:16px;transition:border-color .14s, transform .14s}
+        padding:18px;min-height:140px;transition:border-color .14s, transform .14s}
   .card:hover{border-color:var(--line-strong);transform:translateY(-2px)}
-  .card .thumb{flex:none;width:96px;height:96px;display:flex;align-items:center;justify-content:center}
+  .card .thumb{flex:none;width:104px;height:104px;display:flex;align-items:center;justify-content:center}
   .card .thumb img{max-width:100%;max-height:100%;border-radius:8px}
-  .card h2{margin:0 0 5px;font-size:15px}
-  .card h2 .n{color:var(--accent);font-weight:600;font-size:12.5px;margin-left:6px}
+  /* 没有说明文字了，标题放大一些，卡片才不会显得空 */
+  .card h2{margin:0;font-size:20px;font-weight:600;letter-spacing:.02em;line-height:1.2}
+  .card h2 .n{color:var(--accent);font-weight:600;font-size:13px;margin-left:8px;
+              vertical-align:2px;letter-spacing:0}
   .card p{margin:0;color:var(--muted);font-size:12.5px;line-height:1.6}
 
   @media (max-width:720px){
