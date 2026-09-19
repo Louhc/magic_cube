@@ -70,7 +70,7 @@ console.log('\n[4] 计算器页面的关键行为');
   ok('用了 CSS 3D（perspective + preserve-3d）',
     /perspective:/.test(html) && /preserve-3d/.test(html));
   ok('转动靠 .layer 组旋转 + 过渡动画',
-    /\.layer\{/.test(html) && /transition:transform/.test(html));
+    /\.layer\{/.test(html) && /layer\.style\.transition\s*=/.test(html));
   ok('能拖拽转视角', /pointermove/.test(html) && /applyView/.test(html));
   ok('面转的四个角标能点（跳到那一步）', /data-k=/.test(html));
   // 逐步推进到末尾，等价于一次做完
@@ -100,7 +100,9 @@ console.log('\n[5] 真跑一遍 calc.html 的脚本（DOM 桩）');
     return e;
   };
   const els = { alg: mkEl('input', "R U R' U'") };
-  const ctx = { console, navigator: {}, window: {}, setTimeout, clearTimeout,
+  const ctx = { console, navigator: {},
+    // 页面里会挂 resize 监听，桩也得有
+    window: { addEventListener() {} }, setTimeout, clearTimeout,
     localStorage: { getItem: () => null, setItem() {} }, CubeSim: S,
     document: { getElementById: id => els[id] || (els[id] = mkEl('div')),
                 documentElement: mkEl('html'), createElement: mkEl,
@@ -173,8 +175,12 @@ console.log('\n[6] 六个面的贴纸必须朝外（不是陷进方块里）');
   const got = {};
   for (const m of html.matchAll(/\.cubie i\.(\w+)\{transform:([^}]+)\}/g)) {
     let M = I, tz = 0;
-    for (const p of m[2].matchAll(/rotate([XY])\((-?\d+)deg\)|translateZ\((\d+)px\)/g)) {
-      if (p[3]) tz = +p[3]; else M = mul(M, rot(p[1], +p[2]));
+    // 推出距离现在写成 var(--half)（随舞台尺寸自适应），这里取个名义值就行 ——
+    // 这一节查的是"往哪个方向推"，不是推多远
+    for (const p of m[2].matchAll(/rotate([XY])\((-?\d+)deg\)|translateZ\((\d+)px\)|translateZ\(var\(--half\)\)/g)) {
+      if (p[3]) tz = +p[3];
+      else if (/var\(--half\)/.test(p[0])) tz = 23;
+      else M = mul(M, rot(p[1], +p[2]));
     }
     got[m[1]] = apply(M, [0, 0, 1]).map(x => Math.round(x * tz));
   }
@@ -252,10 +258,38 @@ console.log('\n[8] 配色必须是标准方案（不是镜像的）');
   ok('页面里能读到 COLOR', !!m);
   const C = {};
   if (m) for (const x of m[1].matchAll(/([UDFBRL]):\s*'(#[0-9A-Fa-f]{6})'/g)) C[x[1]] = x[2].toUpperCase();
-  const ORANGE = '#FF8C1A', RED = '#C41E3A', GREEN = '#00A651', YELLOW = '#FFE600';
-  ok('U=黄 F=绿', C.U === YELLOW && C.F === GREEN, JSON.stringify(C));
-  ok('黄在上的时候右边必须是橙（R=橙）', C.R === ORANGE, 'R=' + C.R);
-  ok('红与橙相对', C.L === RED, 'L=' + C.L);
+  const YELLOW = '#FFE600', WHITE = '#F4F4F4', RED = '#C41E3A',
+        ORANGE = '#FF8C1A', GREEN = '#00A651', BLUE = '#0051BA';
+  ok('F 面是红色', C.F === RED, 'F=' + C.F);
+  ok('U=黄、D=白', C.U === YELLOW && C.D === WHITE, JSON.stringify(C));
+  // 相对面必须配对：黄-白、红-橙、绿-蓝
+  ok('红橙相对', C.F === RED && C.B === ORANGE, 'B=' + C.B);
+  ok('绿蓝相对', C.R === GREEN && C.L === BLUE, 'R=' + C.R + ' L=' + C.L);
+}
+
+console.log('\n[9] 布局：和编辑器一样（左边画布铺满，操作区在右侧）');
+{
+  const html = fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8');
+  ok('用了 .app + .stage + .panel 三段式', /\.app\{display:flex/.test(html) &&
+    /<main class="stage"/.test(html) && /<aside class="panel">/.test(html));
+  ok('面板宽度与编辑器一致（322px）', /\.panel\{width:322px/.test(html));
+  ok('面板在右侧（左边框 + 不收缩）', /\.panel\{[^}]*flex:none/.test(html) &&
+    /\.panel\{[^}]*border-left:1px solid/.test(html));
+  ok('画布占满剩余空间', /\.stage\{flex:1;min-width:0/.test(html));
+  ok('整页不滚动（和编辑器一致）', /body\{[^}]*overflow:hidden/.test(html));
+  // 魔方要跟着舞台尺寸放大缩小，而不是写死 46px
+  ok('方块尺寸走 CSS 变量 --cs', /--cs/.test(html) && /--half/.test(html));
+  ok('有自适应函数并在 resize 时重算', /function fit\(\)/.test(html) &&
+    /addEventListener\('resize', fit\)/.test(html));
+  ok('窄屏改为上下布局', /@media \(max-width:760px\)[\s\S]*?\.app\{flex-direction:column\}/.test(html));
+
+  // 尺寸要留出余量，别把舞台撑满 —— 撑满时边角会被裁掉，观感也太挤
+  const div = +(html.match(/Math\.min\(w, h\) \/ ([\d.]+)/) || [])[1];
+  ok('能读出尺寸除数（' + div + '）', div > 4, String(div));
+  const spanX = 3 * 1.38 / div, spanY = 3 * 1.32 / div;   // 相对 min(w,h)
+  ok('魔方投影后不超过舞台的 ' + Math.round(spanX * 100) + '%（宽）/ ' +
+     Math.round(spanY * 100) + '%（高）', spanX <= 0.8 && spanY <= 0.8,
+     'div=' + div);
 }
 
 console.log('\n结果: ' + pass + ' 通过, ' + fail + ' 失败');
