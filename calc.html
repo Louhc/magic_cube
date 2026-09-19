@@ -70,8 +70,10 @@
   .cubie i.on{box-shadow:inset 0 0 0 1.5px #00000038,inset 0 8px 14px -8px #fff6}
   .cubie i.px{transform:rotateY(90deg)  translateZ(23px)}
   .cubie i.nx{transform:rotateY(-90deg) translateZ(23px)}
-  .cubie i.py{transform:rotateX(-90deg) translateZ(23px)}
-  .cubie i.ny{transform:rotateX(90deg)  translateZ(23px)}
+  /* 注意符号：CSS 的 y 轴朝下，所以"朝上"的面要用 rotateX(+90deg)。
+     写反的话贴纸会被推进方块内部，从外面看整面是黑的。 */
+  .cubie i.py{transform:rotateX(90deg)  translateZ(23px)}
+  .cubie i.ny{transform:rotateX(-90deg) translateZ(23px)}
   .cubie i.pz{transform:translateZ(23px)}
   .cubie i.nz{transform:rotateY(180deg) translateZ(23px)}
 

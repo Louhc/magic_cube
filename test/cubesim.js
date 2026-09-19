@@ -143,5 +143,41 @@ console.log('\n[5] 真跑一遍 calc.html 的脚本（DOM 桩）');
   ok('54 张贴纸配色与模拟器一致', bad === 0 && n === 54, '核对 ' + n + ' 张，' + bad + ' 张不符');
 }
 
+console.log('\n[6] 六个面的贴纸必须朝外（不是陷进方块里）');
+{
+  // 这一节是为一个真 bug 加的：py/ny 的 rotateX 符号写反，贴纸被推进了方块
+  // 内部，从外面看黄面白面整片是黑的。只查 DOM（class、颜色）发现不了 ——
+  // 得把 CSS 的 transform 当矩阵算一遍，看它把 +z 推到哪。
+  const html = fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8');
+  const rot = (axis, deg) => {
+    const c = Math.cos(deg * Math.PI / 180), s2 = Math.sin(deg * Math.PI / 180);
+    return axis === 'X' ? [1, 0, 0, 0, c, -s2, 0, s2, c] : [c, 0, s2, 0, 1, 0, -s2, 0, c];
+  };
+  const mul = (A, B) => {
+    const C = new Array(9).fill(0);
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) for (let k = 0; k < 3; k++) C[i * 3 + j] += A[i * 3 + k] * B[k * 3 + j];
+    return C;
+  };
+  const apply = (M, v) => [M[0] * v[0] + M[1] * v[1] + M[2] * v[2],
+                           M[3] * v[0] + M[4] * v[1] + M[5] * v[2],
+                           M[6] * v[0] + M[7] * v[1] + M[8] * v[2]];
+  const I = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+  // 模型法向 -> 屏幕方向（CSS 的 y 朝下，所以模型的 +y 对应屏幕的 -y）
+  const want = { px: [1, 0, 0], nx: [-1, 0, 0], py: [0, -1, 0], ny: [0, 1, 0], pz: [0, 0, 1], nz: [0, 0, -1] };
+  const got = {};
+  for (const m of html.matchAll(/\.cubie i\.(\w+)\{transform:([^}]+)\}/g)) {
+    let M = I, tz = 0;
+    for (const p of m[2].matchAll(/rotate([XY])\((-?\d+)deg\)|translateZ\((\d+)px\)/g)) {
+      if (p[3]) tz = +p[3]; else M = mul(M, rot(p[1], +p[2]));
+    }
+    got[m[1]] = apply(M, [0, 0, 1]).map(x => Math.round(x * tz));
+  }
+  Object.keys(want).forEach(k => {
+    const w = want[k].map(x => x * 23);
+    ok(k + ' 面朝外（贴纸不陷进方块）',
+      got[k] && got[k].join() === w.join(), '推出 ' + JSON.stringify(got[k]) + ' 期望 ' + JSON.stringify(w));
+  });
+}
+
 console.log('\n结果: ' + pass + ' 通过, ' + fail + ' 失败');
 process.exit(fail ? 1 : 0);
