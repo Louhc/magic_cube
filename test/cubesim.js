@@ -529,8 +529,9 @@ console.log('\n[13] 练习页：显示的图形必须是「从复原态执行该
 
     // 洗牌袋：切到 PLL（21 题）连点 20 次，应把 21 题各出一次、无一重复
     (scopeBtns[2]._h.click || []).forEach(function (f) { f({}); });
+    const total = ctx5.ALG_LIST.pll.length;      // 从题库动态取，加公式不用改测试
     const seen = [els5.qid.textContent];
-    for (let i = 0; i < 21; i++) {          // 21 次 + 初始那道 = 22 条
+    for (let i = 0; i < total - 1; i++) {
       (els5.next._h.click || []).forEach(function (f) { f({}); });
       seen.push(els5.qid.textContent);
     }
@@ -547,9 +548,10 @@ console.log('\n[13] 练习页：显示的图形必须是「从复原态执行该
       });
       const labels = Object.keys(expect).sort();
       ok('一轮抽出 ' + seen.length + ' 题，覆盖题库全部 ' + labels.length + ' 个标签',
-        seen.length === 22 && labels.every(t => counts[t] === expect[t]),
+        seen.length === total && labels.every(t => counts[t] === expect[t]),
         JSON.stringify(counts));
-      ok('Z 恰好出现两次（两条写法）', counts['PLL Z'] === 2, String(counts['PLL Z']));
+      ok('多写法的格子被抽到对应次数（Z 两条）',
+        counts['PLL Z'] === 2, String(counts['PLL Z']));
       ok('其余每个标签恰好一次',
         labels.filter(t => t !== 'PLL Z').every(t => counts[t] === 1));
     }
