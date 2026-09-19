@@ -586,6 +586,21 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
         missing.length === 0, missing.slice(0, 3).join(', '));
     }
 
+    // ---- 自动播放 / 单步动画 ----
+    ok('有自动播放按钮', /id="play"/.test(src2) && /function autoPlay\(\)/.test(src2));
+    // 单步必须走动画。早先重写主流程时漏了这一步，◀ ▶ 变成了瞬移。
+    ok('单步走动画（stepAnimated 里调 animate）',
+      /function stepAnimated\(dir, done\)[\s\S]*?animate\(\{ mv: mv\.mv/.test(src2));
+    ok('◀ ▶ 通过 stepAnimated 前进/后退',
+      /function stepBy\(dir\)[\s\S]*?stepAnimated\(dir/.test(src2));
+    ok('自动播放一步步走到末尾',
+      /function autoPlay\(\)[\s\S]*?stepAnimated\(1, nextStep\)/.test(src2));
+    ok('播放中按钮变暂停', /playing \? '暂停' : '自动播放'/.test(src2));
+    // 只有「跳到开头/末尾」和点某一步是瞬移
+    ok('jump 保持瞬移（不带动画）',
+      /function jump\(k\)[\s\S]*?paint\(frames\[at\]\)/.test(src2) &&
+      !/function jump\(k\)[\s\S]{0,120}animate\(/.test(src2));
+
     // 打乱放在最后：22 步要播约 9 秒，放在前面会把后面的提交全挡在 busy 外面
     els.scramble.fire('click');
     await wait(120);

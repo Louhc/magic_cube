@@ -156,6 +156,18 @@
   .ctrl button:hover:not(:disabled){border-color:var(--line-strong);background:var(--field-hover)}
   .ctrl button:disabled{opacity:.35;cursor:default}
 
+  .play{width:100%;height:32px;margin-bottom:8px;border-radius:8px;cursor:pointer;
+        display:flex;align-items:center;justify-content:center;gap:6px;
+        font:inherit;font-size:12.5px;background:var(--field);
+        border:1px solid var(--line);color:var(--text);transition:.12s}
+  .play:hover:not(:disabled){border-color:var(--accent);color:var(--accent);
+                             background:var(--field-hover)}
+  .play i{font-style:normal;font-size:14px;line-height:1;color:var(--muted)}
+  .play:hover:not(:disabled) i{color:var(--accent)}
+  .play.playing{background:var(--accent);border-color:var(--accent);color:#fff}
+  .play.playing i,.play.playing span{color:#fff}
+  .play:disabled{opacity:.4;cursor:default}
+
   .moves{display:flex;flex-wrap:wrap;gap:4px;min-height:24px}
   .moves span{font:12.5px/1 ui-monospace,Menlo,Consolas,monospace;color:var(--muted);
               background:var(--field);border:1px solid var(--line);border-radius:5px;
@@ -245,6 +257,9 @@
 
     <section class="sec">
       <h2>步骤<span class="pos" id="pos">—</span></h2>
+      <button class="play" id="play" type="button" title="从当前位置一步步自动播到末尾">
+        <i>▷</i><span id="playtxt">自动播放</span>
+      </button>
       <div class="ctrl">
         <button id="first" type="button" title="回到开头">⏮</button>
         <button id="prev"  type="button" title="上一步">◀</button>
@@ -326,6 +341,7 @@
   var hist = [];                         // 历史：{kind:'alg'|'scramble', alg}
   var view = { x: -24, y: -32 };         // 观察角度，可拖动
   var busy = false;                      // 播放中不接受新操作
+  var playing = false;                   // 是否在自动连播
   var CS = 46;                           // 小方块边长，随舞台尺寸自适应
 
   // 公式缩略图：和公式表用同一套文件命名
@@ -494,8 +510,14 @@
       b.disabled = busy;
     });
     Array.prototype.forEach.call(document.querySelectorAll('.pick button'), function (b) {
-      b.disabled = busy;
+      b.disabled = !!(busy && !playing);
     });
+    var playBtn = document.getElementById('play');
+    playBtn.classList.toggle('playing', playing);
+    playBtn.disabled = steps.length === 0 || (!playing && busy);
+    document.getElementById('playtxt').textContent = playing ? '暂停' : '自动播放';
+    var pi = playBtn.querySelector('i');
+    if (pi) pi.textContent = playing ? '\u23f8' : '\u25b7';
     document.getElementById('scramble').disabled = busy;
     document.getElementById('reset').disabled = busy;
   }
@@ -546,6 +568,7 @@
 
   /* 播放一串步骤并记入历史。提交公式、整体旋转、打乱都走这里。 */
   function run(list, label, kind, rev) {
+    playing = false;
     busy = true;
     chrome();
     movesEl.innerHTML = list.map(function (x, i) {
@@ -579,6 +602,7 @@
 
   function reset() {
     if (busy) return;
+    playing = false;
     hist = [];
     steps = [];
     frames = [CubeSim.solved()];
@@ -593,16 +617,54 @@
     renderHist();
   }
 
-  // 回放最近一次提交的某一步（不影响累积局面）
+  // 回放最近一次提交（不影响累积局面）。
+  // 单步和连播都走动画；只有「跳到开头/末尾」和点某一步是瞬移。
+
+  // 走一步并播动画。dir=+1 做这一步，dir=-1 做它的逆。
+  function stepAnimated(dir, done) {
+    var next = at + dir;
+    if (next < 0 || next > steps.length) { if (done) done(false); return; }
+    var mv = steps[dir > 0 ? at : next];
+    animate({ mv: mv.mv, times: dir > 0 ? mv.times : -mv.times }, function () {
+      at = next;
+      paint(frames[at]);
+      chrome();
+      if (done) done(true);
+    });
+  }
+
+  function stepBy(dir) {
+    if (busy || !steps.length) return;
+    if (at + dir < 0 || at + dir > steps.length) return;
+    busy = true;
+    chrome();
+    stepAnimated(dir, function () { busy = false; chrome(); });
+  }
+
+  // 从当前位置一步步自动播到末尾，每一步都有动画
+  function autoPlay() {
+    if (busy || !steps.length) return;
+    if (playing) { playing = false; chrome(); return; }   // 再按一次暂停
+    if (at >= steps.length) return;
+    playing = true;
+    busy = true;
+    chrome();
+    (function nextStep() {
+      if (!playing || at >= steps.length) {
+        playing = false;
+        busy = false;
+        chrome();
+        return;
+      }
+      stepAnimated(1, nextStep);
+    })();
+  }
+
   function jump(k) {
     if (busy || !steps.length) return;
     at = Math.max(0, Math.min(steps.length, k));
     paint(frames[at]);
     chrome();
-  }
-  function stepBy(dir) {
-    if (busy || !steps.length) return;
-    jump(at + dir);
   }
 
   /* ---------- 事件 ---------- */
@@ -646,6 +708,7 @@
     });
   });
   document.getElementById('reset').addEventListener('click', reset);
+  document.getElementById('play').addEventListener('click', autoPlay);
   document.getElementById('first').addEventListener('click', function () { jump(0); });
   document.getElementById('last').addEventListener('click', function () { jump(steps.length); });
   document.getElementById('prev').addEventListener('click', function () { stepBy(-1); });
