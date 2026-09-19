@@ -721,6 +721,9 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
       ok(f + ' 里每条公式都有「在计算器里打开」',
         /class="tocalc"/.test(t) && /calc\.html#/.test(t));
     });
+    ok('从公式表跳过来会先复原（不接着上次的局面）',
+      /var hashAlg/.test(fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')) &&
+      /if \(hashAlg\) \{[\s\S]{0,200}?reset\(\)/.test(fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')));
     ok('计算器会读取 hash 里的公式',
       /location\.hash/.test(fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')));
     // 带上 hash 打开时，输入框应当被填好

@@ -867,8 +867,23 @@
 
   fit();
 
-  // 有存档就恢复现场，否则从头开始
+  // 从公式表点「↗」跳过来时会带 hash。这时要从干净状态开始：
+  // 复原魔方 + 清空历史，只把公式填进输入框 —— 否则会接着上次那个
+  // 不相干的局面往下做，公式也就不是从复原态执行了。
+  var hashAlg = '';
   (function () {
+    var h = location.hash || '';
+    if (h.length > 1) {
+      try { hashAlg = decodeURIComponent(h.slice(1)); } catch (e) { hashAlg = h.slice(1); }
+    }
+  })();
+  if (hashAlg) {
+    try { localStorage.removeItem(STORE); } catch (e) {}
+    reset();                 // 复原 + 清空历史（reset 里也会清存档）
+    algEl.value = hashAlg;
+    algEl.focus();
+  } else (function () {
+    // 没有 hash：有存档就恢复现场，否则从头开始
     var d = loadSaved();
     if (!d) { reset(); return; }
     cur = d.cur;
@@ -886,16 +901,6 @@
     paint(cur);
     renderHist();
     chrome();
-  })();
-
-  // 公式表里的「↗ 在计算器里打开」会把公式放在 URL hash 里带过来
-  // （用 hash 而不是查询串：file:// 下也能用）
-  (function () {
-    var h = location.hash || '';
-    if (h.length > 1) {
-      try { h = decodeURIComponent(h.slice(1)); } catch (e) { h = h.slice(1); }
-      if (h) { algEl.value = h; algEl.focus(); }
-    }
   })();
 })();
 </script>
