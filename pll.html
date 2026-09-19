@@ -61,6 +61,22 @@
   code:hover{background:var(--field)}
   code.copied{background:var(--accent);color:#fff}
 
+  /* 有备用写法时，图片可点开。展开后每条备选配一张"对应朝向"的图
+     （就是原图顺时针转 m*90 度 —— 已用模拟器验证过，等价于把局面做 U^m）。 */
+  tr.has-alts td.pic .box{cursor:pointer}
+  tr.has-alts td.pic img{transition:box-shadow .14s}
+  tr.has-alts td.pic .box:hover img{box-shadow:0 0 0 2px var(--line-strong)}
+  tr.open td.pic .box img{box-shadow:0 0 0 2px var(--accent)}
+  tr.has-alts td.pic .box::after{content:'be';position:absolute;right:3px;top:1px;
+        font-size:10px;color:var(--muted);line-height:1;transition:transform .14s}
+  tr.open td.pic .box::after{transform:rotate(180deg);color:var(--accent)}
+  .alts{display:none;margin-top:8px}
+  tr.open .alts{display:block}
+  .alts .r{display:flex;align-items:center;gap:9px;margin:5px 0}
+  .alts .th{flex:none;width:42px;height:42px}
+  .alts .th img{width:42px;height:42px;display:block}
+  .alts .f1{flex:1;min-width:0}
+
   #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(12px);
          background:#111c;color:#fff;padding:8px 16px;border-radius:8px;font-size:13px;
          opacity:0;pointer-events:none;transition:.18s}
@@ -96,29 +112,29 @@
    图片取自 pll/ 目录。公式来自知乎「小狼啊小狼」系列，
    逐条用 tools/verify.py 校验过「照图摆好直接就能用」。 */
 var SECTIONS = [
-  { title: "21 种", cnt: 21, rows: [
-    ["Aa", "x' R2 D2 (R' U' R) D2 (R' U R')"],
-    ["Ab", "x' (R U' R) D2 (R' U R) D2 R'2"],
-    ["E", "x' (R U' R' D) (R U R' D') (R U R' D) (R U' R' D')"],
-    ["F", "R' U' F' (R U R' U' R' F R2 U' R' U' R U R' F') F U R"],
-    ["Ga", "(R2 u) (R' U R' U' R u' R'2) y' (R' U R)"],
-    ["Gb", "(R' U' R) y (R2 u) (R' U R U') (R u' R'2)"],
-    ["Gc", "(R'2 u' R U' R) (U R' u R2) y (R U' R')"],
-    ["Gd", "(R U R') y' (R'2 u' R U') (R' U R' u R2)"],
-    ["H", "M'2 U M'2 U2 M'2 U M'2"],
-    ["Ja", "(L' U' L F) (L' U' L U) (L F') (L2 U L U)"],
-    ["Jb", "(R U R' F') (R U R' U') (R' F) (R2 U' R' U')"],
-    ["Na", "R U R' U (R U R' F' R U R' U' R' F R2 U' R' U') U' R U' R'"],
-    ["Nb", "R' U R U' R' F' U' F R U R' F R' F' R U' R"],
-    ["Ra", "(R U R' F') (R U'2 R' U2) (R' F R U) (R U'2 R' U')"],
-    ["Rb", "(L' U' L F) (L' U2 L U'2) (L F' L' U') (L' U2 L U)"],
-    ["T", "(R U R' U') (R' F R2 U' R' U') (R U R' F')"],
-    ["Ua", "(R U' R) (U R) (U R U' R' U' R'2)"],
-    ["Ub", "(R2 U) (R U R' U' R' U') (R' U R')"],
-    ["V", "R' U R' d' R' F' R2 U' R' U R' F R F"],
-    ["Y", "F (R U' R' U' R U R') F' (R U R' U') (R' F R F')"],
-    ["Z", "U (R' U' R U') (R U R U') (R' U R U) (R2 U' R' U)"],
-  ] },
+  { "title": "21 种", "cnt": 21, "rows": [
+    ["Aa", "x' R2 D2 (R' U' R) D2 (R' U R')", []],
+    ["Ab", "x' (R U' R) D2 (R' U R) D2 R'2", []],
+    ["E", "x' (R U' R' D) (R U R' D') (R U R' D) (R U' R' D')", [["(l U' R' D R U R' D') (R U R' D R U' R' D') x", 0], ["x' (R U' R' D R U R' D') (R U R' D R U' R' D') x", 0], ["x' (R U' R' D R U R' D') (R U R' D R U' R' u')", 0]]],
+    ["F", "R' U' F' (R U R' U' R' F R2 U' R' U' R U R' F') F U R", [["R' U' F' R U R' U' R' F R2 U' R' U' R U R' U R", 0]]],
+    ["Ga", "(R2 u) (R' U R' U' R u' R'2) y' (R' U R)", [["R2 u R' U R' U' R u' R2 y L' U L", 0], ["R2 u R' U R' U' R u' R2 y' R' U R", 0]]],
+    ["Gb", "(R' U' R) y (R2 u) (R' U R U') (R u' R'2)", [["R' U' R y R2 u R' U R U' R u' R2", 0]]],
+    ["Gc", "(R'2 u' R U' R) (U R' u R2) y (R U' R')", [["R2 u' R U' R U R' u R2 y R U' R'", 0]]],
+    ["Gd", "(R U R') y' (R'2 u' R U') (R' U R' u R2)", [["R U R' y' R2 u' R U' R' U R' u R2", 0]]],
+    ["H", "M'2 U M'2 U2 M'2 U M'2", [["(R2 U2' R U2' R2) U2' (R2 U2' R U2' R2)", 0], ["M2 U' (M2 U2 M2' U2') U M2'", 0], ["M2' U' M2' U2' M2' U' M2'", 0]]],
+    ["Ja", "(L' U' L F) (L' U' L U) (L F') (L2 U L U)", []],
+    ["Jb", "(R U R' F') (R U R' U') (R' F) (R2 U' R' U')", [["(R U2 R' U' R U' R') (R U' L' U R' U' L)", 0], ["R U R' F' (R U R' U' R' F R2 U' R' U' R U R' F') F R U' R'", 0], ["R U2 R' U' R U2 L' U R' U' L", 0]]],
+    ["Na", "R U R' U (R U R' F' R U R' U' R' F R2 U' R' U') U' R U' R'", [["R U R' U (R U R' F' R U R' U' R' F R2 U' R') U2 R U' R'", 0], ["(R U' L U2' R' U L') (R U' L U2' R' U L')", 1]]],
+    ["Nb", "R' U R U' R' F' U' F R U R' F R' F' R U' R", [["(R' U L' U2' R U' L) (R' U L' U2' R U' L)", 3]]],
+    ["Ra", "(R U R' F') (R U'2 R' U2) (R' F R U) (R U'2 R' U')", []],
+    ["Rb", "(L' U' L F) (L' U2 L U'2) (L F' L' U') (L' U2 L U)", []],
+    ["T", "(R U R' U') (R' F R2 U' R' U') (R U R' F')", [["(R U R' U' R' F R F') (F R U' R' U' R U R' F')", 0]]],
+    ["Ua", "(R U' R) (U R) (U R U' R' U' R'2)", [["U M2 U (M U2 M' U2') U' M2'", 3], ["U M2' U M U2' M' U M2'", 3], ["U R U' (R U R U R U' R' U' R' U') U R'", 3]]],
+    ["Ub", "(R2 U) (R U R' U' R' U') (R' U R')", [["U M2 U' (M U2 M' U2') U M2'", 3], ["U M2' U' M U2' M' U' M2'", 3], ["U R U' (U R U R U R' U' R' U' R') U R'", 3]]],
+    ["V", "R' U R' d' R' F' R2 U' R' U R' F R F", [["R' U R U' x' U (R U2' R' U' R U' R') U2 (R U R' U')", 0], ["R' U2' R U2' L U' R' U L' U L U' R U L'", 0]]],
+    ["Y", "F (R U' R' U' R U R') F' (R U R' U') (R' F R F')", [["R2 U' R' U R U' x' U' R' D R' D' R' U R", 0]]],
+    ["Z", "U (R' U' R U') (R U R U') (R' U R U) (R2 U' R' U)", [["R U R' U R' U' R' U R U' R' U' R2 U R", 2]]]
+  ] }
 ];
 
 var IMG = function (id) {
@@ -131,10 +147,21 @@ function esc(s) {
     return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c];
   });
 }
-function row(n, alg) {
+function row(n, alg, alts) {
   var body = alg ? '<code>' + esc(alg) + '</code>'
                  : '<span class="todo">—</span>';
-  return '<tr><td class="pic"><span class="box"><img src="' + IMG(n) + '" alt="' + n +
+  if (alts && alts.length) {
+    body += '<div class="alts">';
+    alts.forEach(function (a) {
+      // a[1] 是相对本图要转的 AUF 步数；图顺时针转 m*90 度即"对应的朝向"
+      body += '<div class="r"><span class="th"><img src="' + IMG(n) + '" alt="" loading="lazy"' +
+              (a[1] ? ' style="transform:rotate(' + (a[1] * 90) + 'deg)"' : '') +
+              '></span><span class="f1"><code>' + esc(a[0]) + '</code></span></div>';
+    });
+    body += '</div>';
+  }
+  return '<tr' + (alts && alts.length ? ' class="has-alts" data-id="' + esc(n) + '"' : '') + '>' +
+         '<td class="pic"><span class="box"><img src="' + IMG(n) + '" alt="' + n +
          '" loading="lazy"><span class="no">' + n + '</span></span></td>' +
          '<td class="f">' + body + '</td></tr>';
 }
@@ -143,7 +170,7 @@ SECTIONS.forEach(function (sec) {
   html += '<section><h2>' + esc(sec.title) +
           '<span class="cnt">' + sec.cnt + '</span></h2><table>' +
           '<colgroup><col class="pic"><col></colgroup><tbody>';
-  sec.rows.forEach(function (r) { html += row(r[0], r[1]); });
+  sec.rows.forEach(function (r) { html += row(r[0], r[1], r[2]); });
   html += '</tbody></table></section>';
 });
 document.getElementById('app').innerHTML = html;
@@ -179,6 +206,12 @@ function fallbackCopy(text) {
   ta.remove();
 }
 document.getElementById('app').addEventListener('click', function (e) {
+  // 点图片 -> 展开/收起这一行的其他写法
+  var pic = e.target.closest ? e.target.closest('tr.has-alts > td.pic') : null;
+  if (pic) {
+    pic.parentNode.classList.toggle('open');
+    return;
+  }
   var el = e.target.closest ? e.target.closest('code') : null;
   if (!el) return;
   var compact = el.textContent.replace(/\s+/g, '');

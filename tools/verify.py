@@ -26,6 +26,14 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import cubesim as sim
 import signature as S
 
+# 24 种"复原态"预算好，判定就是一次集合查询
+_SOLVED_FORMS = {tuple(sorted(sim.apply(sim.solved(), r).items())) for r in sim.ROTS}
+
+
+def solved_rot(st):
+    """是否复原（允许整体旋转）—— 含 y/x 的公式做完会留下旋转"""
+    return tuple(sorted(st.items())) in _SOLVED_FORMS
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
@@ -75,13 +83,21 @@ def img_name(kind, ident):
 
 
 def page_data(page):
-    """从页面里读出 [编号, 公式]（编号与公式是数据区前两项）
+    """从页面里读出 [(编号, 主公式, [[备选公式, AUF], ...])]
 
-       编号统一是字符串：OLL 是 '1'..'57'，PLL 是 'Aa'..'Z'。
+       生成器输出的是合法 JSON（键带引号），所以这里直接解析 ——
+       早先我用正则硬啃，会把备选列表里的 ["公式","U"] 也当成一行，
+       解析出的公式和 AUF 全错位。
     """
     h = open(page, encoding='utf-8').read()
-    return [(m.group(1), m.group(2))
-            for m in re.finditer(r'\["([^"]+)", "([^"]*)"', h)]
+    m = re.search(r'var SECTIONS = (\[.*?\n\]);', h, re.S)
+    if not m:
+        return []
+    out = []
+    for sec in json.loads(m.group(1)):
+        for r in sec.get('rows', []):
+            out.append((str(r[0]), r[1], [tuple(a) for a in (r[2] if len(r) > 2 else [])]))
+    return out
 
 
 def check(kind, page, imgdir, libfile):
@@ -91,7 +107,8 @@ def check(kind, page, imgdir, libfile):
         print('  读不到数据')
         return 1
     bad = 0
-    for n, alg in rows:
+    nalt = 0
+    for n, alg, alts in rows:
         img = S.read(kind, os.path.join(imgdir, img_name(kind, n)))
         if not alg:
             print('  %-4s 留空（未填公式）' % n)
@@ -103,6 +120,23 @@ def check(kind, page, imgdir, libfile):
             bad += 1
             continue
         if ss[0] == img:
+            # 主式对了，再逐条验备选：先做 m 步 AUF，再做公式，应当能解开
+            # （页面里每条备选配的那张旋转图，就是"先转 m 步"的可视化）
+            C = sim.case_of(clean(alg), kind)
+            for a, m in alts:
+                nalt += 1
+                if not isinstance(m, int) or not (0 <= m <= 3):
+                    print('  %-4s 备选 AUF 步数不合法: %r' % (n, m)); bad += 1; continue
+                st = C
+                for _ in range(m):
+                    st = sim.turn(st, 'U', 1)
+                try:
+                    good = solved_rot(sim.apply(st, clean(a)))
+                except Exception:
+                    good = False
+                if not good:
+                    print('  %-4s 备选对不上（U^%d 后）: %s' % (n, m, a))
+                    bad += 1
             continue
         k = ss.index(img) if img in ss else None
         print('  %-4s %s' % (n, ('差 %d 步 AUF' % k) if k is not None else '对不上'))
@@ -112,7 +146,8 @@ def check(kind, page, imgdir, libfile):
         print('       公式 %s' % (g if kind == 'pll'
                                  else '%s %s %s  %s' % (g[0][:3], g[0][3:6], g[0][6:9], g[1])))
         bad += 1
-    print('  %d 条，%s' % (len(rows), '全部通过 ✓' if bad == 0 else '%d 条有问题' % bad))
+    print('  %d 条主式 + %d 条备选，%s'
+          % (len(rows), nalt, '全部通过 ✓' if bad == 0 else '%d 条有问题' % bad))
     return bad
 
 

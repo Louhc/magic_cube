@@ -102,5 +102,34 @@ console.log('\n[8] F2L 角标：显示去掉前导 0，文件名不动');
     imgs.slice(0, 3).join(','));
 }
 
+console.log('\n[9] 页面数据必须是合法 JSON（备用公式就挂在里面）');
+{
+  // 生成器早期漏了两处尾逗号（分节一层、行一层），json 解析直接报错。
+  // 这里盯住：能解析、结构对、AUF 标注合法。
+  for (const p of ['oll.html', 'pll.html']) {
+    const h = fs.readFileSync(path.join(ROOT, p), 'utf8');
+    const m = h.match(/var SECTIONS = (\[[\s\S]*?\n\]);/);
+    ok(p + ' 有 SECTIONS 数据段', !!m);
+    if (!m) continue;
+    let data;
+    try { data = JSON.parse(m[1]); } catch (e) {
+      ok(p + ' 数据是合法 JSON', false, e.message); continue;
+    }
+    ok(p + ' 数据是合法 JSON', true);
+    const rows = data.flatMap(s2 => s2.rows);
+    const ids = rows.map(r => r[0]);
+    ok(p + ' 每行是 [编号, 公式] 或 [编号, 公式, 备选]',
+      rows.every(r => (r.length === 2 || r.length === 3) && typeof r[0] === 'string' && typeof r[1] === 'string'),
+      JSON.stringify(rows.find(r => !(r.length === 2 || r.length === 3)) || ''));
+    ok(p + ' 编号唯一（' + ids.length + ' 个）', new Set(ids).size === ids.length);
+    const ms = rows.flatMap(r => (r[2] || []).map(a => a[1]));
+    const okAuf = ms.every(m => Number.isInteger(m) && m >= 0 && m <= 3);
+    ok(p + ' 备选 AUF 步数合法（' + ms.length + ' 条）', okAuf, ms.filter(m => !(Number.isInteger(m) && m >= 0 && m <= 3)).join(','));
+    const alts = rows.flatMap(r => r[2] || []);
+    ok(p + ' 备选不重复主式',
+      rows.every(r => (r[2] || []).every(a => a[0].replace(/\s|\(|\)/g, '') !== r[1].replace(/\s|\(|\)/g, ''))));
+  }
+}
+
 console.log('\n结果: ' + pass + ' 通过, ' + fail + ' 失败');
 process.exit(fail ? 1 : 0);
