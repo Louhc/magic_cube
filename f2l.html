@@ -6,17 +6,27 @@
 <title>F2L 公式合集</title>
 <link rel="icon" type="image/x-icon" href="cube-64x64.ico">
 <style>
-  /* 固定浅色：白底。不跟随系统深色模式 —— 这是一张打印/速查用的表。 */
+  /* 默认浅色（白底）；点右上角按钮切夜晚。不跟随系统 —— 这是打印/速查用的表。 */
   :root{
     color-scheme: light;
     --bg:#ffffff; --card:#ffffff; --line:#d8dee7; --line-strong:#b9c3d0;
     --text:#1e2530; --muted:#6a7686; --head-red:#c0392b; --head-green:#1e8449;
     --head-band:#f7d9b6; --accent:#2f6bd8; --field:#f4f6f9;
   }
+  html[data-theme="dark"]{
+    color-scheme: dark;
+    --bg:#151a22; --card:#1b222c; --line:#2a3340; --line-strong:#3a4553;
+    --text:#e7edf5; --muted:#8a98aa; --head-red:#e05a4a; --head-green:#3fbf74;
+    --head-band:#3a2f22; --accent:#5b9bff; --field:#222a35;
+  }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--text);
        font:14px/1.5 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
-  header{padding:22px 20px 8px;text-align:center}
+  header{position:relative;padding:22px 20px 8px;text-align:center}
+  .themebtn{position:absolute;right:16px;top:16px;width:34px;height:34px;padding:0;
+            border-radius:9px;background:var(--field);border:1px solid var(--line);
+            color:var(--text);font-size:15px;line-height:1;cursor:pointer;transition:.12s}
+  .themebtn:hover{border-color:var(--line-strong)}
   h1{margin:0;font-size:20px;letter-spacing:.02em}
   header p{margin:6px 0 0;color:var(--muted);font-size:12.5px}
   main{max-width:1180px;margin:0 auto;padding:10px 16px 60px}
@@ -40,6 +50,8 @@
   td.pic{padding:6px;text-align:center}
   td.pic img{width:96px;height:auto;display:block;margin:0 auto;
              image-rendering:auto;border-radius:6px}
+  /* 图是深色描边 + 透明底，压在深色卡片上描边会看不见 -> 夜晚给个浅色衬底 */
+  html[data-theme="dark"] td.pic img{background:#e9edf2}
   td.f{padding:10px 14px}
   td.empty{background:var(--field)}
 
@@ -62,7 +74,9 @@
     code{font-size:12.5px}
   }
   @media print{
+    html[data-theme]{--bg:#fff;--card:#fff;--text:#000;--field:#f4f6f9}
     body{background:#fff;color:#000}
+    .themebtn{display:none}
     header{padding:0 0 8px}
     section{break-inside:avoid;border-color:#999}
     code:hover{background:none}
@@ -74,6 +88,7 @@
 <header>
   <h1>F2L 公式合集</h1>
   <p>左列「红色为 F 面」，右列「绿色为 F 面」。点公式即可复制。</p>
+  <button class="themebtn" id="themebtn" type="button" title="切到夜晚">☾</button>
 </header>
 
 <main id="app"></main>
@@ -195,6 +210,21 @@ SECTIONS.forEach(function (sec) {
   html += '</tbody></table></section>';
 });
 document.getElementById('app').innerHTML = html;
+/* 夜晚模式 */
+var root = document.documentElement, themeBtn = document.getElementById('themebtn');
+function applyTheme(t) {
+  root.dataset.theme = t;
+  themeBtn.textContent = t === 'dark' ? '\u2600' : '\u263e';
+  themeBtn.title = t === 'dark' ? '切到白天' : '切到夜晚';
+  try { localStorage.setItem('cube-theme', t); } catch (e) {}
+}
+var saved = null;
+try { saved = localStorage.getItem('cube-theme'); } catch (e) {}
+applyTheme(saved === 'dark' ? 'dark' : 'light');
+themeBtn.addEventListener('click', function () {
+  applyTheme(root.dataset.theme === 'dark' ? 'light' : 'dark');
+});
+
 /* 点公式复制 */
 var toastEl = document.getElementById('toast'), toastTimer = null;
 function toast(msg) {

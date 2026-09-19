@@ -6,147 +6,161 @@
 <title>OLL 公式合集</title>
 <link rel="icon" type="image/x-icon" href="cube-64x64.ico">
 <style>
-  /* 固定浅色：白底。不跟随系统深色模式 —— 这是一张打印/速查用的表。 */
+  /* 默认浅色（白底）；点右上角按钮切夜晚。不跟随系统 —— 这是打印/速查用的表。 */
   :root{
     color-scheme: light;
     --bg:#ffffff; --card:#ffffff; --line:#d8dee7; --line-strong:#b9c3d0;
     --text:#1e2530; --muted:#6a7686; --head-red:#c0392b; --head-green:#1e8449;
-    --head-band:#f7d9b6; --accent:#2f6bd8; --field:#f4f6f9;
+    --head-band:#f7d9b6; --accent:#2f6bd8; --field:#f4f6f9; --chip:#ffffffb3;
+  }
+  html[data-theme="dark"]{
+    color-scheme: dark;
+    --bg:#151a22; --card:#1b222c; --line:#2a3340; --line-strong:#3a4553;
+    --text:#e7edf5; --muted:#8a98aa; --head-red:#e05a4a; --head-green:#3fbf74;
+    --head-band:#3a2f22; --accent:#5b9bff; --field:#222a35; --chip:#00000080;
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--text);
        font:14px/1.5 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
-  header{padding:22px 20px 8px;text-align:center}
+  header{position:relative;padding:22px 20px 8px;text-align:center}
   h1{margin:0;font-size:20px;letter-spacing:.02em}
   header p{margin:6px 0 0;color:var(--muted);font-size:12.5px}
-  main{max-width:1180px;margin:0 auto;padding:10px 16px 60px}
+  .themebtn{position:absolute;right:16px;top:16px;width:34px;height:34px;padding:0;
+            border-radius:9px;background:var(--field);border:1px solid var(--line);
+            color:var(--text);font-size:15px;line-height:1;cursor:pointer;transition:.12s}
+  .themebtn:hover{border-color:var(--line-strong)}
+  main{max-width:880px;margin:0 auto;padding:10px 16px 60px}
 
   section{margin:26px 0 0;background:var(--card);border:1px solid var(--line);
           border-radius:12px;overflow:hidden}
   section > h2{margin:0;padding:11px 16px;font-size:14px;font-weight:600;
                background:var(--head-band);border-bottom:1px solid var(--line)}
+  section > h2 .cnt{float:right;color:var(--muted);font-weight:400;font-size:12.5px}
 
   table{width:100%;border-collapse:collapse;table-layout:fixed}
-  col.side{width:110px}
-  col.formula{width:auto}
-  th{padding:9px 12px;font-size:12.5px;font-weight:600;border-bottom:1px solid var(--line);
-     border-right:1px solid var(--line);background:var(--field)}
-  th.red{color:var(--head-red)} th.green{color:var(--head-green)}
+  col.pic{width:116px}
+  th{padding:9px 12px;font-size:12.5px;font-weight:600;text-align:left;
+     border-bottom:1px solid var(--line);border-right:1px solid var(--line);background:var(--field)}
   th:last-child{border-right:none}
   td{border-bottom:1px solid var(--line);border-right:1px solid var(--line);vertical-align:middle}
   td:last-child{border-right:none}
   tr:last-child td{border-bottom:none}
-  /* 图片是透明底 PNG，这一格就不铺底色，整页保持纯白 */
+  /* 图是透明底 PNG，这一格不铺底色，跟随页面底色 */
   td.pic{padding:6px;text-align:center}
-  td.pic img{width:96px;height:auto;display:block;margin:0 auto;
-             image-rendering:auto;border-radius:6px}
-  td.f{padding:10px 14px}
+  td.pic .box{position:relative;display:inline-block;line-height:0}
+  td.pic img{width:100px;height:auto;display:block;border-radius:6px}
+  td.pic .no{position:absolute;left:3px;top:1px;font-size:11px;font-weight:600;
+             color:var(--muted);line-height:1;background:var(--chip);padding:1px 3px;border-radius:4px}
+  /* 图是深色描边 + 透明底，压在深色卡片上描边会看不见 -> 夜晚给个浅色衬底 */
+  html[data-theme="dark"] td.pic img{background:#e9edf2}
+  td.f{padding:11px 14px}
   td.empty{background:var(--field)}
+  .todo{color:var(--muted);font-size:12.5px;font-style:italic}
 
-  /* 公式：等宽，点一下复制 */
-  code{font:13.5px/1.7 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  code{font:13.5px/1.75 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
        cursor:pointer;word-break:break-word;border-radius:5px;padding:2px 5px;margin:-2px -5px}
   code:hover{background:var(--field)}
   code.copied{background:var(--accent);color:#fff}
 
-  /* 复制提示 */
   #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(12px);
-         background:#111a;color:#fff;padding:8px 16px;border-radius:8px;font-size:13px;
+         background:#111c;color:#fff;padding:8px 16px;border-radius:8px;font-size:13px;
          opacity:0;pointer-events:none;transition:.18s}
   #toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
 
   @media (max-width:720px){
-    col.side{width:78px}
-    td.pic img{width:64px}
+    col.pic{width:86px}
+    td.pic img{width:72px}
     td.f{padding:8px 10px}
     code{font-size:12.5px}
   }
   @media print{
+    html[data-theme]{--bg:#fff;--card:#fff;--text:#000;--field:#f4f6f9}
     body{background:#fff;color:#000}
     header{padding:0 0 8px}
+    .themebtn{display:none}
     section{break-inside:avoid;border-color:#999}
     code:hover{background:none}
     #toast{display:none}
   }
-  .todo{color:var(--muted);font-size:12.5px;font-style:italic}
 </style>
 </head>
 <body>
 <header>
   <h1>OLL 公式合集</h1>
   <p>按顶面图案分四类：十字、单点、一字、拐角。点公式即可复制。</p>
+  <button class="themebtn" id="themebtn" type="button" title="切到夜晚">☾</button>
 </header>
 <main id="app"></main>
 <div id="toast"></div>
 <script>
-/* 数据：每节若干情况，每条 = [编号, 公式, 名称(可选)]。
-   图片取自 oll/ 目录。公式来自知乎「小狼啊小狼」系列；
-   朝向与图不符的已换成朝向吻合的公式，仍找不到的留空（公式为空串）。 */
+/* 数据：每节若干情况，每条 = [编号, 公式]。公式为空串表示留空。
+   图片取自 oll/ 目录。公式来自知乎「小狼啊小狼」系列，
+   逐条用 tools/verify.py 校验过「照图摆好直接就能用」。 */
 var SECTIONS = [
   { title: "顶面「十字」", cnt: 7, rows: [
-    [1, "(R U2 R' U') (R U R' U') (R U' R')", null],
-    [2, "(R U'2) (R'2 U' R2 U') (R'2 U'2 R)", null],
-    [3, "(R2 D) (R' U2 R D') (R' U2 R')", null],
-    [4, "x' (R U R' D) (R U' R' D')", null],
-    [5, "x' (R U' R' D) (R U R' D')", null],
-    [6, "L U L' U L U2 L'", null],
-    [7, "R' U' R U' R' U2 R", null],
+    [1, "(R U2 R' U') (R U R' U') (R U' R')"],
+    [2, "(R U'2) (R'2 U' R2 U') (R'2 U'2 R)"],
+    [3, "(R2 D) (R' U2 R D') (R' U2 R')"],
+    [4, "x' (R U R' D) (R U' R' D')"],
+    [5, "x' (R U' R' D) (R U R' D')"],
+    [6, "L U L' U L U2 L'"],
+    [7, "R' U' R U' R' U2 R"],
   ] },
   { title: "顶面「单点」", cnt: 8, rows: [
-    [8, "(R U'2) (R'2 F R F') U2 (R' F R F')", null],
-    [9, "F (R U R' U') S (R U R' U') f'", null],
-    [10, "F (U' R U' R' U') (R' F R F') U2 F'", null],
-    [11, "F' (U L' U L U) (L F' L' F) U2 F", null],
-    [12, "(R U R' U) (R' F R F') U2 (R' F R F')", null],
-    [13, "(r U R') (U R U'2) (r'2 U' R U' R' U'2 r)", null],
-    [14, "(M U) (R U R' U') M' (R' F R F')", null],
-    [15, "(M U) (R U R' U') M'2 (U R U' r')", null],
+    [8, "(R U'2) (R'2 F R F') U2 (R' F R F')"],
+    [9, "F (R U R' U') S (R U R' U') f'"],
+    [10, "F (U' R U' R' U') (R' F R F') U2 F'"],
+    [11, "F' (U L' U L U) (L F' L' F) U2 F"],
+    [12, "(R U R' U) (R' F R F') U2 (R' F R F')"],
+    [13, "(r U R') (U R U'2) (r'2 U' R U' R' U'2 r)"],
+    [14, "(M U) (R U R' U') M' (R' F R F')"],
+    [15, "(M U) (R U R' U') M'2 (U R U' r')"],
   ] },
   { title: "顶面「一字」", cnt: 15, rows: [
-    [16, "f (R U R' U') (R U R' U') f'", null],
-    [17, "(r' U' r) (U' R' U R) (U' R' U R) (r' U r)", null],
-    [18, "(R' U' R U') (R' U) y' (R' U R B)", null],
-    [19, "(R U'2 R'2 U') (R U' R' U2) (F R F')", null],
-    [20, "(R' F) (R U R' U') F' (U R)", null],
-    [21, "(L F') (L' U' L U) F (U' L')", null],
-    [22, "(R U R' U') M' (U R U' r')", null],
-    [23, "(r U' r') (U' r U r') y (L' U L)", null],
-    [24, "(l' U l) (U l' U' l) y' (R U' R')", null],
-    [25, "(l U l') (L U L' U') (l U' l')", null],
-    [26, "(r' U' r) (R' U' R U) (r' U r)", null],
-    [27, "F (R U R' U') F'", null],
-    [28, "(R U R' U') (R' F R F')", null],
-    [29, "(R' U') (R' F R F') (U R)", null],
-    [30, "(R U R' U') y' (r' U' R U) M'", null],
+    [16, "f (R U R' U') (R U R' U') f'"],
+    [17, "(r' U' r) (U' R' U R) (U' R' U R) (r' U r)"],
+    [18, "(R' U' R U') (R' U) y' (R' U R B)"],
+    [19, "(R U'2 R'2 U') (R U' R' U2) (F R F')"],
+    [20, "(R' F) (R U R' U') F' (U R)"],
+    [21, "(L F') (L' U' L U) F (U' L')"],
+    [22, "(R U R' U') M' (U R U' r')"],
+    [23, "(r U' r') (U' r U r') y (L' U L)"],
+    [24, "(l' U l) (U l' U' l) y' (R U' R')"],
+    [25, "(l U l') (L U L' U') (l U' l')"],
+    [26, "(r' U' r) (R' U' R U) (r' U r)"],
+    [27, "F (R U R' U') F'"],
+    [28, "(R U R' U') (R' F R F')"],
+    [29, "(R' U') (R' F R F') (U R)"],
+    [30, "(R U R' U') y' (r' U' R U) M'"],
   ] },
   { title: "顶面「拐角」", cnt: 27, rows: [
-    [31, "F (R U R' U') (R U R' U') F'", null],
-    [32, "F' (L' U' L U) (L' U' L U) F", null],
-    [33, "(r' U) (r2 U' r'2 U' r2) (U r')", null],
-    [34, "(l U') (l'2 U l2 U l'2) (U' l)", null],
-    [35, "(r' U') (R U' R' U) (R U' R' U2) r", null],
-    [36, "(l U) (L' U L U') (L' U L U2) l'", null],
-    [37, "(R U'2 R') M' (U' R U' R' U) M", null],
-    [38, "(L' U2 L) M' (U L' U L U') M", null],
-    [39, "(r U2) (R' U' R U' r')", null],
-    [40, "(l' U'2) (L U L' U l)", null],
-    [41, "(R U'2) (R'2 F R F') (R U'2 R')", null],
-    [42, "(F R' F' R) (U R U' R')", null],
-    [43, "(R U) f' (L' U' L U) f R'", null],
-    [44, "(L' U') f (R U R' U') f' L", null],
-    [45, "f' (L' U' L U) f", null],
-    [46, "f (R U R' U') f'", null],
-    [47, "(r' U' R) (U' R' U'2 r)", null],
-    [48, "(l U L') (U L U'2 l')", null],
-    [49, "(r R'2 U' R U') (R' U2 R U' R) r'", null],
-    [50, "(l' L2 U L' U) (L U2 L' U L') l", null],
-    [51, "U' (R U R' U') (R U' R') (F' U' F) (R U R')", null],
-    [52, "(L F' L' F) (L' U2 L U) y (L U L')", null],
-    [53, "(R U R') (U R U2 R') F (R U R' U') F'", null],
-    [54, "(L' U' L) (U' L' U'2 L) F' (L' U' L U) F", null],
-    [55, "(R U'2 R'2 F2) (r U' R U'2) r' F", null],
-    [56, "(L' U'2 L2 F'2) (l' U L' U2) l F'", null],
-    [57, "(r' U' R U) M' (U' R' U R)", null],
+    [31, "F (R U R' U') (R U R' U') F'"],
+    [32, "F' (L' U' L U) (L' U' L U) F"],
+    [33, "(r' U) (r2 U' r'2 U' r2) (U r')"],
+    [34, "(l U') (l'2 U l2 U l'2) (U' l)"],
+    [35, "(r' U') (R U' R' U) (R U' R' U2) r"],
+    [36, "(l U) (L' U L U') (L' U L U2) l'"],
+    [37, "(R U'2 R') M' (U' R U' R' U) M"],
+    [38, "(L' U2 L) M' (U L' U L U') M"],
+    [39, "(r U2) (R' U' R U' r')"],
+    [40, "(l' U'2) (L U L' U l)"],
+    [41, "(R U'2) (R'2 F R F') (R U'2 R')"],
+    [42, "(F R' F' R) (U R U' R')"],
+    [43, "(R U) f' (L' U' L U) f R'"],
+    [44, "(L' U') f (R U R' U') f' L"],
+    [45, "f' (L' U' L U) f"],
+    [46, "f (R U R' U') f'"],
+    [47, "(r' U' R) (U' R' U'2 r)"],
+    [48, "(l U L') (U L U'2 l')"],
+    [49, "(r R'2 U' R U') (R' U2 R U' R) r'"],
+    [50, "(l' L2 U L' U) (L U2 L' U L') l"],
+    [51, "U' (R U R' U') (R U' R') (F' U' F) (R U R')"],
+    [52, "(L F' L' F) (L' U2 L U) y (L U L')"],
+    [53, "(R U R') (U R U2 R') F (R U R' U') F'"],
+    [54, "(L' U' L) (U' L' U'2 L) F' (L' U' L U) F"],
+    [55, "(R U'2 R'2 F2) (r U' R U'2) r' F"],
+    [56, "(L' U'2 L2 F'2) (l' U L' U2) l F'"],
+    [57, "(r' U' R U) M' (U' R' U R)"],
   ] },
 ];
 
@@ -158,32 +172,39 @@ function esc(s) {
     return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c];
   });
 }
-function pic(n) {
-  return '<td class="pic"><span class="box"><img src="' + IMG(n) + '" alt="' + n +
-         '" loading="lazy"><span class="no">' + n + '</span></span></td>';
-}
-function fcell(alg, name) {
+function row(n, alg) {
   var body = alg ? '<code>' + esc(alg) + '</code>'
                  : '<span class="todo">朝向与图不符，暂缺</span>';
-  return '<td class="f">' + (name ? '<span class="nm">' + esc(name) + '</span>' : '') +
-         body + '</td>';
+  return '<tr><td class="pic"><span class="box"><img src="' + IMG(n) + '" alt="' + n +
+         '" loading="lazy"><span class="no">' + n + '</span></span></td>' +
+         '<td class="f">' + body + '</td></tr>';
 }
 var html = '';
 SECTIONS.forEach(function (sec) {
   html += '<section><h2>' + esc(sec.title) +
           '<span class="cnt">' + sec.cnt + ' 个</span></h2><table>' +
-          '<colgroup><col class="pic"><col class="f"><col class="pic"><col class="f"></colgroup><tbody>';
-  for (var i = 0; i < sec.rows.length; i += 2) {
-    var a = sec.rows[i], b = sec.rows[i + 1];
-    html += '<tr>' + pic(a[0]) + fcell(a[1], a[2]);
-    html += b ? pic(b[0]) + fcell(b[1], b[2])
-              : '<td class="empty"></td><td class="empty"></td>';
-    html += '</tr>';
-  }
+          '<colgroup><col class="pic"><col></colgroup><tbody>';
+  sec.rows.forEach(function (r) { html += row(r[0], r[1]); });
   html += '</tbody></table></section>';
 });
 document.getElementById('app').innerHTML = html;
 
+/* 夜晚模式 */
+var root = document.documentElement, themeBtn = document.getElementById('themebtn');
+function applyTheme(t) {
+  root.dataset.theme = t;
+  themeBtn.textContent = t === 'dark' ? '\u2600' : '\u263e';
+  themeBtn.title = t === 'dark' ? '切到白天' : '切到夜晚';
+  try { localStorage.setItem('cube-theme', t); } catch (e) {}
+}
+var saved = null;
+try { saved = localStorage.getItem('cube-theme'); } catch (e) {}
+applyTheme(saved === 'dark' ? 'dark' : 'light');
+themeBtn.addEventListener('click', function () {
+  applyTheme(root.dataset.theme === 'dark' ? 'light' : 'dark');
+});
+
+/* 点公式复制 */
 var toastEl = document.getElementById('toast'), toastTimer = null;
 function toast(msg) {
   toastEl.textContent = msg; toastEl.classList.add('on');
