@@ -482,6 +482,14 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
       /translate3d\(calc\(var\(--cs\) \* -1\.02\),[\s\S]*?calc\(var\(--cs\) \* 1\.52\)\)/.test(src2));
     ok('标牌尺寸随方块缩放（--cs）',
       /\.fmark\{[^}]*width:calc\(var\(--cs\) \* 0\.46\)/.test(src2));
+    // 标牌颜色要取 F 面本身的颜色，且从配色表里来（改配色时自动跟着变）
+    ok('标牌用 F 面的颜色（不是主题色）',
+      /class="fmark"[^>]*background:' \+\s*COLOR\.F|background:' \+\s*COLOR\.F/.test(src2) ||
+      /COLOR\.F \+ ';color:'/.test(src2));
+    ok('标牌字色按亮度选（浅色面上不会白字看不见）',
+      /function contrastOn\(hex\)/.test(src2) && /contrastOn\(COLOR\.F\)/.test(src2));
+    ok('CSS 里不再写死标牌配色',
+      !/\.fmark\{[^}]*background:var\(--accent\)/.test(src2));
 
     // 点一下 ← （y）：局面应当等于整体左转一次，并记进历史
     els.reset.fire('click');
