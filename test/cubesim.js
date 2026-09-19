@@ -416,6 +416,40 @@ console.log('\n[13] 练习页：显示的图形必须是「从复原态执行该
     };
     ok('画出来的就是 apply(solved, 公式)（题目 ' + els5.qid.textContent + '）',
       !!row && eqState(got5, S.apply(S.solved(), row[1])), JSON.stringify(got5).slice(0, 60));
+    // F2L 的 b 版必须以「绿色为 F 面」呈现（和表里 b 列一致）
+    ok('b 版会把绿面转到前面',
+      /scope === 'f2l' && \/b\$\/\.test\(r\[0\]\)/.test(html) &&
+      /view\.y = VIEW\.y \+ \(greenFront \? -90 : 0\)/.test(html));
+    {
+      // 切到 F2L，反复换题直到抽到 b 版，检查视角确实偏了 -90
+      const vm7 = require('vm');
+      const els7 = { cube: mk('div'), stage: mk('div'), next: mk('button') };
+      const btns7 = ['f2l', 'oll', 'pll'].map(k => { const b = mk('button'); b.dataset.scope = k; return b; });
+      const ctx7 = { console, navigator: {}, window: { addEventListener() {} },
+        setTimeout, clearTimeout,
+        localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
+        CubeSim: S, location: { hash: '' },
+        document: { getElementById: id => els7[id] || (els7[id] = mk('div')),
+                    querySelectorAll: sel => sel === '#scope button' ? btns7 : [],
+                    documentElement: mk('html'), createElement: mk,
+                    body: { appendChild() {} }, addEventListener() {} } };
+      ctx7.globalThis = ctx7;
+      vm7.createContext(ctx7);
+      vm7.runInContext(fs.readFileSync(path.join(__dirname, '..', 'alglist.js'), 'utf8'), ctx7);
+      vm7.runInContext(page, ctx7);
+      (btns7[0]._h.click || []).forEach(f => f({}));          // 切到 F2L
+      let sawA = null, sawB = null;
+      for (let i = 0; i < 40 && (!sawA || !sawB); i++) {
+        const t = els7.cube.style.transform;
+        if (/b$/.test(els7.qid.textContent)) { if (!sawB) sawB = t; }
+        else if (!sawA) sawA = t;
+        (els7.next._h.click || []).forEach(f => f({}));
+      }
+      const deg = t => { const m = /rotateY\((-?\d+(?:\.\d+)?)deg\)/.exec(t); return m ? +m[1] : null; };
+      ok('a 版用默认视角（rotateY -32）', deg(sawA) === -32, String(sawA));
+      ok('b 版用绿面视角（rotateY -122）', deg(sawB) === -122, String(sawB));
+    }
+
     // 范围选择要持久化
     ok('范围会存进 localStorage', /practice-scope-v1/.test(html) &&
       /localStorage\.setItem\(SCOPE_KEY/.test(html));
