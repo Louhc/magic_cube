@@ -552,8 +552,13 @@ console.log('\n[13] 练习页：显示的图形必须是「从复原态执行该
         JSON.stringify(counts));
       ok('多写法的格子被抽到对应次数（Z 两条）',
         counts['PLL Z'] === 2, String(counts['PLL Z']));
-      ok('其余每个标签恰好一次',
-        labels.filter(t => t !== 'PLL Z').every(t => counts[t] === 1));
+      // 多写法的格子（Ua / Ub / Z）会各出现两次，单条的出现一次 ——
+      // 统一成「每个标签的次数都等于题库里的条数」
+      const multi = labels.filter(t => expect[t] > 1);
+      ok('单条写法的标签恰好一次',
+        labels.filter(t => expect[t] === 1).every(t => counts[t] === 1));
+      ok('多写法的格子按条数各出现多次（' + multi.join(' ') + '）',
+        multi.every(t => counts[t] === expect[t]), JSON.stringify(multi.map(t => [t, counts[t], expect[t]])));
     }
     (els5.next._h.click || []).forEach(function (f) { f({}); });
     ok('换轮时不紧接着重复上一题', els5.qid.textContent !== seen[seen.length - 1],
