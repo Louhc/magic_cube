@@ -534,10 +534,25 @@ console.log('\n[13] 练习页：显示的图形必须是「从复原态执行该
       (els5.next._h.click || []).forEach(function (f) { f({}); });
       seen.push(els5.qid.textContent);
     }
-    // PLL 现在有 22 条（Z 收了两条写法），所以按题库实际条数断言
-    ok('一轮内不重复出题（连出 ' + seen.length + ' 题）',
-      new Set(seen).size === seen.length, seen.join(' '));
-    ok('一轮覆盖整个题库（22 条）', seen.length === 22, String(seen.length));
+    // PLL 现在有 22 条，其中 Z 收了两条写法 —— 两条的题面（图）相同，
+    // 所以标签都是「PLL Z」，不能用标签去重。改成按"每个标签出现的次数
+    // 正好等于题库里该标签的条数"来验，等价于洗牌袋覆盖了每一条。
+    {
+      const counts = {};
+      seen.forEach(t => { counts[t] = (counts[t] || 0) + 1; });
+      const expect = {};
+      ctx5.ALG_LIST.pll.forEach(r => {
+        const t = 'PLL ' + r[0];
+        expect[t] = (expect[t] || 0) + 1;
+      });
+      const labels = Object.keys(expect).sort();
+      ok('一轮抽出 ' + seen.length + ' 题，覆盖题库全部 ' + labels.length + ' 个标签',
+        seen.length === 22 && labels.every(t => counts[t] === expect[t]),
+        JSON.stringify(counts));
+      ok('Z 恰好出现两次（两条写法）', counts['PLL Z'] === 2, String(counts['PLL Z']));
+      ok('其余每个标签恰好一次',
+        labels.filter(t => t !== 'PLL Z').every(t => counts[t] === 1));
+    }
     (els5.next._h.click || []).forEach(function (f) { f({}); });
     ok('换轮时不紧接着重复上一题', els5.qid.textContent !== seen[seen.length - 1],
       seen[seen.length - 1] + ' -> ' + els5.qid.textContent);
