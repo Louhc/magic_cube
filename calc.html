@@ -88,15 +88,23 @@
   #alg.bad{border-color:#c0392b}
 
   .ctrl{display:flex;gap:6px;margin-bottom:9px}
-  .rev{flex:none;width:34px;padding:0;border-radius:7px;cursor:pointer;font-size:14px;
-       line-height:1;background:var(--field);border:1px solid var(--line);
-       color:var(--muted);transition:.12s}
-  .rev:hover{border-color:var(--line-strong);color:var(--text)}
-  .rev.on{background:var(--accent);border-color:var(--accent);color:#fff}
-  .go{flex:none;padding:0 13px;border-radius:7px;cursor:pointer;font:inherit;font-size:12.5px;
-      background:var(--accent);border:1px solid var(--accent);color:#fff;transition:.12s}
-  .go:hover{filter:brightness(1.08)}
-  .go:disabled{opacity:.4;cursor:default;filter:none}
+  /* 正向 / 反向是一对等宽按钮：外形一致，只有图标和文字不同。
+     方向本身就是动作 —— 按哪个就按哪个方向执行，不需要先切开关。 */
+  .run{display:flex;gap:8px;margin-bottom:9px}
+  .run button{flex:1;min-width:0;height:34px;border-radius:8px;cursor:pointer;
+              display:flex;align-items:center;justify-content:center;gap:6px;
+              font:inherit;font-size:12.5px;letter-spacing:.02em;
+              background:var(--field);border:1px solid var(--line);color:var(--text);
+              transition:border-color .12s,color .12s,background .12s}
+  .run button i{font-style:normal;font-size:15px;line-height:1;color:var(--muted);
+                transition:color .12s,transform .12s}
+  .run button:hover:not(:disabled){border-color:var(--accent);color:var(--accent);
+                                   background:var(--field-hover)}
+  .run button:hover:not(:disabled) i{color:var(--accent)}
+  .run button#fwd:hover:not(:disabled) i{transform:rotate(45deg)}
+  .run button#rev:hover:not(:disabled) i{transform:rotate(-45deg)}
+  .run button:active:not(:disabled){transform:translateY(1px)}
+  .run button:disabled{opacity:.4;cursor:default}
 
   /* 历史记录 */
   .hist{display:flex;flex-direction:column;gap:5px}
@@ -149,8 +157,10 @@
       <div class="row">
         <input id="alg" type="text" spellcheck="false" autocomplete="off"
                value="R U R' U'" placeholder="例如 R U R' U'">
-        <button class="rev" id="rev" type="button" title="反向执行（取逆，顺序也倒过来）">↺</button>
-        <button class="go" id="submit" type="button">提交</button>
+      </div>
+      <div class="run">
+        <button id="fwd" type="button" title="按公式正向转动（在输入框里按回车同此）"><i>↻</i>正向</button>
+        <button id="rev" type="button" title="取逆执行：顺序倒过来，每一步再取反"><i>↺</i>反向</button>
       </div>
       <div class="ctrl">
         <button id="scramble" type="button">打乱</button>
@@ -226,6 +236,7 @@
   var errEl = document.getElementById('err');
   var histEl = document.getElementById('hist');
   var revEl = document.getElementById('rev');
+  var fwdEl = document.getElementById('fwd');
 
   var steps = [], frames = [], at = 0;   // 最近一次提交的步骤与各阶段局面
   var cur = CubeSim.solved();            // 当前局面（累积的）
@@ -373,7 +384,7 @@
     ['next', 'last'].forEach(function (id) {
       document.getElementById(id).disabled = noSteps || at >= steps.length;
     });
-    document.getElementById('submit').disabled = busy;
+    fwdEl.disabled = busy;
     revEl.disabled = busy;
     document.getElementById('scramble').disabled = busy;
     document.getElementById('reset').disabled = busy;
@@ -402,7 +413,7 @@
   }
 
   /* ---------- 提交一条公式 ---------- */
-  function submit(kind) {
+  function submit(kind, rev) {
     if (busy) return;
     var alg = algEl.value.trim();
     errEl.textContent = '';
@@ -417,7 +428,7 @@
       return;
     }
     if (!list.length) return;
-    var rev = revEl.classList.contains('on');
+    rev = !!rev;
     if (rev) list = invert(list);
 
     busy = true;
@@ -449,7 +460,7 @@
       out.push(f + suff[Math.floor(Math.random() * 3)]);
     }
     algEl.value = out.join(' ');
-    submit('scramble');
+    submit('scramble', false);
   }
 
   function reset() {
@@ -463,7 +474,6 @@
     algEl.classList.remove('bad');
     errEl.textContent = '';
     movesEl.innerHTML = '';
-    revEl.classList.remove('on');
     paint(cur);
     chrome();
     renderHist();
@@ -482,16 +492,15 @@
   }
 
   /* ---------- 事件 ---------- */
-  var submitBtn = document.getElementById('submit');
-  submitBtn.addEventListener('click', function () { submit('alg'); });
+  fwdEl.addEventListener('click', function () { submit('alg', false); });
+  revEl.addEventListener('click', function () { submit('alg', true); });
   algEl.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') { e.preventDefault(); submit('alg'); }
+    if (e.key === 'Enter') { e.preventDefault(); submit('alg', e.shiftKey); }
   });
   algEl.addEventListener('input', function () {
     algEl.classList.remove('bad');
     errEl.textContent = '';
   });
-  revEl.addEventListener('click', function () { revEl.classList.toggle('on'); });
   document.getElementById('scramble').addEventListener('click', scramble);
   document.getElementById('reset').addEventListener('click', reset);
   document.getElementById('first').addEventListener('click', function () { jump(0); });
@@ -509,9 +518,7 @@
   histEl.addEventListener('click', function (e) {
     var el = e.target.closest ? e.target.closest('.e') : null;
     if (!el) return;
-    var h = hist[+el.dataset.i];
-    algEl.value = h.alg;
-    revEl.classList.toggle('on', !!h.rev);
+    algEl.value = hist[+el.dataset.i].alg;
     algEl.focus();
   });
   document.addEventListener('keydown', function (e) {

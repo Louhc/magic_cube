@@ -411,16 +411,16 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
   // 点两次提交，第二次必须接着第一次的结果往下转
   const wait = ms => new Promise(r => setTimeout(r, ms));
   (async () => {
-    els.submit.fire('click');
+    els.fwd.fire('click');
     await wait(1200);                     // 2 步 × (340+80)ms = 840ms，留足余量
-    ok('第一次提交后历史有 1 条', String(els.hcount.textContent) === '1', els.hcount.textContent);
+    ok('第一次正向执行后历史有 1 条', String(els.hcount.textContent) === '1', els.hcount.textContent);
     ok('第一次提交后局面 = R U',
       sameState(readCube(), S.apply(S.solved(), 'R U')),
       JSON.stringify(readCube()).slice(0, 60));
 
-    els.submit.fire('click');
+    els.fwd.fire('click');
     await wait(1200);
-    ok('第二次提交后历史有 2 条', String(els.hcount.textContent) === '2', els.hcount.textContent);
+    ok('第二次后历史有 2 条', String(els.hcount.textContent) === '2', els.hcount.textContent);
     ok('第二次是从上一次的结果继续（= R U R U）',
       sameState(readCube(), S.apply(S.solved(), 'R U R U')),
       JSON.stringify(readCube()).slice(0, 60));
@@ -434,13 +434,13 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
     const srcText = fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8');
     ok('取逆时倒序遍历（顺序也反过来）',
       /function invert\(list\)[\s\S]*?for \(var i = list\.length - 1; i >= 0; i--\)/.test(srcText));
-    ok('有反向开关按钮', /id="rev"/.test(srcText) && /class="rev"/.test(srcText));
+    ok('正向 / 反向是一对按钮',
+      /id="fwd"/.test(srcText) && /id="rev"/.test(srcText) &&
+      /\.run button\{flex:1/.test(srcText));
 
     els.reset.fire('click');
     els.alg.value = 'R U';
-    els.rev.fire('click');
-    ok('反向开关点亮', els.rev.classList.contains('on'));
-    els.submit.fire('click');
+    els.rev.fire('click');                       // 直接反向执行（不再是开关）
     await wait(1200);
     ok('反向提交后局面 = 逆（U\' R\'）',
       sameState(readCube(), S.apply(S.solved(), "U' R'")),
@@ -449,13 +449,11 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
 
     // 最强的语义检查：正着做一遍、再反着做一遍，应当回到原样
     els.reset.fire('click');
-    els.rev.fire('click');                       // 关掉反向
     els.alg.value = "R U R' U' F";               // 5 步 -> 约 2.1s
-    els.submit.fire('click');
+    els.fwd.fire('click');
     await wait(2600);
     const midway = readCube();
-    els.rev.fire('click');                       // 打开反向
-    els.submit.fire('click');
+    els.rev.fire('click');                       // 反向执行同一串
     await wait(2600);
     ok('正向做完再反向做一遍 -> 回到复原态',
       sameState(readCube(), S.solved()),
