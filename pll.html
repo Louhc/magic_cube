@@ -123,27 +123,27 @@
    逐条用 tools/verify.py 校验过「照图摆好直接就能用」。 */
 var SECTIONS = [
   { "title": "21 种", "cnt": 21, "rows": [
-    ["Aa", "x' R2 D2 (R' U' R) D2 (R' U R')", []],
-    ["Ab", "x' (R U' R) D2 (R' U R) D2 R'2", []],
-    ["E", "x' (R U' R' D) (R U R' D') (R U R' D) (R U' R' D')", [["(l U' R' D R U R' D') (R U R' D R U' R' D') x", 0], ["x' (R U' R' D R U R' D') (R U R' D R U' R' D') x", 0], ["x' (R U' R' D R U R' D') (R U R' D R U' R' u')", 0]]],
-    ["F", "R' U' F' (R U R' U' R' F R2 U' R' U' R U R' F') F U R", [["R' U' F' R U R' U' R' F R2 U' R' U' R U R' U R", 0]]],
-    ["Ga", "(R2 u) (R' U R' U' R u' R'2) y' (R' U R)", [["R2 u R' U R' U' R u' R2 y L' U L", 0], ["R2 u R' U R' U' R u' R2 y' R' U R", 0]]],
-    ["Gb", "(R' U' R) y (R2 u) (R' U R U') (R u' R'2)", [["R' U' R y R2 u R' U R U' R u' R2", 0]]],
-    ["Gc", "(R'2 u' R U' R) (U R' u R2) y (R U' R')", [["R2 u' R U' R U R' u R2 y R U' R'", 0]]],
-    ["Gd", "(R U R') y' (R'2 u' R U') (R' U R' u R2)", [["R U R' y' R2 u' R U' R' U R' u R2", 0]]],
-    ["H", "M'2 U M'2 U2 M'2 U M'2", [["(R2 U2' R U2' R2) U2' (R2 U2' R U2' R2)", 0], ["M2 U' (M2 U2 M2' U2') U M2'", 0], ["M2' U' M2' U2' M2' U' M2'", 0]]],
-    ["Ja", "(L' U' L F) (L' U' L U) (L F') (L2 U L U)", []],
-    ["Jb", "(R U R' F') (R U R' U') (R' F) (R2 U' R' U')", [["(R U2 R' U' R U' R') (R U' L' U R' U' L)", 0], ["R U R' F' (R U R' U' R' F R2 U' R' U' R U R' F') F R U' R'", 0], ["R U2 R' U' R U2 L' U R' U' L", 0]]],
-    ["Na", "R U R' U (R U R' F' R U R' U' R' F R2 U' R' U') U' R U' R'", [["R U R' U (R U R' F' R U R' U' R' F R2 U' R') U2 R U' R'", 0], ["(R U' L U2' R' U L') (R U' L U2' R' U L')", 1]]],
-    ["Nb", "R' U R U' R' F' U' F R U R' F R' F' R U' R", [["(R' U L' U2' R U' L) (R' U L' U2' R U' L)", 3]]],
-    ["Ra", "(R U R' F') (R U'2 R' U2) (R' F R U) (R U'2 R' U')", []],
-    ["Rb", "(L' U' L F) (L' U2 L U'2) (L F' L' U') (L' U2 L U)", []],
-    ["T", "(R U R' U') (R' F R2 U' R' U') (R U R' F')", [["(R U R' U' R' F R F') (F R U' R' U' R U R' F')", 0]]],
-    ["Ua", "(R U' R) (U R) (U R U' R' U' R'2)", [["U M2 U (M U2 M' U2') U' M2'", 3], ["U M2' U M U2' M' U M2'", 3], ["U R U' (R U R U R U' R' U' R' U') U R'", 3]]],
-    ["Ub", "(R2 U) (R U R' U' R' U') (R' U R')", [["U M2 U' (M U2 M' U2') U M2'", 3], ["U M2' U' M U2' M' U' M2'", 3], ["U R U' (U R U R U R' U' R' U' R') U R'", 3]]],
-    ["V", "R' U R' d' R' F' R2 U' R' U R' F R F", [["R' U R U' x' U (R U2' R' U' R U' R') U2 (R U R' U')", 0], ["R' U2' R U2' L U' R' U L' U L U' R U L'", 0]]],
-    ["Y", "F (R U' R' U' R U R') F' (R U R' U') (R' F R F')", [["R2 U' R' U R U' x' U' R' D R' D' R' U R", 0]]],
-    ["Z", "U (R' U' R U') (R U R U') (R' U R U) (R2 U' R' U)", [["R U R' U R' U' R' U R U' R' U' R2 U R", 2]]]
+    ["Aa", "x' R2 D2 (R' U' R) D2 (R' U R')"],
+    ["Ab", "x' (R U' R) D2 (R' U R) D2 R'2"],
+    ["E", "x' (R U' R' D) (R U R' D') (R U R' D) (R U' R' D')"],
+    ["F", "R' U' F' (R U R' U' R' F R2 U' R' U' R U R' F') F U R"],
+    ["Ga", "(R2 u) (R' U R' U' R u' R'2) y' (R' U R)"],
+    ["Gb", "(R' U' R) y (R2 u) (R' U R U') (R u' R'2)"],
+    ["Gc", "(R'2 u' R U' R) (U R' u R2) y (R U' R')"],
+    ["Gd", "(R U R') y' (R'2 u' R U') (R' U R' u R2)"],
+    ["H", "M'2 U M'2 U2 M'2 U M'2"],
+    ["Ja", "(L' U' L F) (L' U' L U) (L F') (L2 U L U)"],
+    ["Jb", "(R U R' F') (R U R' U') (R' F) (R2 U' R' U')"],
+    ["Na", "R U R' U (R U R' F' R U R' U' R' F R2 U' R' U') U' R U' R'"],
+    ["Nb", "R' U R U' R' F' U' F R U R' F R' F' R U' R"],
+    ["Ra", "(R U R' F') (R U'2 R' U2) (R' F R U) (R U'2 R' U')"],
+    ["Rb", "(L' U' L F) (L' U2 L U'2) (L F' L' U') (L' U2 L U)"],
+    ["T", "(R U R' U') (R' F R2 U' R' U') (R U R' F')"],
+    ["Ua", "(R U' R) (U R) (U R U' R' U' R'2)"],
+    ["Ub", "(R2 U) (R U R' U' R' U') (R' U R')"],
+    ["V", "R' U R' d' R' F' R2 U' R' U R' F R F"],
+    ["Y", "F (R U' R' U' R U R') F' (R U R' U') (R' F R F')"],
+    ["Z", "U (R' U' R U') (R U R U') (R' U R U) (R2 U' R' U)"]
   ] }
 ];
 
