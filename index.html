@@ -35,7 +35,7 @@
         background:var(--card);border:1px solid var(--line);border-radius:12px;
         padding:15px;transition:border-color .14s, transform .14s}
   .card:hover{border-color:var(--line-strong);transform:translateY(-2px)}
-  .card .thumb{flex:none;width:86px;height:86px;display:flex;align-items:center;justify-content:center}
+  .card .thumb{flex:none;width:96px;height:96px;display:flex;align-items:center;justify-content:center}
   .card .thumb img{max-width:100%;max-height:100%;border-radius:8px}
   .card h2{margin:0 0 5px;font-size:15px}
   .card h2 .n{color:var(--accent);font-weight:600;font-size:12.5px;margin-left:6px}
@@ -57,7 +57,6 @@
 
 <header>
   <h1>魔方工具箱</h1>
-  <p>一个配色编辑器，三张公式速查表。纯静态页面，双击即可打开。</p>
   <button class="themebtn" id="themebtn" type="button" title="切到夜晚">☾</button>
 </header>
 
@@ -66,38 +65,36 @@
     <a class="card" href="editor.html">
       <span class="thumb"><img src="preview.png" alt="配色编辑器预览"></span>
       <span>
-        <h2>配色编辑器</h2>
-        <p>透视三维视图，外加 OLL / PLL 两种二维图。点贴纸就地取色，可导出 PNG / SVG / JPEG / ICO。</p>
+        <h2>编辑器</h2>
+        <p>透视三维 + OLL / PLL 二维 · 导出 PNG / SVG / JPEG / ICO</p>
       </span>
     </a>
     <a class="card" href="f2l.html">
       <span class="thumb"><img src="f2l/f2l-01a-512x515.png" alt="F2L"></span>
       <span>
-        <h2>F2L 公式<span class="n">39 个</span></h2>
-        <p>左列「红色为 F 面」、右列「绿色为 F 面」，按要特殊处理 / 白色朝上 / 简单情况分节。</p>
+        <h2>F2L<span class="n">39</span></h2>
+        <p>红 / 绿为 F 面</p>
       </span>
     </a>
     <a class="card" href="oll.html">
       <span class="thumb"><img src="oll/oll-01-512x512.png" alt="OLL"></span>
       <span>
-        <h2>OLL 公式<span class="n">57 个</span></h2>
-        <p>按顶面图案分四类：十字、单点、一字、拐角。点公式即可复制。</p>
+        <h2>OLL<span class="n">57</span></h2>
+        <p>十字 · 单点 · 一字 · 拐角</p>
       </span>
     </a>
     <a class="card" href="pll.html">
       <span class="thumb"><img src="pll/pll-01-512x512.png" alt="PLL"></span>
       <span>
-        <h2>PLL 公式<span class="n">21 个</span></h2>
-        <p>顶层排序的 21 种情况，带侧面色带与置换箭头。点公式即可复制。</p>
+        <h2>PLL<span class="n">21</span></h2>
+        <p>带侧面色带与置换箭头</p>
       </span>
     </a>
   </div>
 </main>
 
 <footer>
-  公式取自知乎「小狼啊小狼」的 CFOP 系列，并逐条做过<b>朝向校验</b> —— 确认照图摆好直接做就能解，
-  差一步 AUF 的都不算数。<br>
-  校验脚本在 <code>tools/</code>，可随时重跑：<code>python3 tools/verify.py</code>
+  公式来自知乎「小狼啊小狼」CFOP 系列，已逐条做朝向校验 · <code>tools/verify.py</code>
 </footer>
 
 <script src="nav.js"></script>
