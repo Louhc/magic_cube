@@ -74,6 +74,10 @@
   .qid{font:600 22px/1.2 ui-monospace,Menlo,Consolas,monospace;
        text-align:center;margin:4px 0 2px;letter-spacing:.02em}
   .qhint{text-align:center;color:var(--muted);font-size:12.5px;margin-bottom:12px}
+  /* 公式要解决的图形 —— 就是公式表里那一张 */
+  .qthumb{display:flex;flex-direction:column;align-items:center;gap:5px;margin:6px 0 10px}
+  .qthumb img{width:96px;height:96px;border-radius:10px;background:var(--field)}
+  .qthumb span{color:var(--muted);font-size:11.5px;letter-spacing:.06em}
 
   .act{display:flex;gap:8px}
   .act button{flex:1;height:34px;border-radius:8px;cursor:pointer;font:inherit;font-size:12.5px;
@@ -119,7 +123,8 @@
     <section class="sec">
       <h2>题目</h2>
       <div class="qid" id="qid">—</div>
-      <div class="qhint">拿拼好的魔方做这个情况的公式<br>做完应当得到左边的图形</div>
+      <div class="qthumb"><img id="qimg" alt="要解决的图形"><span>要解决的图形</span></div>
+      <div class="qhint">拿拼好的魔方做这个情况的公式<br>做完应当得到左边的立体魔方</div>
       <div class="act">
         <button id="next" type="button">换一题</button>
         <button id="reveal" class="main" type="button">看答案</button>
@@ -240,15 +245,43 @@
 
   /* ---------- 题目 ---------- */
   var scope = 'oll', cur = null;
+  var bag = [], lastIdx = -1;
+
+  /* 洗牌袋：把该范围的题洗一遍，逐个取出，取完再洗一轮。
+     这样每一题都会出现一次才可能重复；并且换轮时避免第一题和上一题撞。 */
+  function drawIndex(n) {
+    if (!bag.length) {
+      bag = [];
+      for (var i = 0; i < n; i++) bag.push(i);
+      for (var j = n - 1; j > 0; j--) {
+        var k = Math.floor(Math.random() * (j + 1));
+        var t = bag[j]; bag[j] = bag[k]; bag[k] = t;
+      }
+      // 从末尾取，所以把可能与上一题重复的那张换到开头
+      if (n > 1 && bag[n - 1] === lastIdx) {
+        var t2 = bag[n - 1]; bag[n - 1] = bag[0]; bag[0] = t2;
+      }
+    }
+    lastIdx = bag.pop();
+    return lastIdx;
+  }
+  // 公式表里那张图的文件名
+  function thumbOf(kind, id) {
+    var f = kind === 'f2l' ? id : (/^\d+$/.test(id) && id.length < 2 ? '0' + id : id);
+    return kind + '/' + kind + '-' + f + '-' + (kind === 'f2l' ? '512x515' : '512x512') + '.png';
+  }
 
   function pick() {
     var list = (typeof ALG_LIST !== 'undefined' && ALG_LIST[scope]) || [];
     if (!list.length) return;
-    var r = list[Math.floor(Math.random() * list.length)];
+    var r = list[drawIndex(list.length)];
     // 目标图形 = 从【复原态】执行这条公式的结果 ——
     // 用户手里是拼好的魔方，做完得到的正是这个
     cur = { id: r[0], alg: r[1], state: CubeSim.apply(CubeSim.solved(), r[1]) };
     document.getElementById('qid').textContent = scope.toUpperCase() + ' ' + r[0];
+    var img = document.getElementById('qimg');
+    img.src = thumbOf(scope, r[0]);
+    img.alt = scope.toUpperCase() + ' ' + r[0];
     document.getElementById('ans').classList.remove('on');
     document.getElementById('ansalg').textContent = '';
     paint(cur.state);
@@ -279,6 +312,7 @@
     b.addEventListener('click', function () {
       if (busy) return;
       scope = b.dataset.scope;
+      bag = []; lastIdx = -1;          // 换范围就重开一轮
       Array.prototype.forEach.call(document.querySelectorAll('#scope button'), function (o) {
         o.classList.toggle('on', o === b);
       });

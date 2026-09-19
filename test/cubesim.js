@@ -377,7 +377,7 @@ console.log('\n[13] 练习页：显示的图形必须是「从复原态执行该
     setPointerCapture() {}, closest() { return null; }, offsetWidth: 1,
     set innerHTML(v) { this._hh = v; }, get innerHTML() { return this._hh || ''; },
     set textContent(v) { this._t = v; }, get textContent() { return this._t === undefined ? '' : this._t; } });
-  const els5 = { cube: mk('div'), stage: mk('div') };
+  const els5 = { cube: mk('div'), stage: mk('div'), next: mk('button') };
   const scopeBtns = ['f2l', 'oll', 'pll'].map(k => { const b = mk('button'); b.dataset.scope = k; return b; });
   const ctx5 = { console, navigator: {}, window: { addEventListener() {} },
     setTimeout, clearTimeout, localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
@@ -416,6 +416,23 @@ console.log('\n[13] 练习页：显示的图形必须是「从复原态执行该
     };
     ok('画出来的就是 apply(solved, 公式)（题目 ' + els5.qid.textContent + '）',
       !!row && eqState(got5, S.apply(S.solved(), row[1])), JSON.stringify(got5).slice(0, 60));
+    // 洗牌袋：切到 PLL（21 题）连点 20 次，应把 21 题各出一次、无一重复
+    (scopeBtns[2]._h.click || []).forEach(function (f) { f({}); });
+    const seen = [els5.qid.textContent];
+    for (let i = 0; i < 20; i++) {
+      (els5.next._h.click || []).forEach(function (f) { f({}); });
+      seen.push(els5.qid.textContent);
+    }
+    ok('一轮内不重复出题（连出 ' + seen.length + ' 题）',
+      new Set(seen).size === seen.length, seen.join(' '));
+    ok('一轮覆盖整个范围（21 题）', new Set(seen).size === 21, String(new Set(seen).size));
+    (els5.next._h.click || []).forEach(function (f) { f({}); });
+    ok('换轮时不紧接着重复上一题', els5.qid.textContent !== seen[seen.length - 1],
+      seen[seen.length - 1] + ' -> ' + els5.qid.textContent);
+    ok('显示了公式要解决的图形（' + els5.qimg.src + '）',
+      /^pll\/pll-[A-Za-z]+-512x512\.png$/.test(els5.qimg.src) &&
+      fs.existsSync(path.join(__dirname, '..', els5.qimg.src)), els5.qimg.src);
+
   }
 }
 
