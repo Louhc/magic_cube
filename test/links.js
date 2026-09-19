@@ -10,9 +10,11 @@ const ROOT = path.join(__dirname, '..');
 let pass = 0, fail = 0;
 const ok = (n, c, x) => { c ? pass++ : fail++; console.log((c ? '  \u2713 ' : '  \u2717 ') + n + (c ? '' : '  -> ' + x)); };
 
-const PAGES = ['index.html', 'editor.html', 'f2l.html', 'oll.html', 'pll.html'];
+// 从磁盘自动发现，而不是写死清单 —— 加页面不用改测试，
+// 但"某页没接进导航"仍然会被下面的交叉核对抓住。
+const PAGES = fs.readdirSync(ROOT).filter(f => f.endsWith('.html')).sort();
 
-console.log('[1] 五个页面都在');
+console.log('[1] 磁盘上的页面都在（' + PAGES.length + ' 个）');
 PAGES.forEach(p => ok(p + ' 存在', fs.existsSync(path.join(ROOT, p))));
 
 console.log('\n[2] 页面里的每个内部链接都指向真实文件');
