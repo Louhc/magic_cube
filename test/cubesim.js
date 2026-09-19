@@ -546,8 +546,13 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
     }
 
     // ---- 选公式面板 ----
-    ok('有 F2L / OLL / PLL 三个来源按钮',
-      /\.pick button/.test(src2) && ['f2l', 'oll', 'pll'].every(k => src2.includes('data-pick="' + k + '"')));
+    // 三个来源按钮合并成了一个「选公式」，来源改到展开栏里切
+    ok('面板里只有一个「选公式」按钮',
+      /id="openpick"/.test(src2) && !/class="pick"/.test(src2));
+    ok('来源按钮在展开栏里（F2L/OLL/PLL）',
+      /\.tabs button/.test(src2) && ['f2l', 'oll', 'pll'].every(k => src2.includes('data-pick="' + k + '"')));
+    ok('切来源时不收起整栏',
+      /function syncTabs/.test(src2) && !/pickerEl\.classList\.toggle\('on', !!pickKind\)/.test(src2));
     ok('选公式是右侧独立一列（不是挤在面板下面）',
       /<aside class="picker" id="picker">/.test(src2) &&
       /\.picker\.on\{width:300px\}/.test(src2) &&

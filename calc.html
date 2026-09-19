@@ -177,13 +177,26 @@
   .moves span.cur{background:var(--accent);border-color:var(--accent);color:#fff}
 
   /* 选公式：三个来源按钮一排，下面是可滚动的公式表 */
-  .pick{display:flex;gap:6px;margin-bottom:8px}
-  .pick button{flex:1;height:28px;border-radius:7px;cursor:pointer;font:inherit;font-size:12px;
+  .openpick{width:100%;height:32px;margin-bottom:8px;border-radius:8px;cursor:pointer;
+            display:flex;align-items:center;justify-content:center;gap:6px;
+            font:inherit;font-size:12.5px;background:var(--field);
+            border:1px solid var(--line);color:var(--text);transition:.12s}
+  .openpick:hover:not(:disabled){border-color:var(--accent);color:var(--accent);
+                                 background:var(--field-hover)}
+  .openpick i{font-style:normal;font-size:13px;line-height:1;color:var(--muted)}
+  .openpick:hover:not(:disabled) i{color:var(--accent)}
+  .openpick.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .openpick.on i{color:#fff}
+  .openpick:disabled{opacity:.4;cursor:default}
+
+  /* 展开栏顶部的来源切换 */
+  .tabs{display:flex;gap:6px;margin-bottom:10px}
+  .tabs button{flex:1;height:28px;border-radius:7px;cursor:pointer;font:inherit;font-size:12px;
                letter-spacing:.03em;background:var(--field);border:1px solid var(--line);
                color:var(--muted);transition:.12s}
-  .pick button:hover:not(:disabled){color:var(--text);border-color:var(--line-strong)}
-  .pick button.on{background:var(--accent);border-color:var(--accent);color:#fff}
-  .pick button:disabled{opacity:.4;cursor:default}
+  .tabs button:hover:not(:disabled){color:var(--text);border-color:var(--line-strong)}
+  .tabs button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .tabs button:disabled{opacity:.4;cursor:default}
   /* 选公式列：缓慢展开。
      不能用 display:none 切换 —— 那样没法过渡，只能"蹦"出来。
      改成外层宽度 0 -> 300px + overflow:hidden，内层宽度固定，所以内容不会被挤扁。 */
@@ -251,11 +264,8 @@
         <button id="fwd" type="button" title="按公式正向转动（在输入框里按回车同此）"><i>↻</i>正向</button>
         <button id="rev" type="button" title="取逆执行：顺序倒过来，每一步再取反"><i>↺</i>反向</button>
       </div>
-      <div class="pick">
-        <button data-pick="f2l" type="button">F2L</button>
-        <button data-pick="oll" type="button">OLL</button>
-        <button data-pick="pll" type="button">PLL</button>
-      </div>
+      <button class="openpick" id="openpick" type="button"
+              title="展开公式表，选一条填进输入框"><i>\u2630</i><span>选公式</span></button>
       <div class="ctrl">
         <button id="scramble" type="button">打乱</button>
         <button id="reset" type="button">复原</button>
@@ -286,7 +296,11 @@
   <!-- 选公式：点开时在右侧展开一整列 -->
   <aside class="picker" id="picker">
     <div class="inner">
-      <h2 id="ptitle">公式</h2>
+      <div class="tabs">
+        <button data-pick="f2l" type="button">F2L</button>
+        <button data-pick="oll" type="button">OLL</button>
+        <button data-pick="pll" type="button">PLL</button>
+      </div>
       <div class="plist" id="plist"></div>
     </div>
   </aside>
@@ -364,6 +378,7 @@
   }
 
   var pickKind = null;
+  var openBtn = document.getElementById('openpick');
   function renderPick() {
     pickEl.innerHTML = pickKind ? (ALG_LIST[pickKind] || []).map(function (r) {
       return '<div class="p" data-alg="' + esc(r[1]) + '">' +
@@ -545,7 +560,8 @@
     Array.prototype.forEach.call(document.querySelectorAll('.orbit button'), function (b) {
       b.disabled = lock;
     });
-    Array.prototype.forEach.call(document.querySelectorAll('.pick button'), function (b) {
+    openBtn.disabled = lock;
+    Array.prototype.forEach.call(document.querySelectorAll('.tabs button'), function (b) {
       b.disabled = lock;
     });
     var playBtn = document.getElementById('play');
@@ -743,17 +759,26 @@
     errEl.textContent = '';
   });
   // 选公式：点来源按钮展开列表，点某一条就填进输入框并直接执行
-  Array.prototype.forEach.call(document.querySelectorAll('.pick button'), function (b) {
+  // 一个按钮开合整栏；来源在栏内切换（切换时不收起）
+  openBtn.addEventListener('click', function () {
+    if (pausedFirst()) return;
+    var open = !pickerEl.classList.contains('on');
+    if (open && !pickKind) pickKind = 'oll';
+    pickerEl.classList.toggle('on', open);
+    openBtn.classList.toggle('on', open);
+    syncTabs();
+    renderPick();
+  });
+  function syncTabs() {
+    Array.prototype.forEach.call(document.querySelectorAll('.tabs button'), function (o) {
+      o.classList.toggle('on', o.dataset.pick === pickKind);
+    });
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('.tabs button'), function (b) {
     b.addEventListener('click', function () {
       if (pausedFirst()) return;
-      var k = b.dataset.pick;
-      pickKind = (pickKind === k) ? null : k;
-      Array.prototype.forEach.call(document.querySelectorAll('.pick button'), function (o) {
-        o.classList.toggle('on', o.dataset.pick === pickKind);
-      });
-      pickerEl.classList.toggle('on', !!pickKind);
-      document.getElementById('ptitle').textContent =
-        pickKind ? pickKind.toUpperCase() + ' 公式' : '';
+      pickKind = b.dataset.pick;
+      syncTabs();
       renderPick();
     });
   });
