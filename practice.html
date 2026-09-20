@@ -10,13 +10,13 @@
   :root{
     color-scheme: light;
     /* 白天用一套柔和的暖粉配色（#FFF5F5 / #F7D6D0 / #E2B4BD / #4A4A4A）——
-       比原来的冷蓝白柔和，不刺眼。accent 是同色系加深过的 #E2B4BD：
+       页面柔粉 #F7D6D0、卡面暖白 #FFF5F5，比原来的冷蓝白柔和，也不刺眼。accent 是同色系加深过的 #E2B4BD：
        原色太浅，配白字只有 1.8:1、当文字用只有 1.7:1，都看不清。 */
-    --bg:#FFF5F5; --stage:#FDF1EF; --panel:#FFFFFF; --line:#F2D2CE;
-    --text:#4A4A4A; --muted:#8A7D7D; --accent:#A05566;
-    --field:#FDF1EF; --field-hover:#F7D6D0;
-    --line-strong:#E2B4BD; --chip:#F7D6D0; --chip-hover:#EFC8C6;
-    --scroll:#EFD8D6; --cubie:#16181c; --ok:#1e8449;
+    --bg:#F7D6D0; --stage:#FFF5F5; --panel:#FFF5F5; --line:#E2B4BD;
+    --text:#4A4A4A; --muted:#7A6E6E; --accent:#A05566;
+    --field:#FFFFFF; --field-hover:#F7D6D0;
+    --line-strong:#CE96A3; --chip:#F7D6D0; --chip-hover:#E2B4BD;
+    --scroll:#E2B4BD; --cubie:#16181c; --ok:#1e8449;
   }
   html[data-theme="dark"]{
     color-scheme: dark;
@@ -39,7 +39,7 @@
   .stage.drag{cursor:grabbing}
   .themebtn{position:absolute;right:16px;top:14px;z-index:5;
             width:34px;height:34px;padding:0;display:grid;place-items:center;
-            background:var(--chip);border:1px solid var(--line);color:var(--muted);
+            background:var(--panel);border:1px solid var(--line);color:var(--muted);
             border-radius:9px;cursor:pointer;transition:.12s;font-size:15px;line-height:1}
   .themebtn:hover{color:var(--text);border-color:var(--line-strong);background:var(--chip-hover)}
 

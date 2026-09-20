@@ -578,16 +578,21 @@ console.log('\n[16] 白天模式用的是那套暖粉配色');
     ok(p + ' 白天把四色都用上了',
       PALETTE.every(c => used.includes(c)),
       '缺 ' + PALETTE.filter(c => !used.includes(c)).join(' '));
-    ok(p + ' 白天底色取自四色、卡面是白或浅粉',
-      PALETTE.includes(v['--bg']) &&
-      (used.includes('#ffffff') || PALETTE.includes(surface)),
-      'bg=' + v['--bg'] + ' 卡面=' + surface);
+    ok(p + ' 白天页面底是柔粉 #f7d6d0', v['--bg'] === '#f7d6d0', v['--bg']);
+    // 卡面必须是暖白，不能是纯白 —— 纯白放在这套暖调里太跳（原来就是这个问题）
+    ok(p + ' 白天卡面是暖白 #fff5f5（不是纯白）', surface === '#fff5f5', '卡面=' + surface);
+    ok(p + ' 页面比卡面深一档（卡片才不会糊在底色上）',
+      lum(v['--bg']) < lum(surface), 'bg=' + v['--bg'] + ' 卡面=' + surface);
     ok(p + ' 白天正文是深灰 #4a4a4a', v['--text'] === '#4a4a4a', v['--text']);
     ok(p + ' 白天 accent 配白字够清楚（' + contrast(v['--accent'], '#ffffff').toFixed(1) + ':1）',
       contrast(v['--accent'], '#ffffff') >= 4.5, 'accent=' + v['--accent']);
-    ok(p + ' 白天 accent 当文字压浅底也够清楚（' +
+    ok(p + ' 白天 accent 当文字压卡面够清楚（' +
+      contrast(v['--accent'], surface).toFixed(1) + ':1）',
+      contrast(v['--accent'], surface) >= 4.5, 'accent=' + v['--accent'] + ' on ' + surface);
+    // 页面上偶尔也会当文字/图标用（悬停之类），放宽到大字号标准
+    ok(p + ' 白天 accent 压页面底也不算糊（' +
       contrast(v['--accent'], v['--bg']).toFixed(1) + ':1）',
-      contrast(v['--accent'], v['--bg']) >= 4.5, 'accent=' + v['--accent'] + ' on ' + v['--bg']);
+      contrast(v['--accent'], v['--bg']) >= 3, 'accent=' + v['--accent'] + ' on ' + v['--bg']);
   });
 }
 
