@@ -178,8 +178,12 @@
   }
 </style>
 <link rel="stylesheet" href="nav.css">
+<script>/* 主题必须在首次绘制前定好，否则会先用浅色画一遍再翻深色（闪一下） */
+try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.dataset.theme='dark'}catch(e){}</script>
 </head>
 <body>
+
+<script src="nav.js"></script>
 <div class="app">
   <main class="stage">
     <button class="themebtn" id="themebtn"></button>
@@ -1005,6 +1009,5 @@
   setMode(mode);
 })();
 </script>
-<script src="nav.js"></script>
 </body>
 </html>

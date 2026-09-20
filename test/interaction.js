@@ -97,7 +97,10 @@ const ctx = {
 ctx.globalThis = ctx;
 vm.createContext(ctx);
 const html = fs.readFileSync(path.join(__dirname, '..', 'editor.html'), 'utf8');
-const inline = html.match(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/)[1];
+// 页面的内联脚本不止一段了（head 里还有一段「首次绘制前定主题」），
+// 取最长的那段 —— 那才是主逻辑
+const inline = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)]
+  .map(m => m[1]).sort((a, b) => b.length - a.length)[0];
 console.log('(已从 editor.html 实时抽取内联脚本 ' + inline.length + ' 字节)');
 
 /* 桩不解析 HTML，所以把 <input> 的初始 value / checked 从真实标记里读出来灌进去。

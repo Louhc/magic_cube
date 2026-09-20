@@ -6,6 +6,8 @@
 <title>OLL 公式合集</title>
 <link rel="icon" type="image/x-icon" href="cube-64x64.ico">
 <link rel="stylesheet" href="nav.css">
+<script>/* 主题必须在首次绘制前定好，否则会先用浅色画一遍再翻深色（闪一下） */
+try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.dataset.theme='dark'}catch(e){}</script>
 <style>
   /* 默认浅色（白底）；点右上角按钮切夜晚。不跟随系统 —— 这是打印/速查用的表。 */
   :root{
@@ -110,13 +112,13 @@
 </style>
 </head>
 <body>
+<script src="nav.js"></script>
 <header>
   <h1>OLL</h1>
   <button class="themebtn" id="themebtn" type="button" title="切到夜晚">☾</button>
 </header>
 <main id="app"></main>
 <div id="toast"></div>
-<script src="nav.js"></script>
 <script>
 /* 数据：每节若干情况，每条 = [编号, 公式]。公式为空串表示留空。
    图片取自 oll/ 目录。公式来自知乎「小狼啊小狼」系列，

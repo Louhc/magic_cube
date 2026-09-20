@@ -165,5 +165,24 @@ console.log('\n[12] 每个页面的内联脚本都必须能通过语法检查');
   });
 }
 
+console.log('\n[13] 切页不该闪：主题要预设、导航条要早注入');
+{
+  // 为主题闪烁加的两条：
+  // 主题原来在页面渲染完之后才设 -> 先用浅色画一遍再翻深色，看着就是一闪。
+  // nav.js 原来在 body 末尾 -> 内容先渲染再被挤下去 42px。
+  PAGES.forEach(p => {
+    const h = fs.readFileSync(path.join(ROOT, p), 'utf8');
+    const head = h.slice(0, h.indexOf('</head>'));
+    ok(p + ' 在 head 里预设主题（首次绘制前）',
+      /localStorage\.getItem\('cube-theme'\)/.test(head) &&
+      /dataset\.theme/.test(head), 'head 里没有预设主题的脚本');
+    const body = h.slice(h.indexOf('<body>'));
+    const navAt = body.indexOf('src="nav.js"');
+    ok(p + ' 的 nav.js 在 body 开头注入（不产生位移）',
+      navAt >= 0 && navAt < 200, 'nav.js 位置 ' + navAt);
+    ok(p + ' 只引用一次 nav.js', (h.match(/src="nav\.js"/g) || []).length === 1);
+  });
+}
+
 console.log('\n结果: ' + pass + ' 通过, ' + fail + ' 失败');
 process.exit(fail ? 1 : 0);

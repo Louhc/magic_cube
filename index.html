@@ -50,9 +50,13 @@
   }
   @media print{ .themebtn{display:none} }
 </style>
+<script>/* 主题必须在首次绘制前定好，否则会先用浅色画一遍再翻深色（闪一下） */
+try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.dataset.theme='dark'}catch(e){}</script>
 </head>
 <body>
 
+
+<script src="nav.js"></script>
 <header>
   <h1>魔方工具箱</h1>
   <button class="themebtn" id="themebtn" type="button" title="切到夜晚">☾</button>
@@ -99,7 +103,6 @@
   </div>
 </main>
 
-<script src="nav.js"></script>
 <script>
 (function () {
   'use strict';
