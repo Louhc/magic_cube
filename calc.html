@@ -666,6 +666,10 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     if (busy) return;
     playing = false;
     try { localStorage.removeItem(STORE); } catch (e) {}
+    // 视角也回到默认 —— 从 b 版公式跳过来时视角补过 90 度，
+    // 复原后要重新回到「红面在左、绿面在右」
+    view.x = VIEW.x;
+    view.y = VIEW.y;
     hist = [];
     steps = [];
     frames = [CubeSim.solved()];

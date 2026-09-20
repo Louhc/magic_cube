@@ -661,6 +661,9 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
     els.reset.fire('click');
     ok('复原后历史清空', String(els.hcount.textContent) === '0', els.hcount.textContent);
     ok('复原后回到初始态', sameState(readCube(), S.solved()));
+    // 复原要把视角也带回默认（从 b 版公式跳来时视角补过 90 度）
+    ok('复原会把视角带回默认（红面在左、绿面在右）',
+      /function reset\(\)[\s\S]{0,700}?view\.x = VIEW\.x;[\s\S]{0,80}?view\.y = VIEW\.y;/.test(src), '复原没有重置视角');
 
     // ---- 反向执行 ----
     // 逆运算的关键是「顺序也要倒过来」：R U 的逆是 U' R'，不是 R' U'
