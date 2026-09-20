@@ -799,25 +799,19 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
     ok('点击公式先执行逆（无动画）',
       /invert\(fwd\)\.forEach\(function \(x\) \{/.test(src2) &&
       /cur = CubeSim\.turn\(cur, x\.mv, x\.times\);/.test(src2));
-    // 带整体旋转的公式（Aa 的 x'）要先把净旋转补上，再在正向末尾补净旋转的逆
+    // 带整体旋转的公式（Aa 的 x'）要先把净旋转补上，摆出的局面才和图同朝向
     ok('读取公式净旋转并补上（局面与图同朝向）',
       /var r = CubeSim\.netRotation\(hashAlg\);/.test(src2) &&
       /if \(r\) cur = CubeSim\.apply\(cur, r\);/.test(src2));
-    ok('相邻同名动作会化简（x\' x\' x\' -> 单步 x）',
-      /function simplify\(list\)/.test(src2) &&
-      /var s = \(n\(last\.times\) \+ k\) % 4;/.test(src2));
-    // 收尾的净旋转逆不进步骤条 —— 否则步骤条里会多出公式里没有的动作，
-    // 和「历史」里那条公式对不上
-    ok('净旋转的逆走收尾动画（不进步骤条）',
-      /var rinv = invert\(CubeSim\.steps\(r\)\);/.test(src2) &&
-      /run\(fwd, hashAlg, 'alg', false, simplify\(rinv\)\);/.test(src2));
-    ok('收尾动画只动画面、不碰 steps',
-      /function playCoda\(list, from, onDone\)/.test(src2) &&
-      /playCoda\(coda, cur, function \(end2\)/.test(src2));
+    // 动画里只允许有公式本身写明的动作 —— 不能自己追加净旋转的补偿
+    ok('动画里只播公式本身（不追加净旋转补偿）',
+      /run\(fwd, hashAlg, 'alg', false\);/.test(src2) &&
+      !/concat\(rinv\)/.test(src2) && !/playCoda/.test(src2) && !/simplify\(/.test(src2),
+      '代码里还在往动画里加东西');
     ok('逆执行完再正向播一遍（动画）',
-      /run\(fwd, hashAlg, 'alg', false, simplify\(rinv\)\);/.test(src2));
+      /run\(fwd, hashAlg, 'alg', false\);/.test(src2));
     ok('正向播放前先停 2 秒',
-      /setTimeout\(function \(\) \{\s*run\(fwd, hashAlg, 'alg', false, simplify\(rinv\)\);/.test(src2) &&
+      /setTimeout\(function \(\) \{\s*run\(fwd, hashAlg, 'alg', false\);/.test(src2) &&
       /\}, 2000\)/.test(src2));
     ok('计算器会读取 hash 里的公式',
       /location\.hash/.test(fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')));
@@ -853,11 +847,11 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
       }
       const alsrc = fs.readFileSync(path.join(__dirname, '..', 'alglist.js'), 'utf8');
       [
-        ["x' R2 D2 (R' U' R) D2 (R' U R')", '', ''],        // Aa：带 x'，结束复原
-        ["(R U R' U') (R U' R') (F' U' F) (R U R')", '', ''], // 无净旋转
-        ["(U L' U' L)y'(U' R U R')", '@g:', 'y']            // 21b：绿面，结束 y(复原)
+        ["x' R2 D2 (R' U' R) D2 (R' U R')", ''],        // Aa：带 x'
+        ["(R U R' U') (R U' R') (F' U' F) (R U R')", ''], // 无净旋转
+        ["(U L' U' L)y'(U' R U R')", '@g:']             // 21b：绿面 + 净旋转
       ].forEach(function (t) {
-        const alg = t[0], endRot = t[2];
+        const alg = t[0];
         const els3 = { alg: mkEl('input', '') };
         els3.cube = mkEl('div');
         const ctx3 = { console, navigator: {}, window: { addEventListener() {} },
@@ -883,9 +877,44 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
             got3[m[1] + '|' + N3b[x[1]]] = C3b[x[2].toUpperCase()];
           }
         }
-        ok('跳转播完后结束朝向正确（' + alg.slice(0, 16) + '）',
-          eq(S.facelets(got3), S.facelets(S.apply(S.solved(), endRot))));
+        // 动画只播公式本身，所以结束局面 = 净旋转作用在「同朝向的复原态」上。
+        // 带整体旋转的公式（Aa）就是会整体转偏 —— 这是公式本身的结果，不做补偿。
+        const start3 = t[1] === '@g:' ? S.apply(S.solved(), 'y') : S.solved();
+        const r3 = S.netRotation(alg);
+        const wantEnd = r3 ? S.apply(start3, r3) : start3;
+        ok('跳转播完后结束局面就是公式本身的结果（' + alg.slice(0, 16) + '）',
+          eq(S.facelets(got3), S.facelets(wantEnd)),
+          JSON.stringify(S.centers(got3)) + ' 期望 ' + JSON.stringify(S.centers(wantEnd)));
       });
+      // 停 2 秒里展示的「要解的局面」必须和图片同朝向 ——
+      // 净旋转只用在摆局面上。让 setTimeout 不执行动画，页面就停在这个局面上。
+      {
+        const vm4 = require('vm');
+        const els4 = { alg: mkEl('input', '') };
+        els4.cube = mkEl('div');
+        const ctx4 = { console, navigator: {}, window: { addEventListener() {} },
+          setTimeout: function () { return 0; }, clearTimeout() {},   // 不播动画
+          localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
+          CubeSim: S,
+          location: { hash: '#' + encodeURIComponent("x' R2 D2 (R' U' R) D2 (R' U R')") },
+          document: { getElementById: id => els4[id] || (els4[id] = mkEl('div')),
+                      querySelectorAll: () => [], documentElement: mkEl('html'),
+                      createElement: mkEl, body: { appendChild() {} }, addEventListener() {} } };
+        ctx4.globalThis = ctx4;
+        vm4.createContext(ctx4);
+        vm4.runInContext(alsrc, ctx4);
+        vm4.runInContext(src, ctx4);
+        const got4 = {};
+        for (const m of els4.cube.innerHTML
+                 .matchAll(/data-pos="([^"]+)"[^>]*>([\s\S]*?)<\/div>/g)) {
+          for (const x of m[2].matchAll(/class="on (\w+)"[^>]*--c:(#[0-9A-Fa-f]{6})/g)) {
+            got4[m[1] + '|' + N3b[x[1]]] = C3b[x[2].toUpperCase()];
+          }
+        }
+        const c4 = S.centers(got4);
+        ok('Aa 展示的局面是黄朝上（和图片同朝向）',
+          c4.U === 'U' && c4.F === 'F', JSON.stringify(c4));
+      }
     }
 
     // ---- 选公式面板 ----

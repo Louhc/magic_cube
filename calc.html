@@ -544,23 +544,6 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     })();
   }
 
-  /* 收尾动画：只把画面转到位，不碰步骤条（steps / movesEl）。
-     带整体旋转的公式做完后朝向会转偏，收尾把净旋转的逆补上 ——
-     它不是公式的一步，所以不该出现在步骤条里，也就不会和公式本身对不上。 */
-  function playCoda(list, from, onDone) {
-    var st = from, i = 0;
-    (function next() {
-      if (i >= list.length) { onDone(st); return; }
-      var mv = list[i];
-      animate(mv, function () {
-        st = CubeSim.turn(CubeSim.clone(st), mv.mv, mv.times);
-        i++;
-        paint(st);
-        next();
-      });
-    })();
-  }
-
   /* ---------- 界面状态 ---------- */
   function chrome() {
     Array.prototype.forEach.call(movesEl.children, function (el) {
@@ -620,27 +603,6 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     return out;
   }
 
-  /* 化简：相邻同名动作合并（次数按模 4 相加），抵消掉的整步删掉。
-     净旋转的逆常常是一串重复动作（比如 x' x' x'），压成最少步数再看。 */
-  function simplify(list) {
-    function n(t) { return ((t % 4) + 4) % 4; }
-    function back(k) { return k === 3 ? -1 : k; }
-    var out = [];
-    list.forEach(function (x) {
-      var k = n(x.times);
-      if (!k) return;
-      var last = out.length ? out[out.length - 1] : null;
-      if (last && last.mv === x.mv) {
-        var s = (n(last.times) + k) % 4;
-        out.pop();
-        if (s) out.push({ mv: x.mv, times: back(s) });
-        return;
-      }
-      out.push({ mv: x.mv, times: back(k) });
-    });
-    return out;
-  }
-
   /* ---------- 提交一条公式 ---------- */
   function submit(kind, rev) {
     if (pausedFirst()) return;
@@ -664,9 +626,8 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     run(list, alg, kind, rev);
   }
 
-  /* 播放一串步骤并记入历史。提交公式、整体旋转、打乱都走这里。
-     coda 是可选收尾动作（净旋转的逆）：动画补上，但不进步骤条。 */
-  function run(list, label, kind, rev, coda) {
+  /* 播放一串步骤并记入历史。提交公式、整体旋转、打乱都走这里。 */
+  function run(list, label, kind, rev) {
     playing = false;
     busy = true;
     chrome();
@@ -679,14 +640,6 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
       cur = end;
       hist.push({ kind: kind || 'alg', alg: label, rev: !!rev });
       renderHist();
-      if (coda && coda.length) {
-        playCoda(coda, cur, function (end2) {
-          cur = end2;
-          busy = false;
-          chrome();
-        });
-        return;
-      }
       busy = false;
       chrome();
     });
@@ -957,12 +910,12 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     // 视角跟着补同样角度（y 在 CSS 是 rotateY(-90)，视角补 +90），画面看着不变。
     try {
       var fwd = CubeSim.steps(hashAlg);
-      // 公式可能带整体旋转（如 Aa 的 x'、21b 的 y'）：做完公式魔方会整体转偏，
-      // 结束时 F 面不再是红色。处理：先把净旋转 r 作用到复原态上、再做公式的逆，
-      // 这样摆出的局面和图片同一朝向（普通公式黄朝上、绿面公式绿朝前）；
-      // 正向播完公式后，再补一步净旋转的逆 r⁻¹，把转偏的朝向扳回标准复原态。
+      // 公式可能带整体旋转（如 Aa 的 x'）：先把净旋转 r 作用到复原态上，
+      // 再做公式的逆 —— 这样摆出来的局面和图片同一朝向
+      // （普通公式黄朝上、绿面公式绿朝前）。
+      // 【只此一处】补偿只用在摆局面上，动画里只播公式本身写明的动作：
+      // 公式带旋转，做完魔方就真的会整体转偏，不再额外补转回来。
       var r = CubeSim.netRotation(hashAlg);
-      var rinv = invert(CubeSim.steps(r));
       if (hashGreen) {
         cur = CubeSim.apply(cur, 'y');        // 绿面转到前面
         view.y = view.y + 90;
@@ -971,12 +924,10 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
       invert(fwd).forEach(function (x) {
         cur = CubeSim.turn(cur, x.mv, x.times);
       });
-      // 先让用户看清「公式要解的局面」，停 2 秒再正向播动画。
-      // 收尾的净旋转逆走 coda —— 动画补上但不进步骤条：
-      // 步骤条里就只是公式本身，和「历史」里那条对得上。
+      // 先让用户看清「公式要解的局面」，停 2 秒再正向播公式
       paint(cur);
       setTimeout(function () {
-        run(fwd, hashAlg, 'alg', false, simplify(rinv));
+        run(fwd, hashAlg, 'alg', false);
       }, 2000);
     } catch (e) {
       // 公式不合法：退回旧行为，只填进输入框，不执行
