@@ -56,8 +56,21 @@ PAGES.forEach(p => {
     html.includes('href="nav.css"') && html.includes('src="nav.js"'));
 });
 
-console.log('\n[5] 导航样式表存在且定义了当前页高亮');
+console.log('\n[4b] 首页的 GitHub 源码链接');
 {
+  const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  const m = html.match(/class="ghbtn"[^>]*?href="([^"]+)"/);
+  ok('首页有 GitHub 图标按钮', !!m, '没找到 .ghbtn');
+  ok('指向本仓库、新窗口打开',
+    !!m && /^https:\/\/github\.com\/Louhc\/magic_cube\/?$/.test(m[1]) &&
+    /class="ghbtn"[\s\S]{0,200}?target="_blank"/.test(html) &&
+    /class="ghbtn"[\s\S]{0,200}?rel="noopener"/.test(html),
+    m && m[1]);
+  ok('图标是内联 SVG（不引外部图片）',
+    /class="ghbtn"[\s\S]{0,400}?<svg[^>]*viewBox="0 0 16 16"/.test(html));
+}
+
+console.log('\n[5] 导航样式表存在且定义了当前页高亮');{
   const css = fs.readFileSync(path.join(ROOT, 'nav.css'), 'utf8');
   ok('nav.css 有 .topnav 与选中态', /\.topnav\{/.test(css) && /\.topnav a\.on\{/.test(css));
   ok('nav.css 给编辑器的全高布局让了高度',
