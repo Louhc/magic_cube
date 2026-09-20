@@ -903,14 +903,25 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     // 框里填【原公式】，不要加前缀 —— 用户看的就是表里那条
     algEl.value = hashAlg;
     algEl.focus();
-    // 绿面为 F 的公式：先真的执行一个 y（整体旋转，动画播一遍并记进历史），
-    // 把绿面转到前面来；之后按执行就是接着这个朝向做公式。
-    // 但【看着要不变】—— 视角跟着转同样角度，所以画面仍是红面在左、绿面在右。
-    // y 在 CSS 里是 rotateY(-90)，所以视角补 +90。
-    if (hashGreen) {
-      run(CubeSim.steps('y'), 'y', 'rotate', false);
-      view.y = view.y + 90;
-      applyView();
+    // 点击公式跳过来：先把魔方摆到公式要解的局面，再正向播一遍动画看它解回来。
+    //   1) 【无动画】执行公式的逆 —— 从复原态退到那条公式要解的局面；
+    //   2) 【有动画】执行公式本身 —— 演示怎么把局面解回来。
+    // F2L 的 b 版按「绿色为 F 面」写，先无动画地做一个 y 把绿面转到前面，
+    // 视角跟着补同样角度（y 在 CSS 是 rotateY(-90)，视角补 +90），画面看着不变。
+    try {
+      var fwd = CubeSim.steps(hashAlg);
+      if (hashGreen) {
+        cur = CubeSim.apply(cur, 'y');
+        view.y = view.y + 90;
+      }
+      invert(fwd).forEach(function (x) {
+        cur = CubeSim.turn(cur, x.mv, x.times);
+      });
+      run(fwd, hashAlg, 'alg', false);
+    } catch (e) {
+      // 公式不合法：退回旧行为，只填进输入框，不执行
+      algEl.classList.add('bad');
+      errEl.textContent = e.message;
     }
   } else (function () {
     // 没有 hash：有存档就恢复现场，否则从头开始
