@@ -63,14 +63,21 @@ console.log('\n[4b] 首页的 GitHub 纸带');
   ok('首页有 GitHub 纸带', !!m, '没找到 .ghribbon');
   ok('指向本仓库、新窗口打开',
     !!m && /^https:\/\/github\.com\/Louhc\/magic_cube\/?$/.test(m[1]) &&
-    /class="ghribbon"[\s\S]{0,200}?target="_blank"/.test(html) &&
-    /class="ghribbon"[\s\S]{0,200}?rel="noopener"/.test(html),
+    /class="ghribbon"[\s\S]{0,300}?target="_blank"/.test(html) &&
+    /class="ghribbon"[\s\S]{0,300}?rel="noopener"/.test(html),
     m && m[1]);
-  ok('斜贴在右上角（旋转 45° + 裁剪框 overflow:hidden）',
-    /\.ghribbon\{[^}]*top:0[^}]*right:0[^}]*overflow:hidden/.test(html) &&
-    /\.ghribbon a\{[^}]*transform:rotate\(45deg\)/.test(html));
-  ok('导航条让出右内边距（否则会被纸带压住）',
-    /\.topnav\{padding-right:\d+px\}/.test(html));
+  // 位置：贴在导航条【下面】，不能压住导航栏；也不该再让导航让内边距
+  ok('贴在导航条下方（不覆盖导航栏）',
+    /\.ghribbon\{[^}]*top:var\(--nav-h, 42px\)[^}]*right:0[^}]*overflow:hidden/.test(html) &&
+    !/\.topnav\{padding-right/.test(html));
+  ok('45° 斜贴', /\.ghribbon a\{[^}]*transform:rotate\(45deg\)/.test(html));
+  ok('内容是 octocat 图标 + 英文',
+    /class="ghribbon"[\s\S]{0,400}?<svg viewBox="0 0 16 16"/.test(html) &&
+    /class="ghribbon"[\s\S]{0,1200}?>Fork me on GitHub<\/a>/.test(html) &&
+    !/[\u4e00-\u9fa5]/.test((html.match(/class="ghribbon"[\s\S]{0,1200}?<\/a>/) || [''])[0]));
+  ok('GitHub 经典黑白配色',
+    /\.ghribbon a\{[^}]*background:#24292f[^}]*color:#fff/.test(html) &&
+    /html\[data-theme="dark"\] \.ghribbon a\{background:#f0f6fc;color:#24292f\}/.test(html));
 }
 
 console.log('\n[5] 导航样式表存在且定义了当前页高亮');{
