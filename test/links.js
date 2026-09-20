@@ -546,5 +546,50 @@ console.log('\n[15] 各页的明暗底色约定必须一致');
   }
 }
 
+console.log('\n[16] 白天模式用的是那套暖粉配色');
+{
+  // 用户指定的四色。盯三件事：四色都真用上了、正文是深灰、
+  // 以及 accent 的对比度。accent 既当底色配白字、又当文字色，
+  // #E2B4BD 原色两边都不够（1.8:1 / 1.7:1），所以用了同色系加深过的。
+  const PALETTE = ['#fff5f5', '#f7d6d0', '#e2b4bd', '#4a4a4a'];
+  function lum(hex) {
+    const ch = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255)
+      .map(c => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)));
+    return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
+  }
+  function contrast(a, b) {
+    const s = [lum(a), lum(b)].sort((m, n) => n - m);
+    return (s[0] + 0.05) / (s[1] + 0.05);
+  }
+  function lightVars(h) {
+    // 编辑器的白天写在 html[data-theme="light"] 里，别的页就是 :root
+    const m = h.match(/html\[data-theme="light"\]\{([\s\S]*?)\n  \}/) ||
+              h.match(/:root\{([\s\S]*?)\n  \}/);
+    const out = {};
+    [...m[1].matchAll(/(--[\w-]+)\s*:\s*(#[0-9a-fA-F]{6,8})/g)]
+      .forEach(x => { out[x[1]] = x[2].toLowerCase(); });
+    return out;
+  }
+
+  PAGES.forEach(p => {
+    const v = lightVars(fs.readFileSync(path.join(ROOT, p), 'utf8'));
+    const used = Object.values(v);
+    const surface = v['--card'] || v['--panel'];
+    ok(p + ' 白天把四色都用上了',
+      PALETTE.every(c => used.includes(c)),
+      '缺 ' + PALETTE.filter(c => !used.includes(c)).join(' '));
+    ok(p + ' 白天底色取自四色、卡面是白或浅粉',
+      PALETTE.includes(v['--bg']) &&
+      (used.includes('#ffffff') || PALETTE.includes(surface)),
+      'bg=' + v['--bg'] + ' 卡面=' + surface);
+    ok(p + ' 白天正文是深灰 #4a4a4a', v['--text'] === '#4a4a4a', v['--text']);
+    ok(p + ' 白天 accent 配白字够清楚（' + contrast(v['--accent'], '#ffffff').toFixed(1) + ':1）',
+      contrast(v['--accent'], '#ffffff') >= 4.5, 'accent=' + v['--accent']);
+    ok(p + ' 白天 accent 当文字压浅底也够清楚（' +
+      contrast(v['--accent'], v['--bg']).toFixed(1) + ':1）',
+      contrast(v['--accent'], v['--bg']) >= 4.5, 'accent=' + v['--accent'] + ' on ' + v['--bg']);
+  });
+}
+
 console.log('\n结果: ' + pass + ' 通过, ' + fail + ' 失败');
 process.exit(fail ? 1 : 0);

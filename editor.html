@@ -16,16 +16,18 @@
     --scroll:#2b3542;
     --toast-bg:#243044; --toast-fg:#dbe6f5; --toast-line:#3a4c66;
   }
-  /* 白天模式：整套主色翻过来 */
+  /* 白天模式：整套主色翻过来。用柔和的暖粉配色
+     （#FFF5F5 / #F7D6D0 / #E2B4BD / #4A4A4A），比冷蓝白不刺眼。
+     accent 是同色系加深过的 #E2B4BD —— 原色太浅，配白字和当文字用都看不清。 */
   html[data-theme="light"]{
-    --bg:#e9edf2; --stage:#f6f8fa; --panel:#ffffff; --line:#dce2ea;
-    --text:#16202b; --muted:#5d6b7c; --accent:#2f6bd8;
-    --field:#f1f4f8; --field-hover:#e5eaf1; --field-focus:#eef2f7;
-    --chip:#eef1f6; --chip-hover:#e1e7ee; --chip-on-bg:#dbe6fb; --chip-on-fg:#1c4fa0;
-    --line-strong:#c3ccd8; --muted2:#8593a4;
-    --hint-bg:#eef1f5; --kbd-bg:#e6eaf0; --kbd-line:#cbd3de; --kbd-fg:#3a4756;
-    --scroll:#cdd5e0;
-    --toast-bg:#ffffff; --toast-fg:#1c2530; --toast-line:#d5dce6;
+    --bg:#FFF5F5; --stage:#FDF1EF; --panel:#FFFFFF; --line:#F2D2CE;
+    --text:#4A4A4A; --muted:#8A7D7D; --accent:#A05566;
+    --field:#FDF1EF; --field-hover:#F7D6D0; --field-focus:#FFF9F9;
+    --chip:#F7D6D0; --chip-hover:#EFC8C6; --chip-on-bg:#F7D6D0; --chip-on-fg:#8C4A57;
+    --line-strong:#E2B4BD; --muted2:#A79898;
+    --hint-bg:#FDF1EF; --kbd-bg:#F7D6D0; --kbd-line:#E2B4BD; --kbd-fg:#4A4A4A;
+    --scroll:#EFD8D6;
+    --toast-bg:#FFFFFF; --toast-fg:#4A4A4A; --toast-line:#F2D2CE;
   }
   *{box-sizing:border-box}
   html,body{height:100%;margin:0}
@@ -146,7 +148,7 @@
   .schemes button{width:36px;height:36px;border-radius:9px;border:2px solid var(--line);
                   cursor:pointer;padding:0;transition:.12s}
   .schemes button:hover{border-color:var(--line-strong);transform:translateY(-1px)}
-  .schemes button.on{border-color:var(--accent);box-shadow:0 0 0 2px #4c8dff40}
+  .schemes button.on{border-color:var(--accent);box-shadow:0 0 0 2px #a0556640}
 
   /* 取色器 */
   .row input[type=color]{flex:1;min-width:0;height:32px;padding:2px;background:var(--field);

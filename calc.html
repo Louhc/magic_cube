@@ -9,11 +9,14 @@
 <style>
   :root{
     color-scheme: light;
-    --bg:#e9edf2; --stage:#f6f8fa; --panel:#ffffff; --line:#dce2ea;
-    --text:#16202b; --muted:#5d6b7c; --accent:#2f6bd8;
-    --field:#f1f4f8; --field-hover:#e5eaf1;
-    --line-strong:#c3ccd8; --chip:#eef1f6; --chip-hover:#e1e7ee;
-    --scroll:#cdd5e0; --cubie:#16181c;
+    /* 白天用一套柔和的暖粉配色（#FFF5F5 / #F7D6D0 / #E2B4BD / #4A4A4A）——
+       比原来的冷蓝白柔和，不刺眼。accent 是同色系加深过的 #E2B4BD：
+       原色太浅，配白字只有 1.8:1、当文字用只有 1.7:1，都看不清。 */
+    --bg:#FFF5F5; --stage:#FDF1EF; --panel:#FFFFFF; --line:#F2D2CE;
+    --text:#4A4A4A; --muted:#8A7D7D; --accent:#A05566;
+    --field:#FDF1EF; --field-hover:#F7D6D0;
+    --line-strong:#E2B4BD; --chip:#F7D6D0; --chip-hover:#EFC8C6;
+    --scroll:#EFD8D6; --cubie:#16181c;
   }
   html[data-theme="dark"]{
     color-scheme: dark;

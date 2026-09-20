@@ -17,7 +17,7 @@
 .topnav .brand{font-weight:600;white-space:nowrap}
 .topnav .links{margin-left:auto;display:flex;gap:3px;flex-wrap:wrap;justify-content:flex-end}
 .topnav a{
-  color:var(--muted, #8a98aa); text-decoration:none;
+  color:var(--muted, #8A7D7D); text-decoration:none;
   padding:7px 10px; border-radius:7px; white-space:nowrap;
   /* 变色的时长要和 .pill 滑动的一致，两者才像同一件事 */
   transition:background .12s, color .18s;
@@ -61,7 +61,7 @@ body > .app{height:calc(100% - var(--nav-h))}
 .topnav .links{position:relative}
 .topnav .pill{
   position:absolute; top:0; left:0; z-index:0; pointer-events:none;
-  border-radius:7px; background:var(--accent, #2f6bd8);
+  border-radius:7px; background:var(--accent, #A05566);
   transition:transform .18s ease, width .18s ease, height .18s ease;
 }
 /* 链接要压在方块上面 */

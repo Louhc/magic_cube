@@ -9,9 +9,12 @@
   /* 默认浅色（白底）；点右上角按钮切夜晚。不跟随系统 —— 这是打印/速查用的表。 */
   :root{
     color-scheme: light;
-    --bg:#eef1f6; --card:#ffffff;   /* 页面底压暗一档，卡片保持白 -> 靠层次降低刺眼感 */ --line:#d8dee7; --line-strong:#b9c3d0;
-    --text:#1e2530; --muted:#6a7686; --head-red:#c0392b; --head-green:#1e8449;
-    --head-band:#f7d9b6; --accent:#2f6bd8; --field:#f4f6f9;
+    /* 白天用一套柔和的暖粉配色（#FFF5F5 / #F7D6D0 / #E2B4BD / #4A4A4A）——
+       比原来的冷蓝白柔和，不刺眼。accent 是同色系加深过的 #E2B4BD：
+       原色太浅，配白字只有 1.8:1、当文字用只有 1.7:1，都看不清。 */
+    --bg:#FFF5F5; --card:#FFFFFF; --line:#F2D2CE; --line-strong:#E2B4BD;
+    --text:#4A4A4A; --muted:#8A7D7D; --head-red:#c0392b; --head-green:#1e8449;
+    --head-band:#F7D6D0; --accent:#A05566; --field:#FDF1EF;
   }
   html[data-theme="dark"]{
     color-scheme: dark;
