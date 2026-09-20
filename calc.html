@@ -893,7 +893,13 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     algEl.focus();
     // 绿面为 F 的公式：先真的执行一个 y（整体旋转，动画播一遍并记进历史），
     // 把绿面转到前面来；之后按执行就是接着这个朝向做公式。
-    if (hashGreen) run(CubeSim.steps('y'), 'y', 'rotate', false);
+    // 但【看着要不变】—— 视角跟着转同样角度，所以画面仍是红面在左、绿面在右。
+    // y 在 CSS 里是 rotateY(-90)，所以视角补 +90。
+    if (hashGreen) {
+      run(CubeSim.steps('y'), 'y', 'rotate', false);
+      view.y = view.y + 90;
+      applyView();
+    }
   } else (function () {
     // 没有 hash：有存档就恢复现场，否则从头开始
     var d = loadSaved();

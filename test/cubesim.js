@@ -763,7 +763,10 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
       /algEl\.value = hashAlg;/.test(src2) &&
       !/algEl\.value = hashGreen \?/.test(src2));
     ok('@g: 时先真的执行一个 y',
-      /if \(hashGreen\) run\(CubeSim\.steps\('y'\)/.test(src2));
+      /if \(hashGreen\) \{[\s\S]{0,200}?run\(CubeSim\.steps\('y'\)/.test(src2));
+    // 执行 y 之后视角要补同样的角度，画面才保持不变（红面在左、绿面在右）
+    ok('@g: 时视角跟着补 +90（画面不变）',
+      /view\.y = view\.y \+ 90;/.test(src2));
     ok('计算器会读取 hash 里的公式',
       /location\.hash/.test(fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')));
     // 带上 hash 打开时，输入框应当被填好
