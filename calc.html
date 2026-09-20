@@ -878,9 +878,12 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     var h = location.hash || '';
     if (h.length <= 1) return;
     h = h.slice(1);
+    // 【先解码再判断前缀】—— 浏览器会把 hash 里的 @ 编码成 %40，
+    // 先判断的话就匹配不到 @g:，前缀会原样留在输入框里
+    try { h = decodeURIComponent(h); } catch (e) {}
     // F2L 的 b 版公式按「绿色为 F 面」写，链接会带 @g: 前缀
     if (h.indexOf('@g:') === 0) { hashGreen = true; h = h.slice(3); }
-    try { hashAlg = decodeURIComponent(h); } catch (e) { hashAlg = h; }
+    hashAlg = h;
   })();
   if (hashAlg) {
     try { localStorage.removeItem(STORE); } catch (e) {}

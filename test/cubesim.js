@@ -753,6 +753,11 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
       fs.readFileSync(path.join(__dirname, '..', 'f2l.html'), 'utf8').indexOf('@g:') >= 0);
     ok('计算器认识 @g: 前缀',
       /indexOf\('@g:'\) === 0/.test(src2));
+    // 必须先解码再判断 —— 浏览器会把 @ 编码成 %40，否则前缀留在框里，
+    // 执行时报「不认识的动作: @」
+    ok('先解码 hash 再判前缀',
+      src2.indexOf('decodeURIComponent(h)') < src2.indexOf("indexOf('@g:')"),
+      '@g: 的判断排在了解码之前');
     // 框里填原公式；y 是真的执行一次（转一下魔方），不是写进框里
     ok('@g: 时框里填原公式（不加 y）',
       /algEl\.value = hashAlg;/.test(src2) &&
