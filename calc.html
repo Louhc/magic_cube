@@ -544,6 +544,23 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     })();
   }
 
+  /* 收尾动画：只把画面转到位，不碰步骤条（steps / movesEl）。
+     带整体旋转的公式做完后朝向会转偏，收尾把净旋转的逆补上 ——
+     它不是公式的一步，所以不该出现在步骤条里，也就不会和公式本身对不上。 */
+  function playCoda(list, from, onDone) {
+    var st = from, i = 0;
+    (function next() {
+      if (i >= list.length) { onDone(st); return; }
+      var mv = list[i];
+      animate(mv, function () {
+        st = CubeSim.turn(CubeSim.clone(st), mv.mv, mv.times);
+        i++;
+        paint(st);
+        next();
+      });
+    })();
+  }
+
   /* ---------- 界面状态 ---------- */
   function chrome() {
     Array.prototype.forEach.call(movesEl.children, function (el) {
@@ -603,6 +620,27 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     return out;
   }
 
+  /* 化简：相邻同名动作合并（次数按模 4 相加），抵消掉的整步删掉。
+     净旋转的逆常常是一串重复动作（比如 x' x' x'），压成最少步数再看。 */
+  function simplify(list) {
+    function n(t) { return ((t % 4) + 4) % 4; }
+    function back(k) { return k === 3 ? -1 : k; }
+    var out = [];
+    list.forEach(function (x) {
+      var k = n(x.times);
+      if (!k) return;
+      var last = out.length ? out[out.length - 1] : null;
+      if (last && last.mv === x.mv) {
+        var s = (n(last.times) + k) % 4;
+        out.pop();
+        if (s) out.push({ mv: x.mv, times: back(s) });
+        return;
+      }
+      out.push({ mv: x.mv, times: back(k) });
+    });
+    return out;
+  }
+
   /* ---------- 提交一条公式 ---------- */
   function submit(kind, rev) {
     if (pausedFirst()) return;
@@ -626,8 +664,9 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     run(list, alg, kind, rev);
   }
 
-  /* 播放一串步骤并记入历史。提交公式、整体旋转、打乱都走这里。 */
-  function run(list, label, kind, rev) {
+  /* 播放一串步骤并记入历史。提交公式、整体旋转、打乱都走这里。
+     coda 是可选收尾动作（净旋转的逆）：动画补上，但不进步骤条。 */
+  function run(list, label, kind, rev, coda) {
     playing = false;
     busy = true;
     chrome();
@@ -640,6 +679,14 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
       cur = end;
       hist.push({ kind: kind || 'alg', alg: label, rev: !!rev });
       renderHist();
+      if (coda && coda.length) {
+        playCoda(coda, cur, function (end2) {
+          cur = end2;
+          busy = false;
+          chrome();
+        });
+        return;
+      }
       busy = false;
       chrome();
     });
@@ -924,10 +971,12 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
       invert(fwd).forEach(function (x) {
         cur = CubeSim.turn(cur, x.mv, x.times);
       });
-      // 先让用户看清「公式要解的局面」，停 2 秒再正向播动画
+      // 先让用户看清「公式要解的局面」，停 2 秒再正向播动画。
+      // 收尾的净旋转逆走 coda —— 动画补上但不进步骤条：
+      // 步骤条里就只是公式本身，和「历史」里那条对得上。
       paint(cur);
       setTimeout(function () {
-        run(fwd.concat(rinv), hashAlg, 'alg', false);
+        run(fwd, hashAlg, 'alg', false, simplify(rinv));
       }, 2000);
     } catch (e) {
       // 公式不合法：退回旧行为，只填进输入框，不执行

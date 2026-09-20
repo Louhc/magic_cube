@@ -803,13 +803,21 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
     ok('读取公式净旋转并补上（局面与图同朝向）',
       /var r = CubeSim\.netRotation\(hashAlg\);/.test(src2) &&
       /if \(r\) cur = CubeSim\.apply\(cur, r\);/.test(src2));
-    ok('正向末尾补净旋转的逆（结束回到标准复原态）',
+    ok('相邻同名动作会化简（x\' x\' x\' -> 单步 x）',
+      /function simplify\(list\)/.test(src2) &&
+      /var s = \(n\(last\.times\) \+ k\) % 4;/.test(src2));
+    // 收尾的净旋转逆不进步骤条 —— 否则步骤条里会多出公式里没有的动作，
+    // 和「历史」里那条公式对不上
+    ok('净旋转的逆走收尾动画（不进步骤条）',
       /var rinv = invert\(CubeSim\.steps\(r\)\);/.test(src2) &&
-      /run\(fwd\.concat\(rinv\), hashAlg, 'alg', false\);/.test(src2));
+      /run\(fwd, hashAlg, 'alg', false, simplify\(rinv\)\);/.test(src2));
+    ok('收尾动画只动画面、不碰 steps',
+      /function playCoda\(list, from, onDone\)/.test(src2) &&
+      /playCoda\(coda, cur, function \(end2\)/.test(src2));
     ok('逆执行完再正向播一遍（动画）',
-      /run\(fwd\.concat\(rinv\), hashAlg, 'alg', false\);/.test(src2));
+      /run\(fwd, hashAlg, 'alg', false, simplify\(rinv\)\);/.test(src2));
     ok('正向播放前先停 2 秒',
-      /setTimeout\(function \(\) \{\s*run\(fwd\.concat\(rinv\), hashAlg, 'alg', false\);/.test(src2) &&
+      /setTimeout\(function \(\) \{\s*run\(fwd, hashAlg, 'alg', false, simplify\(rinv\)\);/.test(src2) &&
       /\}, 2000\)/.test(src2));
     ok('计算器会读取 hash 里的公式',
       /location\.hash/.test(fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')));
@@ -829,6 +837,55 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
       vm2.createContext(ctx2);
       vm2.runInContext(src, ctx2);
       ok('带 hash 打开时输入框已填好', els2.alg.value === "R U R' U' F", els2.alg.value);
+    }
+    // 真跑一遍跳转：步骤条里必须只有公式本身的步数。
+    // 带整体旋转的公式（Aa 的 x'）做完朝向会转偏，补偿是「收尾动画」，
+    // 不能混进步骤条 —— 混进去就会和历史里那条公式对不上（曾经多了三个 x'）。
+    {
+      const vm3 = require('vm');
+      const N3b = { px: '1,0,0', nx: '-1,0,0', py: '0,1,0',
+                    ny: '0,-1,0', pz: '0,0,1', nz: '0,0,-1' };
+      const C3b = {};
+      for (const x of fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')
+               .match(/var COLOR = \{([^}]+)\}/)[1]
+               .matchAll(/([UDFBRL]):\s*'(#[0-9A-Fa-f]{6})'/g)) {
+        C3b[x[2].toUpperCase()] = x[1];
+      }
+      const alsrc = fs.readFileSync(path.join(__dirname, '..', 'alglist.js'), 'utf8');
+      [
+        ["x' R2 D2 (R' U' R) D2 (R' U R')", '', ''],        // Aa：带 x'，结束复原
+        ["(R U R' U') (R U' R') (F' U' F) (R U R')", '', ''], // 无净旋转
+        ["(U L' U' L)y'(U' R U R')", '@g:', 'y']            // 21b：绿面，结束 y(复原)
+      ].forEach(function (t) {
+        const alg = t[0], endRot = t[2];
+        const els3 = { alg: mkEl('input', '') };
+        els3.cube = mkEl('div');
+        const ctx3 = { console, navigator: {}, window: { addEventListener() {} },
+          // 让 2 秒延时和每步动画立刻跑完，测试不用真等
+          setTimeout: function (fn) { fn(); return 0; }, clearTimeout() {},
+          localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
+          CubeSim: S, location: { hash: '#' + t[1] + encodeURIComponent(alg) },
+          document: { getElementById: id => els3[id] || (els3[id] = mkEl('div')),
+                      querySelectorAll: () => [], documentElement: mkEl('html'),
+                      createElement: mkEl, body: { appendChild() {} }, addEventListener() {} } };
+        ctx3.globalThis = ctx3;
+        vm3.createContext(ctx3);
+        vm3.runInContext(alsrc, ctx3);
+        vm3.runInContext(src, ctx3);
+        const shown = (els3.moves.innerHTML.match(/data-k="/g) || []).length;
+        const want = S.steps(alg).length;
+        ok('跳转后步骤条只显示公式本身的 ' + want + ' 步（' + alg.slice(0, 16) + '）',
+          shown === want, '实际 ' + shown + ' 步');
+        const got3 = {};
+        for (const m of els3.cube.innerHTML
+                 .matchAll(/data-pos="([^"]+)"[^>]*>([\s\S]*?)<\/div>/g)) {
+          for (const x of m[2].matchAll(/class="on (\w+)"[^>]*--c:(#[0-9A-Fa-f]{6})/g)) {
+            got3[m[1] + '|' + N3b[x[1]]] = C3b[x[2].toUpperCase()];
+          }
+        }
+        ok('跳转播完后结束朝向正确（' + alg.slice(0, 16) + '）',
+          eq(S.facelets(got3), S.facelets(S.apply(S.solved(), endRot))));
+      });
     }
 
     // ---- 选公式面板 ----
