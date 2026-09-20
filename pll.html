@@ -51,7 +51,9 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   /* 图是透明底 PNG，这一格不铺底色，跟随页面底色 */
   td.pic{padding:6px;text-align:center}
   td.pic .box{position:relative;display:inline-block;line-height:0}
-  td.pic img{width:100px;height:auto;display:block;border-radius:6px}
+  /* 给图片预留高度：图片是懒加载的，不写 aspect-ratio 的话
+     加载完成前高度为 0，加载后整行会被撑高 —— 也是一次跳动 */
+  td.pic img{width:100px;height:auto;aspect-ratio:1/1;display:block;border-radius:6px}
   td.pic .no{position:absolute;left:3px;top:1px;font-size:11px;font-weight:600;
              color:var(--muted);line-height:1;background:var(--chip);padding:1px 3px;border-radius:4px}
   td.f{padding:11px 14px}

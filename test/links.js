@@ -182,6 +182,14 @@ console.log('\n[13] 切页不该闪：主题要预设、导航条要早注入');
       navAt >= 0 && navAt < 200, 'nav.js 位置 ' + navAt);
     ok(p + ' 只引用一次 nav.js', (h.match(/src="nav\.js"/g) || []).length === 1);
   });
+
+  // 公式表的图是懒加载的：不给 aspect-ratio 的话，加载完成前高度为 0，
+  // 加载后整行被撑高 —— 切页时又是一次跳动
+  ['f2l.html', 'oll.html', 'pll.html'].forEach(p => {
+    const h = fs.readFileSync(path.join(ROOT, p), 'utf8');
+    ok(p + ' 给图片预留了高度（aspect-ratio）',
+      /td\.pic img\{[^}]*aspect-ratio/.test(h), '没有 aspect-ratio，加载时行高会跳');
+  });
 }
 
 console.log('\n结果: ' + pass + ' 通过, ' + fail + ' 失败');

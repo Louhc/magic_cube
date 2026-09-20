@@ -50,7 +50,8 @@
   /* 图片是透明底 PNG，这一格就不铺底色，整页保持纯白 */
   td.pic{padding:6px;text-align:center}
   td.pic .box{position:relative;display:inline-block;line-height:0}
-  td.pic img{width:96px;height:auto;display:block;margin:0 auto;
+  /* 给图片预留高度（F2L 的图是 512x515），否则懒加载完成后整行会被撑高 */
+  td.pic img{width:96px;height:auto;aspect-ratio:512/515;display:block;margin:0 auto;
              image-rendering:auto;border-radius:6px}
   /* 编号角标，和 oll/pll 一致 */
   td.pic .no{position:absolute;left:3px;top:1px;font-size:11px;font-weight:600;
