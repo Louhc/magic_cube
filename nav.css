@@ -19,10 +19,16 @@
 .topnav a{
   color:var(--muted, #8a98aa); text-decoration:none;
   padding:7px 10px; border-radius:7px; white-space:nowrap;
-  transition:background .12s,color .12s;
+  /* 变色的时长要和 .pill 滑动的一致，两者才像同一件事 */
+  transition:background .12s, color .18s;
 }
-.topnav a:hover{color:var(--text, #222); background:var(--field, rgba(127,127,127,.14))}
-.topnav a.on{background:var(--accent, #2f6bd8); color:#fff}
+/* 悬停只改文字颜色 —— 背景专门留给 .pill。
+   以前 hover 会加一层半透明底，鼠标停在目标项上时它就盖在蓝框上，
+   看着像「蓝框滑到了却发灰」，再等鼠标移开才变蓝。 */
+.topnav a:hover{color:var(--text, #222)}
+/* 当前项的底色由 .pill 提供，链接自己只留白字 */
+.topnav a.on{color:#fff}
+.topnav a.on:hover{color:#fff}
 
 /* 编辑器是「整页高度」的 flex 布局（body > .app 撑满 100%），
    导航条插在它前面，所以要给它让出一条的高度。 */
@@ -47,3 +53,20 @@ body > .app{height:calc(100% - var(--nav-h))}
 .totop.on{opacity:1; pointer-events:auto; transform:none}
 .totop:hover{border-color:var(--line-strong, #aaa)}
 @media print{ .totop{display:none} }
+
+/* ---------- 当前页的蓝色框：一个会滑动的 .pill ----------
+   链接自己不再画背景，背景统一交给 .links 里这个绝对定位的圆角方块。
+   换页时它的 transform/width/height 有过渡，看上去就是蓝框滑到了另一项。
+   （页面是整页跳转，所以是「点下去先滑、滑完再跳」，新页上它已在正确位置。） */
+.topnav .links{position:relative}
+.topnav .pill{
+  position:absolute; top:0; left:0; z-index:0; pointer-events:none;
+  border-radius:7px; background:var(--accent, #2f6bd8);
+  transition:transform .18s ease, width .18s ease, height .18s ease;
+}
+/* 链接要压在方块上面 */
+.topnav a{position:relative; z-index:1}
+/* 系统设了「减少动态效果」就不滑，直接跳过去 */
+@media (prefers-reduced-motion: reduce){
+  .topnav .pill{transition:none}
+}

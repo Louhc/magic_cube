@@ -80,7 +80,8 @@ console.log('\n[4b] 首页的 GitHub 纸带');
     /html\[data-theme="dark"\] \.ghribbon a\{background:#f0f6fc;color:#24292f\}/.test(html));
 }
 
-console.log('\n[5] 导航样式表存在且定义了当前页高亮');{
+console.log('\n[5] 导航样式表存在且定义了当前页高亮');
+{
   const css = fs.readFileSync(path.join(ROOT, 'nav.css'), 'utf8');
   ok('nav.css 有 .topnav 与选中态', /\.topnav\{/.test(css) && /\.topnav a\.on\{/.test(css));
   ok('nav.css 给编辑器的全高布局让了高度',
@@ -213,6 +214,183 @@ console.log('\n[13] 切页不该闪：主题要预设、导航条要早注入');
     ok(p + ' 给图片预留了高度（aspect-ratio）',
       /td\.pic img\{[^}]*aspect-ratio/.test(h), '没有 aspect-ratio，加载时行高会跳');
   });
+}
+
+console.log('\n[14] 导航高亮框：会滑动的 .pill');
+{
+  // 换页时「当前页」那个蓝框要滑到点击的那一项，而不是原地跳过去。
+  // 光看正则看不出对不对，这里用 DOM 桩真跑一遍 nav.js。
+  const vm = require('vm');
+  const nav = fs.readFileSync(path.join(ROOT, 'nav.js'), 'utf8');
+  const SEL = '.topnav .links a[href]';
+
+  // 桩里的「布局」：元素依次往右排，好让 placePill 算出不同位置
+  let seq = 0;
+  function el(tag) {
+    const e = {
+      tagName: tag, children: [], dataset: {}, style: {},
+      className: '', textContent: '', href: '', value: '',
+      offsetLeft: (seq++) * 48, offsetTop: 0, offsetWidth: 40, offsetHeight: 30,
+      classList: {
+        _s: new Set(),
+        add(c) { this._s.add(c); },
+        remove(c) { this._s.delete(c); },
+        contains(c) { return this._s.has(c); },
+        toggle(c, on) {
+          if (on === undefined) { this._s.has(c) ? this._s.delete(c) : this._s.add(c); }
+          else if (on) { this._s.add(c); } else { this._s.delete(c); }
+        }
+      },
+      appendChild(c) { this.children.push(c); return c; },
+      insertBefore(c) { this.children.unshift(c); return c; },
+      setAttribute(k, v) { this[k] = v; },
+      getAttribute(k) { return this[k]; },
+      addEventListener(t, fn) { (this._h = this._h || {})[t] = fn; },
+      querySelectorAll() { return []; }, querySelector() { return null; },
+      closest() { return null; }
+    };
+    return e;
+  }
+
+  function run(page, opts) {
+    opts = opts || {};
+    seq = 0;
+    const body = el('body');
+    const store = Object.assign({}, opts.store || {});
+    const doc = {
+      body, documentElement: el('html'), createElement: el,
+      getElementById: () => null, querySelectorAll: () => [],
+      addEventListener(t, fn) { (this._h = this._h || {})[t] = fn; }
+    };
+    const pending = [];
+    const ctx = {
+      console, clearTimeout() {},
+      // defer=true 时把回调攒起来，好检查「蓝框到位前 / 到位后」两个阶段
+      setTimeout(fn) { pending.push(fn); if (!opts.defer) fn(); return 0; },
+      sessionStorage: { getItem: k => (k in store ? store[k] : null),
+                        setItem: (k, v) => { store[k] = String(v); },
+                        removeItem: k => { delete store[k]; } },
+      window: { addEventListener() {}, pageYOffset: 0,
+                matchMedia: () => ({ matches: !!opts.reduce }) },
+      document: doc, location: { pathname: '/' + page, href: '' }, navigator: {}
+    };
+    ctx.globalThis = ctx;
+    vm.createContext(ctx);
+    vm.runInContext(nav, ctx);
+    const navEl = body.children[0];
+    const links = navEl.children[1];            // [0] 是 brand
+    return {
+      ctx, links, pill: links.children[0], pending,
+      linkAt: i => links.children[i + 1],       // [0] 是 .pill
+      active: links.children.find(c => c.className === 'on'),
+      click: doc._h.click
+    };
+  }
+
+  function fire(target, extra) {
+    let prevented = false;
+    const e = Object.assign({
+      button: 0, defaultPrevented: false,
+      preventDefault() { prevented = true; },
+      target: { closest: sel => (sel === SEL ? target : null) }
+    }, extra || {});
+    return { e, got: () => prevented };
+  }
+
+  // 结构：.links 里有个 .pill，排在最前面（垫在链接下面）
+  const r0 = run('oll.html');
+  ok('.links 里有 .pill', !!r0.pill && r0.pill.className === 'pill',
+    r0.pill && r0.pill.className);
+  ok('.pill 是 .links 的第一个子节点（垫在链接下面）', r0.links.children[0] === r0.pill);
+  ok('当前页那一项带着 .on', !!r0.active, '没找到 .on');
+  ok('开屏就把蓝框摆到当前项上（位置 = 该项的 offset）',
+    !!r0.active && r0.pill.style.transform ===
+      'translate(' + r0.active.offsetLeft + 'px,' + r0.active.offsetTop + 'px)',
+    r0.pill.style.transform + ' vs ' + (r0.active && r0.active.offsetLeft));
+  ok('开屏定位时关掉过渡（否则会看到它从左上角滑过来）',
+    /pill\.style\.transition = 'none'/.test(nav));
+  ok('窗口尺寸变化后重新对位',
+    /window\.addEventListener\('resize'[\s\S]{0,80}?placePill/.test(nav));
+
+  // 点别的导航项：蓝框滑过去，滑完再跳
+  {
+    const r = run('oll.html');
+    const before = r.pill.style.transform;
+    const c = fire(r.linkAt(6));                 // PLL，当前页是 OLL
+    r.click(c.e);
+    ok('点别的导航项：蓝框滑过去（transform 变了）',
+      c.got() && r.pill.style.transform !== before,
+      before + ' -> ' + r.pill.style.transform);
+    ok('点别的导航项：滑完才跳页', r.ctx.location.href === 'pll.html',
+      r.ctx.location.href);
+  }
+  // 文字颜色必须和蓝框同步 —— 否则蓝框一走，旧项的白字留在浅底上就看不见了，
+  // 看着就像「框先滑过去、字过一会儿才冒出来」
+  {
+    const r = run('oll.html', { defer: true });
+    const from = r.active, to = r.linkAt(6);
+    const c = fire(to);
+    r.click(c.e);
+    ok('点下去：旧项立刻褪回灰字',
+      !from.classList.contains('on'), [...from.classList._s].join(','));
+    ok('点下去：新项先不变白字（蓝框还没到，白字在浅底上看不见）',
+      !to.classList.contains('on'), [...to.classList._s].join(','));
+    r.pending.forEach(fn => fn());
+    ok('蓝框到位后：新项才变白字',
+      to.classList.contains('on'), [...to.classList._s].join(','));
+    ok('蓝框到位后才跳页', r.ctx.location.href === 'pll.html', r.ctx.location.href);
+  }
+  // 点当前项：不拦（浏览器照常处理）
+  {
+    const r = run('oll.html');
+    const c = fire(r.active);
+    r.click(c.e);
+    ok('点当前项：不拦、也不动蓝框', !c.got());
+  }
+  // 下面这些也都不该拦
+  [['ctrl+点击（新标签）', { ctrlKey: true }],
+   ['shift+点击', { shiftKey: true }],
+   ['中键', { button: 1 }]].forEach(([name, extra]) => {
+    const r = run('oll.html');
+    const c = fire(r.linkAt(0), extra);
+    r.click(c.e);
+    ok('不拦：' + name, !c.got());
+  });
+  // 页面里别的链接（首页那六张卡片、外链）不归它管
+  {
+    const r = run('index.html');
+    let prevented = false;
+    r.click({ button: 0, defaultPrevented: false,
+              preventDefault() { prevented = true; },
+              target: { closest: () => null } });
+    ok('页面里其它链接不受影响', !prevented);
+  }
+  // 系统设了「减少动态效果」：不拦，直接跳
+  {
+    const r = run('oll.html', { reduce: true });
+    const c = fire(r.linkAt(6));
+    r.click(c.e);
+    ok('「减少动态效果」时不拦也不滑', !c.got(), 'preventDefault=' + c.got());
+  }
+  // 样式得配齐，否则类/内联样式都白设
+  {
+    const css = fs.readFileSync(path.join(ROOT, 'nav.css'), 'utf8');
+    ok('.links 是定位参照（position:relative）',
+      /\.topnav \.links\{[^}]*position:relative/.test(css));
+    ok('.pill 绝对定位 + 有 transform 过渡',
+      /\.topnav \.pill\{[^}]*position:absolute[^}]*transition:transform/.test(css));
+    ok('链接压在方块上面（z-index:1）',
+      /\.topnav a\{[^}]*z-index:1/.test(css));
+    ok('当前项底色改由 .pill 提供（链接自身不再画背景）',
+      /\.topnav a\.on\{color:#fff\}/.test(css) && !/\.topnav a\.on\{background/.test(css));
+    ok('悬停不再加背景（否则会盖在蓝框上、看着发灰）',
+      /\.topnav a:hover\{color:var\(--text, #222\)\}/.test(css) &&
+      !/\.topnav a:hover\{[^}]*background/.test(css));
+    ok('尊重 prefers-reduced-motion', /prefers-reduced-motion/.test(css));
+    ok('链接变色的时长和 .pill 滑动一致（看着才像同一件事）',
+      /\.topnav a\{[^}]*transition:background \.12s, color \.18s/.test(css) &&
+      /\.topnav \.pill\{[^}]*transition:transform \.18s/.test(css));
+  }
 }
 
 console.log('\n结果: ' + pass + ' 通过, ' + fail + ' 失败');
