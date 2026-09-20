@@ -260,6 +260,7 @@ console.log('\n[14] 导航高亮框：会滑动的 .pill');
     const doc = {
       body, documentElement: el('html'), createElement: el,
       getElementById: () => null, querySelectorAll: () => [],
+      readyState: 'loading',          // 让 nav.js 走 DOMContentLoaded 那条路
       addEventListener(t, fn) { (this._h = this._h || {})[t] = fn; }
     };
     const pending = [];
@@ -280,9 +281,10 @@ console.log('\n[14] 导航高亮框：会滑动的 .pill');
     const navEl = body.children[0];
     const links = navEl.children[1];            // [0] 是 brand
     return {
-      ctx, links, pill: links.children[0], pending,
+      ctx, body, links, store, pill: links.children[0], pending,
       linkAt: i => links.children[i + 1],       // [0] 是 .pill
       active: links.children.find(c => c.className === 'on'),
+      domReady: () => { if (doc._h && doc._h.DOMContentLoaded) doc._h.DOMContentLoaded(); },
       click: doc._h.click
     };
   }
@@ -292,7 +294,7 @@ console.log('\n[14] 导航高亮框：会滑动的 .pill');
     const e = Object.assign({
       button: 0, defaultPrevented: false,
       preventDefault() { prevented = true; },
-      target: { closest: sel => (sel === SEL ? target : null) }
+      target: { closest: sel => (sel === 'a[href]' ? target : null) }
     }, extra || {});
     return { e, got: () => prevented };
   }
@@ -356,21 +358,107 @@ console.log('\n[14] 导航高亮框：会滑动的 .pill');
     r.click(c.e);
     ok('不拦：' + name, !c.got());
   });
-  // 页面里别的链接（首页那六张卡片、外链）不归它管
+  // 站内链接（首页那六张卡片、公式表的 ↗）都走同一套：
+  // 内容淡出 + 蓝框滑到目标页对应的那一项
+  {
+    const r = run('index.html', { defer: true });
+    const card = el('a');
+    card.setAttribute('href', 'editor.html');
+    const c = fire(card);
+    r.click(c.e);
+    ok('点首页卡片：拦下来，内容先淡出',
+      c.got() && r.body.classList.contains('nav-fade'),
+      'preventDefault=' + c.got() + ' 类=' + [...r.body.classList._s].join(','));
+    ok('点首页卡片：蓝框滑到对应那一项（编辑器）',
+      r.pill.style.transform ===
+        'translate(' + r.linkAt(1).offsetLeft + 'px,' + r.linkAt(1).offsetTop + 'px)',
+      r.pill.style.transform);
+    r.pending.forEach(fn => fn());
+    ok('内容淡完才跳页', r.ctx.location.href === 'editor.html', r.ctx.location.href);
+  }
+  // 公式表的 ↗：calc.html#公式 也走同一套，蓝框还要滑到「计算器」
+  {
+    const r = run('oll.html', { defer: true });
+    const jump = el('a');
+    jump.setAttribute('href', 'calc.html#R_U_R');
+    const c = fire(jump);
+    r.click(c.e);
+    ok('点公式的 ↗：拦下来，内容先淡出',
+      c.got() && r.body.classList.contains('nav-fade'),
+      'preventDefault=' + c.got() + ' 类=' + [...r.body.classList._s].join(','));
+    ok('点公式的 ↗：蓝框滑到「计算器」',
+      r.pill.style.transform ===
+        'translate(' + r.linkAt(2).offsetLeft + 'px,' + r.linkAt(2).offsetTop + 'px)',
+      r.pill.style.transform);
+    r.pending.forEach(fn => fn());
+    ok('跳页时 # 里的公式没丢', r.ctx.location.href === 'calc.html#R_U_R',
+      r.ctx.location.href);
+  }
+  // 目标页不在导航表里：照样淡出，只是蓝框无处可去
+  {
+    const r = run('index.html', { defer: true });
+    const other = el('a');
+    other.setAttribute('href', 'elsewhere.html');
+    const before = r.pill.style.transform;
+    const c = fire(other);
+    r.click(c.e);
+    ok('目标不在导航表里：仍然淡出，蓝框不动',
+      c.got() && r.body.classList.contains('nav-fade') &&
+      r.pill.style.transform === before,
+      'preventDefault=' + c.got() + ' 蓝框=' + r.pill.style.transform);
+  }
+  // 当前页的锚点（比如站在 calc.html 上点 calc.html#...）交给浏览器
+  {
+    const r = run('calc.html');
+    const self = el('a');
+    self.setAttribute('href', 'calc.html#R_U');
+    const c = fire(self);
+    r.click(c.e);
+    ok('当前页的锚点链接：不拦', !c.got());
+  }
+  // 点到不是链接的地方：一点影响都没有
   {
     const r = run('index.html');
     let prevented = false;
     r.click({ button: 0, defaultPrevented: false,
               preventDefault() { prevented = true; },
               target: { closest: () => null } });
-    ok('页面里其它链接不受影响', !prevented);
+    ok('点到非链接区域：不受影响',
+      !prevented && !r.body.classList.contains('nav-fade'));
   }
-  // 系统设了「减少动态效果」：不拦，直接跳
+  // 直接打开 / 刷新：没有标记，内容不淡（否则每次开页都白闪一下）
+  {
+    const r = run('index.html');
+    ok('直接打开：内容不淡', !r.body.classList.contains('nav-fade'),
+      [...r.body.classList._s].join(','));
+  }
+  // 带标记打开：先隐着，等 DOM 好了再淡进来
+  {
+    const r = run('pll.html', { defer: true,
+      store: { 'cube-nav-fade': JSON.stringify({ t: Date.now() }) } });
+    ok('带标记打开：先挂上 .nav-fade（首次绘制前就把内容隐掉，才不闪）',
+      r.body.classList.contains('nav-fade'), [...r.body.classList._s].join(','));
+    r.domReady();
+    ok('DOM 好了：摘掉 .nav-fade，内容淡进来',
+      !r.body.classList.contains('nav-fade'), [...r.body.classList._s].join(','));
+    ok('标记用完即删（刷新不再淡）',
+      !('cube-nav-fade' in r.store), JSON.stringify(r.store));
+  }
+  // 过期标记不认（导航被中途取消时不残留）
+  {
+    const r = run('pll.html',
+      { store: { 'cube-nav-fade': JSON.stringify({ t: Date.now() - 9000 }) } });
+    ok('过期标记（>3 秒）不淡入', !r.body.classList.contains('nav-fade'),
+      [...r.body.classList._s].join(','));
+  }
+  // 系统设了「减少动态效果」：既不滑也不淡，直接跳
   {
     const r = run('oll.html', { reduce: true });
     const c = fire(r.linkAt(6));
     r.click(c.e);
-    ok('「减少动态效果」时不拦也不滑', !c.got(), 'preventDefault=' + c.got());
+    ok('「减少动态效果」：不拦、不滑、不淡',
+      !c.got() && !r.body.classList.contains('nav-fade'),
+      'preventDefault=' + c.got() + ' 类=' + [...r.body.classList._s].join(','));
   }
   // 样式得配齐，否则类/内联样式都白设
   {
@@ -390,6 +478,12 @@ console.log('\n[14] 导航高亮框：会滑动的 .pill');
     ok('链接变色的时长和 .pill 滑动一致（看着才像同一件事）',
       /\.topnav a\{[^}]*transition:background \.12s, color \.18s/.test(css) &&
       /\.topnav \.pill\{[^}]*transition:transform \.18s/.test(css));
+    ok('nav.css 有内容淡出/淡入，且导航条不参与',
+      /body > \*:not\(\.topnav\)\{transition:opacity/.test(css) &&
+      /body\.nav-fade > \*:not\(\.topnav\)\{opacity:0\}/.test(css) &&
+      !/body\.nav-fade\{[^}]*opacity/.test(css));
+    ok('减少动态效果时内容也不淡（别把内容真藏起来）',
+      /prefers-reduced-motion: reduce\)\{[\s\S]{0,240}?body\.nav-fade > \*:not\(\.topnav\)\{opacity:1\}/.test(css));
   }
 }
 

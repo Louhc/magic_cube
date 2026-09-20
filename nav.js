@@ -82,27 +82,74 @@
   window.addEventListener('resize', function () { placePill(activeLink, false); });
   window.addEventListener('load', function () { placePill(activeLink, false); });
 
-  var PILL_MS = 180;              // 和 nav.css 里 .pill / 链接变色的过渡时长对齐
+  var PILL_MS = 180;              // 和 nav.css 里 .pill 的过渡时长对齐
+  var FADE_MS = 180;              // 和 nav.css 里内容淡出/淡入的时长对齐
+  var FADE_KEY = 'cube-nav-fade';
 
+  // —— 进场：上一页点了站内链接才淡入；直接打开 / 刷新 / 后退都不淡
+  (function () {
+    var raw = null;
+    try {
+      raw = sessionStorage.getItem(FADE_KEY);
+      sessionStorage.removeItem(FADE_KEY);
+    } catch (e) { return; }
+    if (!raw || noMotion()) return;
+    var fresh = false;
+    try {
+      var d = JSON.parse(raw);
+      fresh = !!d && typeof d.t === 'number' && Date.now() - d.t < 3000;
+    } catch (e) { return; }
+    if (!fresh) return;
+    // nav.js 就在 <body> 开头，这里的类在内容解析、首次绘制之前就落下了，
+    // 所以不会先亮一下再淡下去（那才是"闪一下"）。
+    document.body.classList.add('nav-fade');
+    var show = function () {
+      void document.body.offsetHeight;    // 先把「隐着」结算掉，淡入的过渡才会跑
+      document.body.classList.remove('nav-fade');
+    };
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', show);
+    } else {
+      show();
+    }
+  })();
+
+  // —— 出场：点站内页面链接，先把动画演完再跳页
   document.addEventListener('click', function (e) {
     // 新标签打开、中键、拖拽之类交给浏览器自己处理
     if (e.defaultPrevented || e.button !== 0 ||
         e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-    var a = e.target && e.target.closest ? e.target.closest('.topnav .links a[href]') : null;
-    if (!a || a === activeLink) return;               // 不是导航项 / 就是当前项
+    var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+    if (!a) return;
+    var href = a.getAttribute('href') || '';
+    // 只认站内页面；允许带 # —— 公式表的 ↗ 就是 calc.html#...
+    var m = /^([\w-]+\.html)(#[\s\S]*)?$/.exec(href);
+    if (!m) return;
+    var page = m[1].toLowerCase();
+    if (page === here) return;                        // 就是当前页（含页内锚点）
     if (noMotion()) return;                           // 减少动态效果：直接跳
 
+    // 目标页在导航表里的话，蓝框就滑到对应那一项 ——
+    // 这样点公式表的 ↗ 跳到计算器时，蓝框也会滑到「计算器」。
+    var hit = null;
+    for (var i = 0; i < links.children.length; i++) {
+      var li = links.children[i];
+      if (!li.tagName || String(li.tagName).toUpperCase() !== 'A') continue;
+      if ((li.getAttribute('href') || '').toLowerCase() === page) { hit = li; break; }
+    }
+
     e.preventDefault();
-    // 旧项立刻褪回灰字 —— 蓝框一走，白字留在浅底上就看不见了，
-    // 之前看着像「框滑走了、字才没了」就是这个原因。
-    if (activeLink) activeLink.classList.remove('on');
-    placePill(a, true);                               // 蓝框滑过去
-    // 等蓝框到位再给它白字，然后跳页 —— 新页上它本来就是当前项
-    setTimeout(function () {
-      activeLink = a;
-      a.classList.add('on');
-      location.href = a.href;
-    }, PILL_MS);
+    // ① 蓝框滑过去。旧项立刻褪回灰字 —— 蓝框一走，白字留在浅底上就看不见了；
+    //    新项等蓝框到位再变白。
+    if (hit && hit !== activeLink) {
+      if (activeLink) activeLink.classList.remove('on');
+      placePill(hit, true);
+      setTimeout(function () { activeLink = hit; hit.classList.add('on'); }, PILL_MS);
+    }
+    // ② 导航条下面的内容淡出，淡完再跳（导航条自己不淡）
+    try { sessionStorage.setItem(FADE_KEY, JSON.stringify({ t: Date.now() })); } catch (err) {}
+    document.body.classList.add('nav-fade');
+    setTimeout(function () { location.href = href; }, FADE_MS);
   });
 
   // 长表格页：右下角一个纯图标的「回到顶部」，滚过一屏才出现

@@ -66,7 +66,18 @@ body > .app{height:calc(100% - var(--nav-h))}
 }
 /* 链接要压在方块上面 */
 .topnav a{position:relative; z-index:1}
-/* 系统设了「减少动态效果」就不滑，直接跳过去 */
+
+/* ---------- 切页：导航条留着，下面的内容淡出再淡入 ----------
+   页面是整页跳转，所以拆两半：点链接先把内容淡掉再跳，新页加载时先摆成隐的
+   再淡进来（见 nav.js）。不依赖各页的具体结构 —— 直接作用于 body 的直接子
+   元素里除 .topnav 之外的那些。导航条由脚本重建，看上去始终是连续的一条，
+   所以不参与淡出淡入。 */
+body > *:not(.topnav){transition:opacity .18s ease}
+body.nav-fade > *:not(.topnav){opacity:0}
+
+/* 系统设了「减少动态效果」就不滑也不淡，直接切 */
 @media (prefers-reduced-motion: reduce){
   .topnav .pill{transition:none}
+  body > *:not(.topnav){transition:none}
+  body.nav-fade > *:not(.topnav){opacity:1}
 }
