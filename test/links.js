@@ -487,5 +487,64 @@ console.log('\n[14] 导航高亮框：会滑动的 .pill');
   }
 }
 
+console.log('\n[15] 各页的明暗底色约定必须一致');
+{
+  // editor.html 的 :root 基础配色是深色（别的页都是浅色，靠 [data-theme="dark"] 覆盖），
+  // 而它的预设脚本原来只写 dark 分支 —— 白天时 data-theme 不设，页面就落到深色底：
+  // 于是「切到编辑器会莫名其妙变成黑夜」。
+  // 这里对每个页面真跑一遍 <head> 里的预设脚本，算出实际生效的 --bg，再核对三档存档。
+  const vm = require('vm');
+
+  const headThemeScript = h => {
+    const head = h.slice(0, h.indexOf('</head>'));
+    return [...head.matchAll(/<script>([\s\S]*?)<\/script>/g)]
+      .map(m => m[1]).filter(b => b.includes('cube-theme')).join('\n');
+  };
+  const bgOf = (h, key) => {
+    const re = key === ':root'
+      ? /:root\{[^}]*?--bg:\s*(#[0-9a-fA-F]{6})/
+      : new RegExp('html\\[data-theme="' + key + '"\\]\\{[^}]*?--bg:\\s*(#[0-9a-fA-F]{6})');
+    const m = h.match(re);
+    return m ? m[1] : null;
+  };
+  const isDark = hex => {
+    const n = parseInt(hex.slice(1), 16);
+    return ((n >> 16 & 255) + (n >> 8 & 255) + (n & 255)) / 3 < 128;
+  };
+  function effective(h, stored) {
+    const el = { dataset: {} };
+    const ctx = { document: { documentElement: el },
+                  localStorage: { getItem: k => (k === 'cube-theme' ? stored : null) } };
+    ctx.globalThis = ctx;
+    vm.createContext(ctx);
+    vm.runInContext(headThemeScript(h), ctx);
+    const t = el.dataset.theme;
+    // data-theme 没设时，生效的是 :root 的基础值
+    const bg = (t ? bgOf(h, t) : null) || bgOf(h, ':root');
+    return { theme: t || '(未设)', bg: bg, dark: isDark(bg) };
+  }
+
+  PAGES.forEach(p => {
+    const h = fs.readFileSync(path.join(ROOT, p), 'utf8');
+    [['没存档（站点的默认）', null, false],
+     ['存档为 light', 'light', false],
+     ['存档为 dark', 'dark', true]].forEach(([name, store, wantDark]) => {
+      const e = effective(h, store);
+      ok(p + ' ' + name + '时是' + (wantDark ? '夜晚' : '白天'),
+        e.dark === wantDark, '实际 --bg=' + e.bg + ' theme=' + e.theme);
+    });
+  });
+
+  // 预设脚本只管「首次绘制前」；主脚本里的 theme 变量也得读同一个存档，
+  // 否则会先按存档画好、再被主脚本覆盖回去（editor.html 原来就只认深色）
+  {
+    const h = fs.readFileSync(path.join(ROOT, 'editor.html'), 'utf8');
+    ok('editor.html 主脚本的 theme 也读 cube-theme',
+      /var theme = 'light';[\s\S]{0,200}?localStorage\.getItem\('cube-theme'\)/.test(h));
+    ok('editor.html 切换主题会写回 cube-theme（和别的页共用同一个键）',
+      /function applyTheme[\s\S]{0,260}?localStorage\.setItem\('cube-theme', theme\)/.test(h));
+  }
+}
+
 console.log('\n结果: ' + pass + ' 通过, ' + fail + ' 失败');
 process.exit(fail ? 1 : 0);

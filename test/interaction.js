@@ -83,6 +83,9 @@ const ctx = {
     };
   },
   window:{ innerWidth:1280, innerHeight:820, addEventListener(){} },
+  // 编辑器的明暗跟着全站共用的 cube-theme 走。这里模拟「用户选的是夜晚」，
+  // 下面的断言都在这个前提下成立；「存档是白天」的情况由 test/links.js [15] 盯着。
+  localStorage:{ getItem: k => (k === 'cube-theme' ? 'dark' : null), setItem(){} },
   navigator:{}, parseFloat, parseInt, Math, JSON, Object, Array, Set, String,
   URL:{ createObjectURL(b){ objectURLs.push(b); return 'blob:fake'; }, revokeObjectURL(){} },
   // 真实 Image 的 onload 是异步的，但这里同步触发就能把整条导出路径测完
@@ -499,7 +502,8 @@ check('透明底导出（夜晚）-> 描边用浅色', new RegExp('stroke="' + O
 check('透明底导出 -> 实心格还是同一个方案色', /fill="#7E6FC7"/.test(lastSvgBlob()));
 
 console.log('\n[13] 白天 / 夜晚模式');
-check('默认是夜晚', !document.documentElement.dataset.theme || document.documentElement.dataset.theme === 'dark');
+check('存档是夜晚时用夜晚（编辑器以前无视存档，永远是深色）',
+  document.documentElement.dataset.theme === 'dark', document.documentElement.dataset.theme);
 check('按钮不放文字，只有图标', !/[\u4e00-\u9fa5]/.test(reg['themebtn'].textContent || ''));
 check('夜晚模式显示太阳图标（点它切到白天）',
   reg['themebtn'].dataset.icon === 'sun' && /<svg/.test(reg['themebtn']._html), reg['themebtn'].dataset.icon);

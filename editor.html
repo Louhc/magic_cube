@@ -178,7 +178,10 @@
   }
 </style>
 <link rel="stylesheet" href="nav.css">
-<script>/* 主题必须在首次绘制前定好，否则会先用浅色画一遍再翻深色（闪一下） */
+<script>/* 主题必须在首次绘制前定好，否则会先画一遍再翻（闪一下）。
+   本页默认配色是深色（别的页是浅色），所以「白天」也得显式写上 data-theme ——
+   不能像别的页那样只在夜晚时才设，否则默认会落到深色底。 */
+document.documentElement.dataset.theme = 'light';
 try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.dataset.theme='dark'}catch(e){}</script>
 </head>
 <body>
@@ -284,7 +287,10 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   var MODES = { f2l: 'F2L', oll: 'OLL', pll: 'PLL' };
   var MODE_ZH = { f2l: 'F2L（前两层）', oll: 'OLL（顶面朝向）', pll: 'PLL（顶层排序）' };
   var mode = 'f2l';
-  var theme = 'dark';                     // 'dark' | 'light'
+  // 开屏的明暗由 <head> 里的预设脚本按存档定好，这里保持一致：
+  // 本页默认白天（和别的页一样），存档是夜晚才用夜晚。
+  var theme = 'light';                    // 'dark' | 'light'
+  try { if (localStorage.getItem('cube-theme') === 'dark') theme = 'dark'; } catch (e) {}
   var oll = Cube.cloneOll(Cube.DEFAULT_OLL);
   var pll = Cube.pllDefault();               // 8 个顶层块各在哪个槽位（置换）
   var pllShowColors = true;                  // 颜色+箭头 / 仅箭头
@@ -715,6 +721,9 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   function applyTheme(t, silent) {
     theme = (t === 'light') ? 'light' : 'dark';
     document.documentElement.dataset.theme = theme;
+    // 和别的页共用同一个键 —— 以前编辑器只在开屏读了一下、从不写，
+    // 所以在编辑器里切了主题，切到别的页又变回去
+    try { localStorage.setItem('cube-theme', theme); } catch (e) {}
     // 图标表示"点它切到哪边"：夜晚模式显示太阳，白天模式显示月亮
     themeBtn.dataset.icon = theme === 'light' ? 'moon' : 'sun';
     themeBtn.innerHTML = THEME_ICON[themeBtn.dataset.icon];
