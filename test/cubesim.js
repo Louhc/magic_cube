@@ -779,6 +779,9 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
       /cur = CubeSim\.turn\(cur, x\.mv, x\.times\);/.test(src2));
     ok('逆执行完再正向播一遍（动画）',
       /run\(fwd, hashAlg, 'alg', false\);/.test(src2));
+    ok('正向播放前先停 2 秒',
+      /setTimeout\(function \(\) \{\s*run\(fwd, hashAlg, 'alg', false\);/.test(src2) &&
+      /\}, 2000\)/.test(src2));
     ok('计算器会读取 hash 里的公式',
       /location\.hash/.test(fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')));
     // 带上 hash 打开时，输入框应当被填好

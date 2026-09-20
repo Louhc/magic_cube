@@ -917,7 +917,11 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
       invert(fwd).forEach(function (x) {
         cur = CubeSim.turn(cur, x.mv, x.times);
       });
-      run(fwd, hashAlg, 'alg', false);
+      // 先让用户看清「公式要解的局面」，停 2 秒再正向播动画
+      paint(cur);
+      setTimeout(function () {
+        run(fwd, hashAlg, 'alg', false);
+      }, 2000);
     } catch (e) {
       // 公式不合法：退回旧行为，只填进输入框，不执行
       algEl.classList.add('bad');
