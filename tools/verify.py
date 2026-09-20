@@ -179,6 +179,287 @@ def find(kind, ident, imgdir, libfile):
     return 0
 
 
+# ---------------- F2L：不需要图的结构校验 ----------------
+#
+# F2L 的图和 OLL/PLL 不一样 —— OLL/PLL 的图是"做完公式之后顶面长什么样"，
+# 读图就能验。F2L 的图是"公式要解的那个局面"，而同一个局面换个 AUF 摆法
+# 就有好几种画法，图上又只有十几个贴纸有颜色（其余是灰底），
+# 拿图反推对应关系噪声太大。所以 F2L 改用一个不需要图的判据：
+#
+#   A 是某个槽位的合法 F2L 插入公式  <=>  S = A⁻¹(r(复原)) 里
+#   "下两层除该槽位外全部完好，且恰好只有这一个槽位被破坏"
+#
+# 道理：F2L 插入公式干的事就是把某个槽位的一角一棱从顶层归位，同时不碰
+# 十字和另外三个槽位。反过来做，就只应该翻出那一个槽位。
+# 纯顶层公式（一个槽位都没动）和写错到动了别的槽位的公式，都会被这一条挡掉。
+#
+# 再用两条独立的交叉验证兜底：
+#   * 镜像 —— 每一行的 a/b 两式必须严格互为镜像（页面表头就写着"红 F"/"绿 F"）
+#   * 唯一 —— 36 条公式算出的 36 个局面必须两两不同（能抓出复制粘贴、串行）
+
+F2L_SLOTS = {
+    'FR': ((1, -1, 1), (1, 0, 1)),
+    'FL': ((-1, -1, 1), (-1, 0, 1)),
+    'BR': ((1, -1, -1), (1, 0, -1)),
+    'BL': ((-1, -1, -1), (-1, 0, -1)),
+}
+F2L_LOWER = {p for (f, r, c, p) in sim.SLOTS if p[1] <= 0}
+_F2L_SOLVED = sim.solved()
+_F2L_HOME = {}
+for _p in {p for (f, r, c, p) in sim.SLOTS}:
+    _F2L_HOME[_p] = {n: c for (p2, n), c in _F2L_SOLVED.items() if p2 == _p}
+
+
+def _key(st):
+    return tuple(sorted(st.items()))
+
+
+def f2l_page(page):
+    """读出 [(小节标题, [(a 编号, af, b 编号或 None, bf 或 None), ...]), ...]
+
+    f2l.html 的 rows 是对象（a/b/af/bf），和 OLL/PLL 的数组结构不同，所以单独写读取器。
+    注意 b/bf 允许是 null —— 07/08/09 是只有左格、没有右格的单图形行。
+    早先按 '…' 硬匹配会把这三行连同 07 里的两条公式一起静默漏掉。
+    """
+    h = open(page, encoding='utf-8').read()
+    out = []
+    for sec in re.finditer(r"title:\s*'([^']*)',\s*rows:\s*\[(.*?)\n\s*\]", h, re.S):
+        rows = []
+        for rm in re.finditer(r'\{([^{}]*)\}', sec.group(2)):
+            row = rm.group(1)
+
+            def field(name, row=row):
+                mm = re.search(r'\b%s\s*:\s*(?:\'([^\']*)\'|"((?:[^"\\]|\\.)*)"|null)'
+                               % name, row)
+                if not mm:
+                    return None
+                return mm.group(1) if mm.group(1) is not None else mm.group(2)
+
+            a, b = field('a'), field('b')
+            if not a and not b:
+                continue
+            rows.append((a, field('af'), b, field('bf')))
+        out.append((sec.group(1), rows))
+    return out
+
+
+def f2l_rows(page):
+    """摊平成 [(编号, 公式, 'a'|'b')]，格子里的 \\n 并列写法逐条拆开"""
+    out = []
+    for _, rows in f2l_page(page):
+        for a, af, b, bf in rows:
+            for ident, raw, side in ((a, af, 'a'), (b, bf, 'b')):
+                if not ident or not raw:
+                    continue
+                for line in raw.split('\\n'):
+                    if line.strip():
+                        out.append((ident, line.strip(), side))
+    return out
+
+
+def f2l_case(alg):
+    """公式所解的局面，含净整体旋转修正（21a/21b 带 y）"""
+    r = sim.net_rotation(alg)
+    base = sim.apply(_F2L_SOLVED, r) if r else _F2L_SOLVED
+    return sim.apply_inverse(base, alg)
+
+
+def f2l_slot(alg):
+    """返回 ('ok', 槽位) 或 (问题类型, 说明)"""
+    try:
+        toks = sim.parse(alg)
+    except Exception as e:
+        return 'bad', '解析失败: %s' % e
+    if not toks:
+        return 'bad', '空公式'
+    st = f2l_case(alg)
+    broken = [n for n in F2L_SLOTS
+              if any(st.get((p, n2)) != c
+                     for p in F2L_SLOTS[n] for n2, c in _F2L_HOME[p].items())]
+    for pos in F2L_LOWER:
+        if any(pos in F2L_SLOTS[n] for n in broken):
+            continue
+        if any(st.get((pos, n2)) != c for n2, c in _F2L_HOME[pos].items()):
+            return 'nohome', '下两层的 %s 位置被带动了' % (pos,)
+    if not broken:
+        return 'none', '一个槽位都没动（纯顶层公式，不是 F2L 插入）'
+    if len(broken) > 1:
+        return 'many', '破坏了 %d 个槽位: %s' % (len(broken), '+'.join(broken))
+    return 'ok', broken[0]
+
+
+# ---- 镜像 ----
+# 在 x=0 平面照镜子时 R/L 两个颜色也会互换，不互换得到的是"不存在的魔方"
+# （R 色贴到 L 面上），任何动作序列都变不出来。
+_MIRROR_RELABEL = {'R': 'L', 'L': 'R'}
+_MIRROR_MOVE = None
+
+
+def _mirror_state(st):
+    def m(p):
+        return (-p[0], p[1], p[2])
+    return {(m(p), m(n)): _MIRROR_RELABEL.get(c, c) for (p, n), c in st.items()}
+
+
+def _mv_name(mv, t):
+    return mv + ('' if t == 1 else ('2' if t == 2 else "'"))
+
+
+def _inv(name):
+    if name.endswith("'"):
+        return name[:-1]
+    if name.endswith('2'):
+        return name
+    return name + "'"
+
+
+def mirror_move(mv):
+    """查表得出每个动作的镜像动作（懒构建）。
+
+    结果符合物理：R→L'、U→U'、F→F'、M→M、x→x、y→y'
+    """
+    global _MIRROR_MOVE
+    if _MIRROR_MOVE is None:
+        table = {}
+        for m in sorted(sim.MOVES):
+            for t in (1, 2, 3):
+                table[_key(sim.apply(_F2L_SOLVED, _mv_name(m, t)))] = _mv_name(m, t)
+        _MIRROR_MOVE = {}
+        for m in sorted(sim.MOVES):
+            _MIRROR_MOVE[m] = table[_key(_mirror_state(sim.apply(_F2L_SOLVED, m)))]
+    return _MIRROR_MOVE[mv]
+
+
+def mirror_alg(alg):
+    out = []
+    for mv, t in sim.parse(alg):
+        b = mirror_move(mv)
+        if t == 2 or t == -2:
+            out.append(b[0] + '2')
+        elif t == 1:
+            out.append(b)
+        else:
+            out.append(_inv(b))
+    return ' '.join(out)
+
+
+_F2L_NRM = {(0, 1, 0): 'U', (0, -1, 0): 'D', (0, 0, 1): 'F', (0, 0, -1): 'B',
+            (1, 0, 0): 'R', (-1, 0, 0): 'L'}
+F2L_SLOT_COLORS = {'FR': ({'D', 'F', 'R'}, {'F', 'R'}),
+                   'FL': ({'D', 'F', 'L'}, {'F', 'L'}),
+                   'BR': ({'D', 'B', 'R'}, {'B', 'R'}),
+                   'BL': ({'D', 'B', 'L'}, {'B', 'L'})}
+
+
+def _by_pos(st):
+    d = {}
+    for (p, n), c in st.items():
+        d.setdefault(p, {})[n] = c
+    return d
+
+
+def _piece(bypos, colors):
+    for p, dd in bypos.items():
+        if len(dd) == len(colors) and set(dd.values()) == set(colors):
+            return p, dd
+    return None, None
+
+
+def f2l_corner_white(alg):
+    """该公式所解的局面里，目标槽位角块的白色贴纸朝哪 —— 返回 'U'/'R'/... 或 None"""
+    kind, slot = f2l_slot(alg)
+    if kind != 'ok':
+        return None
+    cc, _ = F2L_SLOT_COLORS[slot]
+    _, cd = _piece(_by_pos(f2l_case(alg)), cc)
+    if not cd:
+        return None
+    for n, c in cd.items():
+        if c == 'D':
+            return _F2L_NRM[n]
+    return None
+
+
+def f2l_sections(page):
+    """读出 [(小节标题, [编号...])]，用来核对分节标题说的和局面算出来的一不一致"""
+    out = []
+    for title, rows in f2l_page(page):
+        out.append((title, [i for a, _, b, _ in rows for i in (a, b) if i]))
+    return out
+
+
+def check_f2l(page):
+    print('=== %s （结构校验，不用图） ===' % os.path.basename(page))
+    rows = f2l_rows(page)
+    if not rows:
+        print('  读不到数据')
+        return 1
+    bad = 0
+    # 页面里声明了编号、却没有对应公式的行，会被 f2l_rows 跳过。
+    # 这类漏读必须报出来，不然"少验了几条"看着还是一片全过。
+    ids_page = {i for _, ids in f2l_sections(page) for i in ids}
+    ids_read = {i for i, _, _ in rows}
+    if ids_page != ids_read:
+        if ids_page - ids_read:
+            print('  这些编号有声明但没读到公式（af 为空？）: %s'
+                  % ' '.join(sorted(ids_page - ids_read)))
+        if ids_read - ids_page:
+            print('  读出了页面里没有的编号: %s' % ' '.join(sorted(ids_read - ids_page)))
+        bad += 1
+    for ident, alg, side in rows:
+        kind, info = f2l_slot(alg)
+        if kind == 'ok':
+            continue
+        print('  %-5s %-36s %s' % (ident, alg, info))
+        bad += 1
+    # 左格必须落在 FR 槽、右格必须落在 FL 槽
+    for ident, alg, side in rows:
+        kind, slot = f2l_slot(alg)
+        want = 'FR' if side == 'a' else 'FL'
+        if kind == 'ok' and slot != want:
+            print('  %-5s 应落在 %s 槽，实得 %s' % (ident, want, slot))
+            bad += 1
+    # a/b 必须互为镜像。b 为 null 的单图形行（07/08/09）没有镜像可对，跳过。
+    # 格子里的 \n 并列写法按集合比，单行时就是"逐字镜像"。
+    for _, drows in f2l_page(page):
+        for aid, af, bid, bf in drows:
+            if not (aid and af and bid and bf):
+                continue
+            akeys = {_key(sim.apply(_F2L_SOLVED, x.strip()))
+                     for x in af.split('\\n') if x.strip()}
+            for x in (y.strip() for y in bf.split('\\n') if y.strip()):
+                exp = mirror_alg(x)
+                if _key(sim.apply(_F2L_SOLVED, exp)) not in akeys:
+                    print('  %s/%s 不是镜像: %s 的镜像 = %s' % (aid, bid, x, exp))
+                    bad += 1
+    # 所有局面必须两两不同
+    seen = {}
+    for ident, alg, side in rows:
+        c = _key(f2l_case(alg))
+        if c in seen:
+            print('  %s 与 %s 是同一个局面（重复）' % (ident, seen[c]))
+            bad += 1
+        else:
+            seen[c] = ident
+    # 分节标题说的朝向，算出来必须真的成立（"白色朝上"节：角块白贴纸必须朝 U）
+    byid = {}
+    for ident, alg, side in rows:
+        byid.setdefault(ident, alg)
+    for title, ids in f2l_sections(page):
+        if '白' not in title or '上' not in title:
+            continue
+        for ident in ids:
+            if ident not in byid:
+                continue
+            w = f2l_corner_white(byid[ident])
+            if w != 'U':
+                print('  %s 在「%s」节，但角块白贴纸朝 %s' % (ident, title, w))
+                bad += 1
+    print('  %d 条公式，%d 个互不相同的局面，%s'
+          % (len(rows), len(seen), '全部通过 ✓' if bad == 0 else '%d 条有问题' % bad))
+    return bad
+
+
 def main(argv):
     kind = None
     if '--find' in argv:
@@ -188,6 +469,8 @@ def main(argv):
         return find(kind, ident, os.path.join(ROOT, kind),
                     os.path.join(ROOT, 'tools/data/%s.js' % kind))
     bad = 0
+    bad += check_f2l(os.path.join(ROOT, 'f2l.html'))
+    print()
     for kind in ('oll', 'pll'):
         bad += check(kind, os.path.join(ROOT, '%s.html' % kind),
                      os.path.join(ROOT, kind),
