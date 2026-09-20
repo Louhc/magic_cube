@@ -205,8 +205,16 @@ var SECTIONS = [
 var IMG = function (id) {
   // 编号统一是字符串：OLL 是 '1'..'57'（文件名补零成 01），PLL 是 'Aa'..'Z'
   var f = /^\d+$/.test(id) && id.length < 2 ? '0' + id : id;
-  return 'oll/oll-' + f + '-512x512.png';
+  // 白天用紫顶、夜晚用黄顶 —— 两套图除了顶面颜色一模一样，按当前主题挑
+  var tone = document.documentElement.dataset.theme === 'dark' ? 'night' : 'day';
+  return 'oll/oll-' + f + '-' + tone + '-256x256.png';
 };
+// 主题切换后，已经画出来的图要换成另一套配色
+function syncOllImages() {
+  Array.prototype.forEach.call(document.querySelectorAll('#app img[data-oll]'), function (im) {
+    im.src = IMG(im.dataset.oll);
+  });
+}
 function esc(s) {
   return String(s).replace(/[&<>]/g, function (c) {
     return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c];
@@ -243,7 +251,8 @@ function row(n, alg, alts) {
     body += '<div class="alts">';
     alts.forEach(function (a) {
       // a[1] 是相对本图要转的 AUF 步数；图顺时针转 m*90 度即"对应的朝向"
-      body += '<div class="r"><span class="th"><img src="' + IMG(n) + '" alt="" loading="lazy"' +
+      body += '<div class="r"><span class="th"><img src="' + IMG(n) + '" data-oll="' + esc(n) +
+              '" alt="" loading="lazy"' +
               (a[1] ? ' style="transform:rotate(' + (a[1] * 90) + 'deg)"' : '') +
               '></span><span class="f1"><code>' + esc(a[0]) + '</code>' + toCalc(a[0], n) +
               '</span></div>';
@@ -251,7 +260,8 @@ function row(n, alg, alts) {
     body += '</div>';
   }
   return '<tr' + (alts && alts.length ? ' class="has-alts" data-id="' + esc(n) + '"' : '') + '>' +
-         '<td class="pic"><span class="box"><img src="' + IMG(n) + '" alt="' + n +
+         '<td class="pic"><span class="box"><img src="' + IMG(n) + '" data-oll="' + esc(n) +
+         '" alt="' + n +
          '" loading="lazy"><span class="no">' + n + '</span></span></td>' +
          '<td class="f">' + body + '</td></tr>';
 }
@@ -269,6 +279,7 @@ document.getElementById('app').innerHTML = html;
 var root = document.documentElement, themeBtn = document.getElementById('themebtn');
 function applyTheme(t) {
   root.dataset.theme = t;
+  syncOllImages();          // OLL 图有昼夜两版，切主题要跟着换
   themeBtn.title = t === 'dark' ? '切到白天' : '切到夜晚';
   try { localStorage.setItem('cube-theme', t); } catch (e) {}
 }

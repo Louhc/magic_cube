@@ -76,10 +76,14 @@ def lib_algs(libfile):
     return out
 
 
-def img_name(kind, ident):
-    """编号 -> 图文件名。OLL 是 1..57（补零），PLL 是 Aa..Z"""
+def img_name(kind, ident, tone=''):
+    """编号 -> 图文件名。OLL 是 1..57（补零），PLL 是 Aa..Z。
+
+    OLL 有昼夜两套图（白天紫顶 / 夜晚黄顶），tone 传 'day' / 'night'；
+    PLL 只有一套，tone 留空。"""
     f = ident if not ident.isdigit() else ident.zfill(2)
-    return '%s-%s-512x512.png' % (kind, f)
+    mid = ('-' + tone) if tone else ''
+    return '%s-%s%s-256x256.png' % (kind, f, mid)
 
 
 def page_data(page):
@@ -114,7 +118,14 @@ def check(kind, page, imgdir, libfile):
     bad = 0
     nalt = 0
     for n, alg, alts in rows:
-        img = S.read(kind, os.path.join(imgdir, img_name(kind, n)))
+        # OLL 以「夜晚（黄顶）」那版为准，白天那版单独再核一次签名
+        tone = 'night' if kind == 'oll' else ''
+        img = S.read(kind, os.path.join(imgdir, img_name(kind, n, tone)))
+        if kind == 'oll':
+            day = os.path.join(imgdir, img_name(kind, n, 'day'))
+            if not os.path.exists(day) or S.read('oll', day) != img:
+                print('  %-4s 白天那版（紫顶）和夜晚那版签名不一致' % n)
+                bad += 1
         if not alg:
             print('  %-4s 留空（未填公式）' % n)
             bad += 1
@@ -158,7 +169,7 @@ def check(kind, page, imgdir, libfile):
 
 def find(kind, ident, imgdir, libfile):
     """去公式库里搜这个情况能用的写法。ident: OLL 用数字(16)，PLL 用字母(T)"""
-    img = S.read(kind, os.path.join(imgdir, img_name(kind, ident)))
+    img = S.read(kind, os.path.join(imgdir, img_name(kind, ident, 'night' if kind == 'oll' else '')))
     print('图 %s 的签名: %s' % (ident, img))
     hits = []
     for cid, name, alg in lib_algs(libfile):

@@ -535,6 +535,21 @@ console.log('\n[13] 练习页：显示的图形必须是「从复原态执行该
       ok('恢复的那一题，局面也对得上', same9, JSON.stringify(got9).slice(0, 50));
     }
 
+    // 切白天/夜晚，OLL 题图要跟着换（白天紫顶 / 夜晚黄顶）
+    ok('练习页的 applyTheme 里真的调了 syncThumb（不是只定义了函数）',
+      /function applyTheme\(t\) \{\s*\n\s*root\.dataset\.theme = t;\s*\n\s*syncThumb\(\);/.test(html));
+    ok('题图文件名按昼夜挑（只有 OLL 有两版）',
+      /kind === 'oll' \? \(document\.documentElement\.dataset\.theme === 'dark' \? '-night' : '-day'\) : ''/.test(html));
+    {
+      const before = els5.qimg.src;
+      ok('初始是白天那版（紫顶）', /-day-/.test(before), before);
+      (els5.themebtn._h.click || []).forEach(function (f) { f({}); });
+      ok('点主题开关，题图当场换成夜晚那版',
+        /-night-/.test(els5.qimg.src) && els5.qimg.src !== before, before + ' -> ' + els5.qimg.src);
+      (els5.themebtn._h.click || []).forEach(function (f) { f({}); });
+      ok('再点回来又变回白天那版', /-day-/.test(els5.qimg.src), els5.qimg.src);
+    }
+
     // 范围选择要持久化
     ok('范围会存进 localStorage', /practice-scope-v1/.test(html) &&
       /localStorage\.setItem\(SCOPE_KEY/.test(html));
@@ -646,9 +661,106 @@ console.log('\n[13] 练习页：显示的图形必须是「从复原态执行该
       });
     }
     ok('显示了公式要解决的图形（' + els5.qimg.src + '）',
-      /^pll\/pll-[A-Za-z]+-512x512\.png$/.test(els5.qimg.src) &&
+      /^pll\/pll-[A-Za-z]+-256x256\.png$/.test(els5.qimg.src) &&
       fs.existsSync(path.join(__dirname, '..', els5.qimg.src)), els5.qimg.src);
 
+  }
+}
+
+console.log('\n[11c] PLL 页的「显示颜色」开关（真跑一遍页面脚本）');
+{
+  const vm = require('vm');
+  const mkPll = (store) => {
+    const els = {}, imgs = [];
+    const mkEl = (t) => {
+      const e = { tagName: t, children: [], dataset: {}, _h: '', _t: '',
+        style: { setProperty() {} },
+        classList: { _s: new Set(), add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); },
+          toggle(c, v) { v === undefined ? (this._s.has(c) ? this._s.delete(c) : this._s.add(c))
+                                         : (v ? this._s.add(c) : this._s.delete(c)); },
+          contains(c) { return this._s.has(c); } },
+        _h2: {}, addEventListener(ev, fn) { (this._h2[ev] = this._h2[ev] || []).push(fn); },
+        fire(ev, a) { (this._h2[ev] || []).forEach(f => f(a || {})); },
+        appendChild(c) { this.children.push(c); return c; },
+        querySelectorAll() { return []; }, querySelector() { return null; },
+        set innerHTML(v) { this._h = v; }, get innerHTML() { return this._h; },
+        set textContent(v) { this._t = v; }, get textContent() { return this._t; } };
+      return e;
+    };
+    // 表里每张图在真实 DOM 里是 <img data-pll="编号">；桩里按编号造出来交给 syncPllImages
+    const ids = [...fs.readFileSync(path.join(__dirname, '..', 'pll.html'), 'utf8')
+      .match(/var SECTIONS = (\[[\s\S]*?\n\]);/)[1].matchAll(/"([A-Za-z]{1,2})",\s*"/g)]
+      .map(m => m[1]);
+    [...new Set(ids)].forEach(id => { const im = mkEl('img'); im.dataset.pll = id; im.src = 'x'; imgs.push(im); });
+    const ctx = { console, navigator: {}, window: { addEventListener() {} },
+      setTimeout, clearTimeout,
+      localStorage: { getItem: k => (k in store ? store[k] : null),
+                     setItem: (k, v) => { store[k] = String(v); }, removeItem() {} },
+      location: { hash: '' },
+      document: { documentElement: { dataset: {} },
+                  getElementById: id => els[id] || (els[id] = mkEl('div')),
+                  querySelectorAll: sel => (sel.indexOf('#app img') === 0 ? imgs : []),
+                  createElement: mkEl, body: { appendChild() {} }, addEventListener() {} } };
+    ctx.globalThis = ctx;
+    vm.createContext(ctx);
+    const src = fs.readFileSync(path.join(__dirname, '..', 'pll.html'), 'utf8')
+      .match(/<script>([\s\S]*?)<\/script>/g).map(x => x.replace(/<\/?script>/g, ''))
+      .filter(x => x.includes('SECTIONS')).pop();
+    vm.runInContext(src, ctx);
+    return { els, imgs, store };
+  };
+
+  // 存档说「关掉颜色」：第一次渲染就该是无色图
+  {
+    const w = mkPll({ 'pll-color-v1': '0' });
+    ok('存档关着颜色时，首次渲染就用无色图',
+      /pll\/pll-Aa-nc-256x256\.png/.test(w.els.app.innerHTML) &&
+      !/pll\/pll-Aa-256x256\.png/.test(w.els.app.innerHTML),
+      (w.els.app.innerHTML.match(/pll\/pll-[\w-]+\.png/) || [])[0]);
+    ok('开关本身也停在「没勾」的状态',
+      w.els.showcolors.checked === false && !w.els['tg-colors'].classList.contains('on'));
+    // 再打开：图片地址换回彩色那套，同时写回存档
+    w.els.showcolors.checked = true;
+    w.els.showcolors.fire('change', {});
+    ok('打开开关后，表里每张图都换回彩色版',
+      w.imgs.every(im => /pll\/pll-[\w]+-256x256\.png$/.test(im.src)) &&
+      w.imgs.some(im => /pll\/pll-Aa-256x256\.png$/.test(im.src)),
+      w.imgs[0].src);
+    ok('打开后写回存档（pll-color-v1 = 1）', w.store['pll-color-v1'] === '1', w.store['pll-color-v1']);
+    ok('打开后开关外框也亮起来', w.els['tg-colors'].classList.contains('on'));
+  }
+  // 存档说「关掉颜色」+「夜晚」：无色图得挑黄箭头那版。
+  // 这条是补上的 —— 之前 Aa 的夜晚图其实是白天那张（深紫箭头压在深色卡片上
+  // 只有 1.3:1，基本看不见），当时没有任何测试盯着"图里到底是什么颜色"。
+  {
+    const w = mkPll({ 'pll-color-v1': '0', 'cube-theme': 'dark' });
+    ok('夜晚 + 关颜色：首屏就用黄箭头那版（-nc-night），不是白天那张',
+      /pll\/pll-Aa-nc-night-256x256\.png/.test(w.els.app.innerHTML) &&
+      !/pll\/pll-Aa-nc-256x256\.png/.test(w.els.app.innerHTML),
+      (w.els.app.innerHTML.match(/pll\/pll-[\w-]+\.png/) || [])[0]);
+    ok('21 张一个不漏，全换成 -nc-night',
+      w.imgs.length >= 21 && w.imgs.every(im => /-nc-night-256x256\.png$/.test(im.src)),
+      w.imgs[0].src);
+    // 切回白天：换回紫箭头那版（无色白天图）
+    w.els.themebtn.fire('click', {});
+    ok('切回白天后换成紫箭头那版（-nc），不留 -nc-night',
+      w.imgs.every(im => /-nc-256x256\.png$/.test(im.src)) &&
+      !w.imgs.some(im => /-nc-night/.test(im.src)), w.imgs[0].src);
+    ok('主题也写回存档（cube-theme = light）', w.store['cube-theme'] === 'light', w.store['cube-theme']);
+    // 开着颜色时不分昼夜：白天夜晚共用同一张（夜晚那套彩色图已经删了）
+    w.els.showcolors.checked = true;
+    w.els.showcolors.fire('change', {});
+    ok('开着颜色时白天/夜晚共用一张图（不会去找 -night 的彩色版）',
+      w.imgs.every(im => /pll-[\w]+-256x256\.png$/.test(im.src) && !/-night|-nc/.test(im.src)),
+      w.imgs[0].src);
+  }
+  // 存档说「开着颜色」（默认）
+  {
+    const w = mkPll({});
+    ok('默认就是彩色（存档里没有这个键）',
+      /pll\/pll-Aa-256x256\.png/.test(w.els.app.innerHTML) &&
+      !/-nc-/.test(w.els.app.innerHTML));
+    ok('默认勾选框是勾上的', w.els.showcolors.checked === true);
   }
 }
 
@@ -669,6 +781,11 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
       appendChild(c) { this.children.push(c); return c; },
       querySelectorAll() { return []; }, querySelector() { return null; },
       setPointerCapture() {}, closest() { return null; }, offsetWidth: 1,
+      // 拍照链路要用到：canvas 的 2d 上下文 + toBlob、<a download> 的 click
+      getContext() { return { fillStyle: '', fillRect() {}, drawImage() {} }; },
+      toBlob(cb, mime) { cb(new Blob(['png-bytes'], { type: mime || 'image/png' })); },
+      click() { if (this.download) downloads.push(this.download); },
+      remove() {},
       focus() { this._focused = true; },
       setAttribute(k, v) { this['_a_' + k] = String(v); },
       value: init || '',
@@ -691,12 +808,50 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
     return b;
   });
   const st = {};               // 记下页面写进 localStorage 的东西（缩放持久化要查）
+  const downloads = [], blobs = [];   // 拍照：记下下载的文件名和造出来的 blob
+  /* 拍照要用的两个浏览器对象。按 CSS 规范实现：transform 列表从左往右相乘
+     （点在最右边 → 列表里最后一个函数最先作用在点上），带 perspective 时按 w 除。 */
+  const mul4 = (A, B) => A.map((r, i) => B[0].map((_, j) => r.reduce((s, v, k) => s + v * B[k][j], 0)));
+  const ID4 = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]];
+  const DOMMatrix = function (init) {
+    let m = ID4;
+    const rad = d => parseFloat(d) * Math.PI / 180;
+    String(init || '').replace(/([a-zA-Z]+)\(([^)]*)\)/g, (all, fn, arg) => {
+      const a = rad(parseFloat(arg)), c = Math.cos(a), sn = Math.sin(a);
+      let f = ID4;
+      if (fn === 'rotateX') f = [[1, 0, 0, 0], [0, c, -sn, 0], [0, sn, c, 0], [0, 0, 0, 1]];
+      else if (fn === 'rotateY') f = [[c, 0, sn, 0], [0, 1, 0, 0], [-sn, 0, c, 0], [0, 0, 0, 1]];
+      else if (fn === 'perspective') f = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, -1 / parseFloat(arg), 1]];
+      else throw new Error('测试桩没实现 ' + fn);
+      m = mul4(m, f);
+      return '';
+    });
+    this.m = m;
+  };
+  DOMMatrix.prototype.transformPoint = function (p) {
+    const v = [p.x, p.y, p.z, 1];
+    const o = this.m.map(r => r.reduce((s, x, k) => s + x * v[k], 0));
+    // 浏览器里 transformPoint **不做**透视除法（w 原样留着）。
+    // 桩必须照这个来：要是桩替页面除了，页面忘了除也照样绿 —— 实测就栽在这。
+    return { x: o[0], y: o[1], z: o[2], w: o[3] };
+  };
+  const DOMPoint = function (x, y, z) { this.x = x; this.y = y; this.z = z; };
+  DOMPoint.prototype.matrixTransform = function (m) { return m.transformPoint(this); };
+
   const ctx = { console, navigator: {}, window: { addEventListener() {} },
-    setTimeout, clearTimeout,
+    setTimeout, clearTimeout, DOMMatrix, DOMPoint,
     // 读一律给 null（等价于首次打开，不去动「恢复现场」那条路），写则记下来
     localStorage: { getItem: () => null, setItem: (k, v) => { st[k] = String(v); },
                     removeItem() {} },
     CubeSim: S,
+    URL: { createObjectURL(b) { blobs.push(b); return 'blob:fake'; }, revokeObjectURL() {} },
+    Blob: function (parts, o) { this.parts = parts || []; this.type = (o || {}).type; },
+    Image: function () {                  // 真 Image 的 onload 是异步的，桩里同步触发
+      const self = this;
+      Object.defineProperty(this, 'src', {
+        set(v) { self._src = v; if (self.onload) self.onload(); },
+        get() { return self._src; } });
+    },
     location: { hash: '' },   // 页面会读 hash 取公式
     document: { getElementById: id => els[id] || (els[id] = mkEl('div')),
                 querySelectorAll: sel => sel === '.orbit button' ? els.arrows : [],
@@ -863,7 +1018,7 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
 
     // ---- 面板按钮的「质感」：一份共用配方 + 三个状态 ----
     ok('面板按钮共用同一份底色配方（不再各写各的 background）',
-      /\.run button, \.ctrl button, \.play, \.openpick, \.tabs button, \.moves span,\s*\n\s*\.mv button, \.phandle\{/.test(src2) &&
+      /\.run button, \.ctrl button, \.play, \.openpick, \.tabs button, \.moves span,\s*\n\s*\.mv button, \.phandle, \.spd \.mini, \.paste\{/.test(src2) &&
       /background:linear-gradient\(180deg, var\(--btn-bg\) 0%, var\(--btn-bg2\) 100%\)/.test(src2));
     ok('无边框的旋转键不在那份配方里（否则会被加回底色和边框）',
       !/\\.mv button, \\.orbit button\\{/.test(src2));
@@ -912,18 +1067,76 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
     ok('整体旋转记进了历史', String(els.hcount.textContent) === '1', els.hcount.textContent);
     ok('历史里标为旋转类', /class="e rt/.test(els.hist.innerHTML), els.hist.innerHTML.slice(0, 80));
 
-    // 箭头要能点：拖拽视角的 pointerdown 必须放过它们。
-    // 否则 setPointerCapture 会把后续指针事件重定向到舞台，click 落不到按钮上
-    // —— 这正是「箭头毫无反应」的原因。
-    // 拖拽会 setPointerCapture，被捕获之后按钮的 click 就没了 ——
-    // 所以「哪些东西不该触发拖拽」这份名单必须把舞台上的按钮都列上。
-    // 缩放三键当初漏了，点了一点反应都没有（滚轮却正常，因为滚轮不走 pointerdown）。
-    ok('拖拽视角时放过箭头按钮和缩放三键',
-      /closest\('\.orbit button, \.zoom button, \.themebtn'\)/
-        .test(fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')));
-    ok('练习页的拖拽也放过缩放三键',
-      /closest\('\.zoom button, \.themebtn'\)/
-        .test(fs.readFileSync(path.join(__dirname, '..', 'practice.html'), 'utf8')));
+    // 拖拽视角靠 setPointerCapture；一旦捕获，后续指针事件就重定向到舞台，
+    // 按钮的 click 落不到按钮上 —— 表现就是「点了完全没反应」
+    // （滚轮却照常，因为滚轮不走 pointerdown）。所以「哪些东西不该触发拖拽」
+    // 这份名单必须把舞台上的**每一个**按钮都列上：箭头、缩放三键、拍照都是这么栽的。
+    // 这里不写死整串选择器，而是把舞台里的按钮挨个找出来核 —— 以后再加按钮，
+    // 漏进名单就是红。
+    // 只在拖拽那个 pointerdown 处理函数里找 `closest('...')` ——
+    // 页面里别处也用 closest（比如选公式栏的 .p），抓第一个会抓错
+    const dragExempt = src => {
+      const i = src.indexOf("stageEl.addEventListener('pointerdown'");
+      const h = i < 0 ? '' : src.slice(i, src.indexOf('});', i));
+      return (h.match(/closest\('([^']+)'\)/) || [])[1] || '';
+    };
+    const stageButtons = src => {
+      const body = (src.match(/<main class="stage"[^>]*>([\s\S]*?)<\/main>/) || [])[1] || '';
+      const spans = {};
+      ['orbit', 'zoom'].forEach(k => {
+        const open = body.indexOf('<div class="' + k + '">');
+        spans[k] = open < 0 ? [-1, -1] : [open, body.indexOf('</div>', open)];
+      });
+      return (body.match(/<button[^>]*>/g) || []).map(tag => {
+        const at = body.indexOf(tag);
+        const cls = (tag.match(/class="([^"]*)"/) || [])[1] || '';
+        const id = (tag.match(/id="([^"]*)"/) || [])[1] || '';
+        const region = Object.keys(spans).find(k => at > spans[k][0] && at < spans[k][1]) || 'self';
+        const need = region === 'orbit' ? '.orbit button'
+                   : region === 'zoom' ? '.zoom button'
+                   : /\bsnap\b/.test(cls) ? '.snap'
+                   : (/\bthemebtn\b/.test(cls) || id === 'themebtn') ? '.themebtn' : null;
+        return { tag: tag.slice(0, 40), need };
+      });
+    };
+    [['calc.html', '计算器'], ['practice.html', '练习页']].forEach(([f, name]) => {
+      const src = fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
+      const exempt = dragExempt(src);
+      const btns = stageButtons(src);
+      const missing = btns.filter(b => b.need && exempt.indexOf(b.need) < 0);
+      const unknown = btns.filter(b => !b.need);
+      ok(name + '：舞台上的 ' + btns.length + ' 个按钮全在「不触发拖拽」名单里',
+        exempt !== '' && missing.length === 0 && unknown.length === 0,
+        '名单=' + exempt + ' 漏=' + missing.map(b => b.need).join(',') +
+        ' 认不出=' + unknown.map(b => b.tag).join(','));
+    });
+    {
+      const calcSrc = fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8');
+      const exempt = dragExempt(calcSrc);
+      ok('拍照键就在名单里（它就是漏了才点了没反应）', exempt.indexOf('.snap') >= 0, exempt);
+      // 真跑一遍 pointerdown：点拍照键不能开始拖拽、也不能捕获指针
+      let captured = 0;
+      els.stage.setPointerCapture = function () { captured++; };
+      els.stage.fire('pointerdown', { pointerId: 1, clientX: 5, clientY: 5,
+        target: { closest: sel => sel.indexOf('.snap') >= 0 } });
+      ok('点拍照键不触发拖拽（不 setPointerCapture，click 才留得住）',
+        captured === 0 && !els.stage.classList.contains('drag'), 'captured=' + captured);
+      // 点魔方本身还是要能拖 —— 别为了修这个把拖拽弄没了
+      els.stage.fire('pointerdown', { pointerId: 2, clientX: 5, clientY: 5,
+        target: { closest: () => null } });
+      ok('点魔方本身照样能拖拽（名单没有误伤）',
+        captured === 1 && els.stage.classList.contains('drag'), 'captured=' + captured);
+      els.stage.fire('pointerup', {});
+    }
+    {
+      // 编辑器的捕获路径不一样：它只在抓住 .cell（方块/贴纸）时才捕获，按钮所以安全
+      const ed = fs.readFileSync(path.join(__dirname, '..', 'editor.html'), 'utf8');
+      const i = ed.indexOf("host.addEventListener('pointerdown'");
+      const h = i < 0 ? '' : ed.slice(i, ed.indexOf('});', i));
+      ok('编辑器只在抓方块时才捕获指针（舞台上的按钮不受影响）',
+        h.indexOf("closest('.cell')") >= 0 &&
+        h.indexOf("closest('.cell')") < h.indexOf('setPointerCapture'), h.slice(0, 60));
+    }
     ok('输入框里没有默认值',
       !/id="alg"[^>]*value="/.test(fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')));
 
@@ -1175,7 +1388,8 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
           /Math\.max\(ZMIN, Math\.min\(ZMAX, z\)\)/.test(h) &&
           /getElementById\('zin'\)\.disabled = zoom >= ZMAX - 0\.001/.test(h) &&
           /getElementById\('zout'\)\.disabled = zoom <= ZMIN \+ 0\.001/.test(h));
-        ok(f + ' 打印时不印缩放按钮', /@media print\{[^}]*\.zoom\{display:none\}/.test(h));
+        ok(f + ' 打印时不印缩放按钮',
+          /@media print\{[^}]*\.zoom(,\.snap)?\{display:none\}/.test(h));
         // 这条也是给真 bug 加的：三个键原来被插到了 </main> 外面，
         // 于是 absolute 定位是相对窗口算的 —— 直接盖在右边的操作面板上
         ok(f + ' 缩放的三个键在舞台里面（不是面板上）',
@@ -1225,6 +1439,197 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
       ok('恢复默认也会写回存档（= 1）', Math.abs(parseFloat(st['cube-zoom-v1']) - 1) < 0.001,
         st['cube-zoom-v1']);
     }
+
+    // ---- 输入框右端的小叉：一键清空 ----
+    {
+      ok('输入框右端有个清空小叉（框内定位、内联 SVG）',
+        /<div class="algwrap">[\s\S]{0,260}?<button class="clr" id="clr"[\s\S]{0,160}?<svg viewBox="0 0 24 24">/.test(src2) &&
+        /\.clr\{position:absolute;right:5px;top:50%/.test(src2) &&
+        /#alg\{[^}]*padding:7px 28px 7px 9px/.test(src2));   // 右边留出位置，字不会压到叉上
+      const clr = ctx.document.getElementById('clr');
+      els.alg.value = '';
+      els.alg.fire('input', {});
+      ok('输入框空的时候，小叉是灰的（点也没意义）', clr.disabled === true);
+      els.alg.value = "R U";
+      els.alg.fire('input', {});
+      ok('有内容时小叉可用', clr.disabled === false);
+      clr.fire('click');
+      ok('点小叉：输入框清空、光标还在框里、小叉自己又变灰',
+        els.alg.value === '' && els.alg._focused === true && clr.disabled === true,
+        els.alg.value);
+      // 顺带把报错状态也清掉（红框 + 提示）
+      els.alg.value = 'ZZZ';
+      els.alg.fire('input', {});
+      els.fwd.fire('click');
+      clr.fire('click');
+      ok('清空时连报错状态一起清（红框、提示都不留）',
+        els.alg.value === '' && !els.alg.classList.contains('bad') &&
+        els.err.textContent === '' && !els.err.classList.contains('hint'),
+        JSON.stringify({ v: els.alg.value, err: els.err.textContent }));
+    }
+
+
+    // ---- 转动速度 / 跳过动画 ----
+    {
+      ok('「步骤」里有速度滑条和「跳过动画」开关',
+        /<input type="range" id="spd" min="80" max="800"/.test(src2) && /id="skip"/.test(src2));
+      // 这条是给「看不出是个开关」改的：做成带勾选框的 .tg，而不是又一个普通按钮
+      // 样式改成滑动开关（轨道 + 滑块）：一看就是「开/关」，不是又一个按钮
+      ok('「跳过动画」是个滑动开关（轨道 + 滑块，勾选框藏起来但键盘可达）',
+        /<label class="tg" id="tg-skip"[\s\S]{0,140}?<input type="checkbox" id="skip"> 跳过动画/.test(src2) &&
+        /\.tg::before\{content:'';position:absolute;left:0;top:50%;width:36px;height:20px/.test(src2) &&
+        /\.tg\.on::before\{background:var\(--accent\);border-color:var\(--accent\)\}/.test(src2) &&
+        /\.tg\.on::after\{transform:translateX\(16px\)/.test(src2) &&
+        /\.tg input\{position:absolute;width:1px;height:1px;margin:0;opacity:0/.test(src2) &&
+        !/class="skip"/.test(src2));
+      const spd = ctx.document.getElementById('spd');
+      spd.value = '120';
+      spd.fire('input', {});
+      ok('拖速度滑条会改转动时长，并写进存档',
+        els['spd-v'].textContent === '120ms' && /"dur":120/.test(st['calc-state-v1'] || ''),
+        els['spd-v'].textContent + ' / ' + String(st['calc-state-v1']).slice(0, 60));
+      // 速度恢复默认：小键，已经是默认值时置灰
+      const rst = ctx.document.getElementById('spd-reset');
+      ok('速度不是默认值时「默认」键可用，点了回到 340ms',
+        rst.disabled === false &&
+        /var DUR_DEFAULT = 340/.test(src2) &&
+        /<input type="range" id="spd" min="80" max="800" step="20" value="340">/.test(src2));
+      rst.fire('click');
+      ok('点「默认」：滑条回 340ms、键自己置灰、存档也跟着回去',
+        els['spd-v'].textContent === '340ms' && rst.disabled === true &&
+        /"dur":340/.test(st['calc-state-v1'] || ''),
+        els['spd-v'].textContent);
+      spd.value = '120';
+      spd.fire('input', {});                       // 再调回去，后面的测试按 120ms 算
+      ok('再调开，「默认」键又可用', rst.disabled === false);
+
+      const sk = ctx.document.getElementById('skip');
+      const tgSk = ctx.document.getElementById('tg-skip');
+      sk.checked = true;
+      sk.fire('change', {});
+      ok('勾上「跳过动画」：勾选框与外框都亮起，并写进存档',
+        sk.checked === true && tgSk.classList.contains('on') &&
+        /"skip":true/.test(st['calc-state-v1'] || ''));
+      // 跳过动画要真的跳过：animate 直接返回、play 一次算完只画一帧
+      ok('跳过动画时不等 transition：animate 直接回调、play 只画最后一帧',
+        /if \(skipAnim\) \{ done\(\); return; \}/.test(src2) &&
+        /if \(skipAnim\) \{\s*\n\s*var s0 = from;/.test(src2) &&
+        /if \(skipAnim\) \{\s*\n\s*at = steps\.length;/.test(src2));
+    }
+
+    // ---- 跳过动画：提交后同步出结果，不用等 ----
+    els.reset.fire('click');
+    els.alg.value = "R U R'";
+    els.fwd.fire('click');
+    ok('开着「跳过动画」时，点提交立刻就到结果',
+      String(els.hcount.textContent) === '1' &&
+      sameState(readCube(), S.apply(S.solved(), "R U R'")),
+      String(els.hcount.textContent) + ' / ' + JSON.stringify(readCube()).slice(0, 40));
+
+    // ---- 历史回溯：点一条 = 回到那一步结束时的局面 ----
+    {
+      els.alg.value = 'U';
+      els.fwd.fire('click');                       // 第 2 条
+      const typed = els.alg.value;
+      const N1 = String(S.steps("R U R'").length);   // 第 1 条公式有几步
+      // 桩不解析 innerHTML，所以直接给个带 dataset.i 的假元素 —— 处理器只读它
+      const clickHist = i => els.hist.fire('click', {
+        target: { closest: s => (s === '.e' ? { dataset: { i: String(i) } } : null) } });
+
+      clickHist(0);
+      ok('点历史第 1 条：局面回到「这一条执行完」',
+        sameState(readCube(), S.apply(S.solved(), "R U R'")),
+        JSON.stringify(readCube()).slice(0, 48));
+      ok('点历史不往输入框里填公式', els.alg.value === typed, els.alg.value);
+      ok('回溯后当前那条高亮、后面那条变淡',
+        /class="e cur" data-i="0"/.test(els.hist.innerHTML) &&
+        /class="e after" data-i="1"/.test(els.hist.innerHTML),
+        els.hist.innerHTML.slice(0, 100));
+      // 第 1 条是 R U R'（3 步），摆成步骤后位置停在末尾
+      ok('这一条被摆成可播放的步骤（位置停在末尾）',
+        els.pos.textContent === N1 + ' / ' + N1, els.pos.textContent);
+      ok('当前游标也进存档（刷新后还停在同一条）', /"histAt":0/.test(st['calc-state-v1'] || ''));
+
+      // 播放这一条：先退回这条公式执行前的局面，再一步步播
+      els.skip.checked = false;                    // 关掉跳过动画，才看得到「播」
+      els.skip.fire('change', {});
+      els.play.fire('click');
+      ok('点播放会从这条公式的开头播起（先退回执行前）',
+        els.pos.textContent === '0 / ' + N1, els.pos.textContent);
+      await wait(900);
+      ok('播完停在公式结束的局面',
+        els.pos.textContent === N1 + ' / ' + N1 &&
+        sameState(readCube(), S.apply(S.solved(), "R U R'")), els.pos.textContent);
+
+      // 复制这一条：点复制键只复制，不回溯
+      const copied = [];
+      ctx.navigator.clipboard = { writeText: t => { copied.push(t); return Promise.resolve(); } };
+      ctx.window.isSecureContext = true;
+      const fakeCp = { dataset: { i: '1' }, classList: els.hist === undefined ? null : null };
+      ok('每条历史右侧都有复制键（内联 SVG 图标，不是字符）',
+        /class="cp" type="button" data-i="' \+ i \+/.test(src2) &&
+        /var CP_ICON = '<svg/.test(src2) &&
+        /\.hist \.e \.cp\{flex:none;margin-left:6px/.test(src2));
+      {
+        const mkBtn = () => {
+          const st = new Set();                 // 闭包里的集合：classList 的方法 this 指向自己
+          return { dataset: { i: '1' },
+            classList: { add(c) { st.add(c); }, remove(c) { st.delete(c); },
+                         contains(c) { return st.has(c); } } };
+        };
+        const btn = mkBtn();
+        els.hist.fire('click', { target: { closest: s => (s === '.cp' ? btn : null) } });
+        ok('点复制键：把这一条的公式送进剪贴板（' + copied.join('') + '）',
+          copied.length === 1 && copied[0] === 'U', copied.join('|'));
+        await wait(30);                    // 加上「闪一下」的类是写在 then 里的
+        ok('复制成功后按键自己闪一下（这页没有 toast）',
+          btn.classList.contains('copied'));
+        ok('点复制键不会动局面/位置', els.pos.textContent === N1 + ' / ' + N1, els.pos.textContent);
+      }
+
+      ok('复制键优先于回溯判断（点它不会跳位置）',
+        /var cp = e\.target\.closest \? e\.target\.closest\('\.cp'\) : null;\s*\n\s*if \(cp\) \{ copyHist/.test(src2));
+      ok('复制走 clipboard API，另有一条 execCommand 退路（file:// 下没有前者）',
+        /navigator\.clipboard && window\.isSecureContext/.test(src2) &&
+        /document\.execCommand\('copy'\)/.test(src2));
+
+      // 回溯之后再做新动作：后面那几条作废
+      els.alg.value = 'F';
+      els.fwd.fire('click');
+      await wait(900);
+      ok('回溯点之后做新动作，后面那几条作废', String(els.hcount.textContent) === '2',
+        els.hcount.textContent);
+      ok('新的一条接在回溯点后面（原来的 U 没了、变成了 F）',
+        els.hist.innerHTML.includes('<span>F</span>') &&
+        !els.hist.innerHTML.includes('<span>U</span>'),
+        els.hist.innerHTML.slice(0, 120));
+    }
+
+    // ---- 公式框的粘贴键 ----
+    {
+      ok('公式框右边有粘贴键（内联 SVG 图标，不是字符）',
+        /<button class="paste" id="paste" type="button"[\s\S]{0,200}?<svg viewBox="0 0 24 24">/.test(src2) &&
+        /\.paste\{flex:none;width:\d+px;height:\d+px/.test(src2));
+      ok('粘贴优先用 clipboard.readText，读不到才退回「本页最近复制的」+ 提示',
+        /navigator\.clipboard\.readText\(\)\.then/.test(src2) &&
+        /if \(use\(lastCopied\)\) return;/.test(src2) &&
+        /不让读剪贴板，按 Ctrl\+V 吧/.test(src2) &&
+        /\.err\.hint\{color:var\(--muted\)\}/.test(src2));
+      const pasteEl = ctx.document.getElementById('paste');
+      // 上一条（复制键）刚把 'U' 记进 lastCopied，这里先给个「能读剪贴板」的环境
+      ctx.navigator.clipboard.readText = () => Promise.resolve("R U R' U");
+      pasteEl.fire('click');
+      await wait(30);                       // readText 是异步的
+      ok('点粘贴：剪贴板里的公式进了输入框（' + els.alg.value + '）',
+        els.alg.value === "R U R' U", els.alg.value);
+      ok('粘贴后光标落在输入框里，直接回车就能提交', els.alg._focused === true);
+      // 换成「读不到剪贴板」的环境：应当退回本页复制过的那条
+      ctx.navigator.clipboard.readText = undefined;
+      els.alg.value = '';
+      pasteEl.fire('click');
+      ok('读不到剪贴板时，用本页刚复制的那条顶上', els.alg.value === 'U', els.alg.value);
+    }
+
     ok('内容宽度固定，收起时靠外层裁剪（不会被挤扁）',
       /overflow:hidden/.test(src2) && /\.picker > \.inner\{width:300px/.test(src2));
     ok('列表项带缩略图', /function thumb\(kind, id\)/.test(src2) && /<img src="' \+ thumb/.test(src2));
@@ -1259,7 +1664,8 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
       let missing = [];
       ['f2l', 'oll', 'pll'].forEach(k => A[k].forEach(r => {
         const id = k === 'f2l' ? r[0] : (/^\d+$/.test(r[0]) && r[0].length < 2 ? '0' + r[0] : r[0]);
-        const f = k + '/' + k + '-' + id + '-' + (k === 'f2l' ? '512x515' : '512x512') + '.png';
+        const tone = k === 'oll' ? '-day' : '';
+        const f = k + '/' + k + '-' + id + tone + '-' + (k === 'f2l' ? '256x258' : '256x256') + '.png';
         if (!fs.existsSync(path.join(__dirname, '..', f))) missing.push(f);
       }));
       ok('缩略图文件都存在（' + (A.f2l.length + A.oll.length + A.pll.length) + ' 张）',
@@ -1355,6 +1761,180 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
       }
       ok('回来时魔方局面恢复了', sameState(got4, saved.cur),
         JSON.stringify(got4).slice(0, 50));
+    }
+
+    // ---- 拍照：把当前局面存成 PNG ----
+    {
+      // 位置在右上角、和主题开关并排（左上角是「整体逆时针滚 z'」的 56px 大按键，
+      // 主题开关正下方又会在舞台变矮时压到右边那个折角）
+      ok('舞台右上角有拍照键（内联 SVG 相机图标，和缩放键同一套外观）',
+        /<button class="snap" id="snap" type="button"[\s\S]{0,240}?<svg viewBox="0 0 24 24">/.test(src2) &&
+        /\.zoom button, \.snap\{width:40px/.test(src2) &&
+        /\.snap\{position:absolute;right:80px;top:14px/.test(src2) &&
+        !/\.snap\{[^}]*left:14px/.test(src2));
+      // 画法必须和舞台一致：同一串 transform 交给 DOMMatrix 解析、同一套 COLOR 表。
+      // 用编辑器那套 cube.js 渲染是不行的 —— 它视角固定（拖过就对不上），
+      // 颜色也另有一套（F 面 #C00000 vs 舞台的 #C41E3A）。
+      ok('拍照是页面自己按舞台的变换画的（不再借 cube.js 的固定视角渲染）',
+        !/<script src="cube\.js"><\/script>/.test(src2) &&
+        /new DOMMatrix\('perspective\(/.test(src2) &&
+        /rotateX\(' \+ view\.x/.test(src2) && /rotateY\(' \+ view\.y/.test(src2) &&
+        !/Cube\.toSvg/.test(src2));
+      ok('贴纸颜色取自页面自己的 COLOR 表（和舞台上同一个红）',
+        /fill: COLOR\[cell\.col\]/.test(src2) || /COLOR\[cell\.col\]/.test(src2));
+      {
+        const stageP = (src2.match(/\.stage\{[^}]*perspective:\s*(\d+)px/) || [])[1];
+        const snapP = (src2.match(/var SNAP_PERSP = (\d+);/) || [])[1];
+        ok('拍照的透视距离就是 .stage 上的那个（' + stageP + 'px）',
+          stageP && snapP && stageP === snapP, 'stage=' + stageP + ' snap=' + snapP);
+      }
+      // 先真的转几步再拍：复原态是「对称」的，镜不镜像、视角对不对都看不出来
+      els.alg.value = "R U R'";
+      els.fwd.fire('click');
+      await wait(1200);
+      ok('拍照前局面确实打乱了（否则下面那些对称的图看不出问题）',
+        !sameState(readCube(), S.solved()), JSON.stringify(readCube()).slice(0, 40));
+      downloads.length = 0; blobs.length = 0;
+      ctx.document.getElementById('snap').fire('click');
+      ok('点拍照会下载一张 PNG（文件名带公式和时间）',
+        downloads.length === 1 && /^cube-R-U-R'-\d{8}-\d{6}\.png$/.test(downloads[0]),
+        downloads.join('|'));
+      ok('拍的是 toSvg 渲染出来那张（不是舞台截屏）',
+        blobs.length >= 1 && /svg/.test(blobs[0].type || '') &&
+        /<svg/.test(String(blobs[0].parts[0])), String(blobs.length) + ' 个 blob');
+      ok('拍完给个提示（这页没有 toast，用输入框下面那行灰字）',
+        /^已保存 cube-R-U-R'-\d{8}-\d{6}\.png（1024×\d+）$/.test(els.err.textContent) &&
+        els.err.classList.contains('hint'), els.err.textContent);
+
+      /* 拍出来的那张图，必须是「舞台上看到的那个视角 + 那套颜色」，而且是同一套透视。
+         参照用一套照 CSS 规范手算的投影（和页面里那段实现分开写）。 */
+      {
+        const svg = String(blobs[0].parts[0]);
+        const polys = [...svg.matchAll(/<polygon class="(\w+)" points="([^"]+)" fill="([^"]+)"\/>/g)]
+          .map(m => {
+            const pts = m[2].split(' ').map(t => t.split(',').map(Number));
+            return { pts, fill: m[3].toUpperCase(), cls: m[1], sticker: m[1] === 'sticker',
+                     x: pts.reduce((a, p) => a + p[0] / pts.length, 0),
+                     y: pts.reduce((a, p) => a + p[1] / pts.length, 0) };
+          });
+        const drawn = polys.filter(p => p.cls === 'sticker');
+        const frames = polys.filter(p => p.cls === 'frame');
+        const stickerHex = new Set(Object.keys(C2));
+        ok('拍出来 ' + frames.length + ' 块塑料壳 + ' + drawn.length + ' 张贴纸',
+          frames.length >= 20 && drawn.length === frames.length, frames.length + ' / ' + drawn.length);
+        // 塑料壳必须是「整格的直角四边形」：一旦跟着贴纸倒角，四个格子交汇处
+        // 就会留下小洞 —— 舞台上洞后面是方块内部（深色）看不出来，照片后面是白底，
+        // 会变成一个个白点、整块看着镂空。贴纸那边才倒角（12 个点）。
+        ok('塑料壳是整格直角四边形（不留缝、不镂空）',
+          frames.length > 20 && frames.every(f => f.pts.length === 4),
+          [...new Set(frames.map(f => f.pts.length))].join(','));
+        ok('贴纸是倒过角的轮廓（12 个点）',
+          drawn.length > 20 && drawn.every(d => d.pts.length === 12),
+          [...new Set(drawn.map(d => d.pts.length))].join(','));
+        // 这一条正是用户报的 bug：整张图全是灰的（局面没喂进去，退回了 EMPTY 灰）
+        ok('每张贴纸都是六种贴纸色之一（不是灰的塑料底）',
+          drawn.length > 0 && drawn.every(p => stickerHex.has(p.fill)),
+          [...new Set(drawn.map(p => p.fill))].join(' '));
+        // 贴纸必须比它那格小一圈（四角往里收）：内缩写成负号时贴纸会溢出去、
+        // 塑料缝没了，但中心点和面积比几乎不变，只看那两条是抓不住的
+        {
+          const area = pts => Math.abs(pts.reduce((acc, q, i) => {
+            const r = pts[(i + 1) % pts.length];
+            return acc + q[0] * r[1] - r[0] * q[1];
+          }, 0)) / 2;
+          const ratios = drawn.map((d, i) => area(d.pts) / area(frames[i].pts));
+          const avg = ratios.reduce((a, b) => a + b, 0) / ratios.length;
+          // 面内内缩 ×0.042、圆角 ×0.095：面积比应当落在 0.8 上下，
+          // 而且在透视里基本不变（上一版按屏幕平均边长缩，侧面会被挤成一条线）
+          ok('贴纸是往格子里面缩的（平均占格子 ' + avg.toFixed(2) + '，应 ≈0.83）',
+            ratios.length > 20 && avg > 0.7 && avg < 0.92 &&
+            ratios.every(r => r > 0.6 && r < 0.98),
+            ratios.slice(0, 3).map(r => r.toFixed(2)).join(' '));
+        }
+
+        // 参照投影：模型 y 朝上 -> CSS y 朝下；CSS 的 rotateX(x) rotateY(y) 先转 Y 再转 X；
+        // 透视除法和 .stage 的 perspective / perspective-origin 一致
+        const RAD = Math.PI / 180, PERSP = 1400, VIEW = { x: -24, y: -32 };
+        const OY = -0.02 * els.stage.clientHeight;
+        const UV = {
+          '1,0,0': [[0, 1, 0], [0, 0, 1]], '-1,0,0': [[0, 1, 0], [0, 0, -1]],
+          '0,1,0': [[1, 0, 0], [0, 0, -1]], '0,-1,0': [[1, 0, 0], [0, 0, 1]],
+          '0,0,1': [[1, 0, 0], [0, 1, 0]], '0,0,-1': [[1, 0, 0], [0, -1, 0]]
+        };
+        // 每格边长取页面当前写进 --cs 的那个值：透视强度是 cs/1400，
+        // 随便拿个 60 当基准，两边透视强弱就不一样了
+        const CSP = parseFloat(els.cube.style['--cs']) || 60;
+        const at = v => {
+          const s0 = CSP, x = v[0] * s0, y = -v[1] * s0, z = v[2] * s0;
+          const x1 = x * Math.cos(VIEW.y * RAD) + z * Math.sin(VIEW.y * RAD);
+          const z1 = -x * Math.sin(VIEW.y * RAD) + z * Math.cos(VIEW.y * RAD);
+          const y1 = y * Math.cos(VIEW.x * RAD) - z1 * Math.sin(VIEW.x * RAD);
+          const z2 = y * Math.sin(VIEW.x * RAD) + z1 * Math.cos(VIEW.x * RAD);
+          const w = 1 - z2 / PERSP;
+          return { x: x1 / w, y: OY + (y1 - OY) / w, z: z2 };
+        };
+        const H2 = {};                       // 颜色字母 -> 十六进制（C2 是反过来的）
+        for (const k in C2) H2[C2[k]] = k;
+        const st0 = readCube(), ref = [];
+        Object.keys(st0).forEach(k => {
+          const ps = k.split('|')[0].split(',').map(Number);
+          const nk = k.split('|')[1], ns = nk.split(',').map(Number);
+          if (at(ns).z <= 0) return;                       // 背面不画
+          const c = [ps[0] + ns[0] / 2, ps[1] + ns[1] / 2, ps[2] + ns[2] / 2];
+          const uv = UV[nk];
+          const pts = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(sg => at([0, 1, 2].map(i =>
+            c[i] + (sg[0] * uv[0][i] + sg[1] * uv[1][i]) / 2)));
+          const cen = at(c);
+          ref.push({ x: cen.x, y: cen.y, hex: H2[st0[k]], pts: pts.map(p => [p.x, p.y]) });
+        });
+        // 两张图各自缩放过，先按自己的包围盒归一化，再找最近的点配对
+        const bbox = list => {
+          const xs = [].concat(...list.map(p => p.pts.map(q => q[0])));
+          const ys = [].concat(...list.map(p => p.pts.map(q => q[1])));
+          return { x0: Math.min(...xs), y0: Math.min(...ys),
+                   sc: Math.max(Math.max(...xs) - Math.min(...xs),
+                                Math.max(...ys) - Math.min(...ys)) || 1 };
+        };
+        const norm = (list, b) => list.map(p => Object.assign({}, p, {
+          hex: p.hex || p.fill,
+          x: (p.x - b.x0) / b.sc, y: (p.y - b.y0) / b.sc,
+          area: Math.abs(p.pts.reduce((acc, q, i) => {
+            const r = p.pts[(i + 1) % p.pts.length];
+            return acc + q[0] * r[1] - r[0] * q[1];
+          }, 0)) / 2 / (b.sc * b.sc)
+        }));
+        // 归一化用「整格」那圈点（塑料壳 / 参照的格子四角）——
+        // 贴纸是内缩过的，拿它当包围盒两边缩放不一致，位置会系统性偏一点
+        const A = norm(drawn, bbox(frames)), B = norm(ref, bbox(ref));
+        // 比透视要用同一层的东西：参照给的是「整格」四角，这边也取塑料壳那圈
+        const AF = norm(frames, bbox(frames));
+        ok('参照投影的可见贴纸数和拍出来的一样（' + B.length + ' 张）',
+          A.length === B.length && B.length > 20, A.length + ' vs ' + B.length);
+        let bad = 0, far = 0;
+        B.forEach(r => {
+          let best = null;
+          A.forEach(a => {
+            const d = Math.hypot(a.x - r.x, a.y - r.y);
+            if (!best || d < best.d) best = { d, hex: a.hex };
+          });
+          if (!best) { bad++; return; }
+          if (best.d > 0.05) far++;
+          if (best.hex !== r.hex) bad++;
+        });
+        ok('每张贴纸的位置和颜色都和舞台视角对得上', bad === 0 && far === 0,
+          '颜色不符 ' + bad + ' 张 / 位置偏差 ' + far + ' 张');
+
+        /* 透视（近大远小）必须真的在：同一个面里，靠前的格子投影更大。
+           正交投影下所有格子一样大 —— 用户就是一眼看出来的这个。
+           量「最大格 / 最小格」的面积比：和参照（自己算的透视投影）比，
+           并且必须明显大于 1（1.000 就说明没做透视除法）。 */
+        const spread = list => Math.max(...list.map(p => p.area)) /
+                              Math.min(...list.map(p => p.area));
+        ok('透视生效：最大/最小格子面积比 ' + spread(AF).toFixed(3) +
+           '（参照 ' + spread(B).toFixed(3) + '，正交投影是 1.000）',
+          spread(AF) > 1.02 && Math.abs(spread(AF) - spread(B)) < 0.03,
+          spread(AF).toFixed(3) + ' vs ' + spread(B).toFixed(3));
+      }
     }
 
     // 打乱放在最后：22 步要播约 9 秒，放在前面会把后面的提交全挡在 busy 外面

@@ -47,16 +47,27 @@ def bar_pt(face, i):
     return (PAD + BOARD + BAR_OFF, PAD + i * PITCH + CELL / 2)
 
 
+def is_top_colour(rgb):
+    """顶面「已朝向」那一格的颜色：白天紫 #7E6FC7、夜晚黄 #FFE600 都算。
+
+    两套图除了顶面颜色完全一样，签名只看「这一格有没有涂上顶面色」，
+    所以两种都要认 —— 否则白天那套读出来全是 0。"""
+    r, g, b = rgb[:3]
+    if r > 200 and g > 200 and b < 120:            # 黄
+        return True
+    return 105 < r < 145 and 90 < g < 130 and 175 < b < 220   # 紫
+
+
 def read_oll(path):
-    """OLL 图 -> (顶面 9 位黄, 侧边 12 位划线)"""
+    """OLL 图 -> (顶面 9 位顶面色, 侧边 12 位划线)"""
     im = Image.open(path).convert('RGB')
     px = make_sampler(im.width)
-    top = ''.join('1' if is_yellow(im.getpixel(px(*cell_center(r, c)))) else '0'
+    top = ''.join('1' if is_top_colour(im.getpixel(px(*cell_center(r, c)))) else '0'
                   for r in range(3) for c in range(3))
     bars = ''
     for face in 'BLRF':
         for i in range(3):
-            bars += '1' if is_yellow(im.getpixel(px(*bar_pt(face, i)))) else '0'
+            bars += '1' if is_top_colour(im.getpixel(px(*bar_pt(face, i)))) else '0'
     return top, bars
 
 

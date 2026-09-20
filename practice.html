@@ -347,7 +347,10 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   // 公式表里那张图的文件名
   function thumbOf(kind, id) {
     var f = kind === 'f2l' ? id : (/^\d+$/.test(id) && id.length < 2 ? '0' + id : id);
-    return kind + '/' + kind + '-' + f + '-' + (kind === 'f2l' ? '512x515' : '512x512') + '.png';
+    var size = kind === 'f2l' ? '256x258' : '256x256';
+    // OLL 有昼夜两版（白天紫顶 / 夜晚黄顶），别的只有一版
+    var tone = kind === 'oll' ? (document.documentElement.dataset.theme === 'dark' ? '-night' : '-day') : '';
+    return kind + '/' + kind + '-' + f + tone + '-' + size + '.png';
   }
 
   // 本轮进度也要留住 —— 否则切回来重开一轮，"不重复出题"就断了
@@ -445,8 +448,13 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
 
   /* 夜晚模式 */
   var root = document.documentElement, btn = document.getElementById('themebtn');
+  // 切主题时把当前这道题的图换成另一套（OLL 才有两版）
+  function syncThumb() {
+    if (cur && cur.id) document.getElementById('qimg').src = thumbOf(scope, cur.id);
+  }
   function applyTheme(t) {
     root.dataset.theme = t;
+    syncThumb();        // 切主题时把图/缩略图换成另一套（OLL 分昼夜两版）
     btn.title = t === 'dark' ? '切到白天' : '切到夜晚';
     try { localStorage.setItem('cube-theme', t); } catch (e) {}
   }

@@ -54,17 +54,21 @@
   .orbit .z2{left:58px;top:2px}
   /* 右下角的放大缩小：和四周的折角按钮同一套（无边框、平时淡、指上去染色放大） */
   .zoom{position:absolute;right:14px;bottom:14px;display:grid;gap:6px;z-index:4}
-  .zoom button{width:40px;height:40px;padding:0;margin:0;border:0;background:none;
+  /* 拍照键：和缩放那三个同一套外观。摆在主题开关左边（和公式页的打印键同一个位置，
+     右上角并排）—— 左上角那个 56px 的「整体逆时针滚 z'」压不得，正下方又太靠右中，
+     舞台一矮就会碰到右边那个折角。 */
+  .snap{position:absolute;right:80px;top:14px;z-index:4}
+  .zoom button, .snap{width:40px;height:40px;padding:0;margin:0;border:0;background:none;
                box-shadow:none;border-radius:12px;cursor:pointer;
                display:grid;place-items:center;color:var(--muted);opacity:.6;
                transition:opacity .14s ease,color .14s ease,scale .12s ease}
-  .zoom button svg{width:26px;height:26px;display:block;fill:none;stroke:currentColor;
+  .zoom button svg, .snap svg{width:26px;height:26px;display:block;fill:none;stroke:currentColor;
                    stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
-  .zoom button:hover:not(:disabled){opacity:1;color:var(--accent-text);scale:1.1}
-  .zoom button:active:not(:disabled){scale:.94}
-  .zoom button:focus-visible{opacity:1;color:var(--accent-text);
+  .zoom button:hover:not(:disabled), .snap:hover:not(:disabled){opacity:1;color:var(--accent-text);scale:1.1}
+  .zoom button:active:not(:disabled), .snap:active:not(:disabled){scale:.94}
+  .zoom button:focus-visible, .snap:focus-visible{opacity:1;color:var(--accent-text);
                              outline:2px solid var(--accent-text);outline-offset:-6px}
-  .zoom button:disabled{opacity:.22;cursor:default}
+  .zoom button:disabled, .snap:disabled{opacity:.22;cursor:default}
 
   .cube{position:relative;width:0;height:0;transform-style:preserve-3d}
   /* F 面标牌：贴在前面的中心方块上，跟着魔方一起转，
@@ -126,7 +130,7 @@
      定位（translateX(-50%) 之类），用 transform 会被这里覆盖、按钮会跑位。
      舞台四周那几个折角按钮是无边框的，不在这份配方里（见上面的 .orbit）。 */
   .run button, .ctrl button, .play, .openpick, .tabs button, .moves span,
-  .mv button, .phandle{
+  .mv button, .phandle, .spd .mini, .paste{
     background:linear-gradient(180deg, var(--btn-bg) 0%, var(--btn-bg2) 100%);
     border:1px solid var(--line);
     box-shadow:inset 0 1px 0 var(--btn-hi), inset 0 -1px 0 var(--btn-shade),
@@ -137,7 +141,7 @@
   .run button:hover:not(:disabled), .ctrl button:hover:not(:disabled),
   .play:hover:not(:disabled), .openpick:hover:not(:disabled),
   .tabs button:hover:not(:disabled), .moves span:hover,
-  .mv button:hover:not(:disabled), .phandle:hover{
+  .mv button:hover:not(:disabled), .phandle:hover, .spd .mini:hover:not(:disabled), .paste:hover:not(:disabled){
     translate:0 -1px;
     box-shadow:inset 0 1px 0 var(--btn-hi), inset 0 -1px 0 var(--btn-shade),
                0 3px 8px var(--btn-drop);
@@ -145,10 +149,38 @@
   .run button:active:not(:disabled), .ctrl button:active:not(:disabled),
   .play:active:not(:disabled), .openpick:active:not(:disabled),
   .tabs button:active:not(:disabled), .moves span:active,
-  .mv button:active:not(:disabled), .phandle:active{
+  .mv button:active:not(:disabled), .phandle:active, .spd .mini:active:not(:disabled), .paste:active:not(:disabled){
     translate:0 1px;
     box-shadow:inset 0 2px 5px var(--btn-shade);
   }
+  /* 播放速度 + 跳过动画：都归「步骤」这一节，因为它们只管怎么播 */
+  .spd{display:flex;align-items:center;gap:8px;margin:2px 0 8px}
+  .spd label{flex:none;font-size:12px;color:var(--muted)}
+  .spd input[type=range]{flex:1;min-width:0;height:18px;margin:0;accent-color:var(--accent)}
+  .spd .val{flex:none;width:46px;text-align:right;color:var(--muted);
+            font:12px/1 ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
+  /* 速度行末尾的「默认」：小键；已经是默认值时就置灰 */
+  .spd .mini{flex:none;height:22px;padding:0 8px;border-radius:6px;cursor:pointer;
+             font:inherit;font-size:11.5px;color:var(--muted)}
+  .spd .mini:disabled{opacity:.4;cursor:default}
+  /* 开关（显示颜色 / 跳过动画 / 明暗…）：一条轨道 + 一个滑块，和主题开关同一套语言。
+     真勾选框藏起来（视觉由 .on 决定），但保留键盘可达性：Tab 能走到，:focus-within 给焦点圈。 */
+  .tg{position:relative;display:flex;width:100%;box-sizing:border-box;margin-bottom:8px;align-items:center;padding:1px 0 1px 44px;
+      cursor:pointer;color:var(--muted);font-size:12.5px;user-select:none;
+      transition:color .12s ease}
+  .tg input{position:absolute;width:1px;height:1px;margin:0;opacity:0;pointer-events:none}
+  .tg::before{content:'';position:absolute;left:0;top:50%;width:36px;height:20px;margin-top:-10px;
+              box-sizing:border-box;border-radius:10px;background:var(--line);
+              border:1px solid var(--line-strong);
+              transition:background .15s ease,border-color .15s ease}
+  .tg::after{content:'';position:absolute;left:2px;top:50%;width:16px;height:16px;margin-top:-8px;
+             border-radius:50%;background:var(--panel);box-shadow:0 1px 3px #00000033;
+             transition:transform .18s cubic-bezier(.34,.86,.32,1),background .15s ease}
+  .tg:hover,.tg.on{color:var(--text)}
+  .tg.on::before{background:var(--accent);border-color:var(--accent)}
+  .tg.on::after{transform:translateX(16px);background:var(--on-accent, #fff)}
+  .tg:focus-within::before{outline:2px solid var(--accent-text);outline-offset:2px}
+
   /* 单步键盘：6 列 × 2 行 —— 上面一排顺时针，下面一排逆时针 */
   .mv{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
   .mv button{height:32px;padding:0;border-radius:8px;cursor:pointer;
@@ -156,10 +188,29 @@
   .mv button:hover:not(:disabled){color:var(--accent-text);border-color:var(--accent-text)}
 
   .row{display:flex;align-items:center;gap:9px;margin-bottom:9px}
-  #alg{flex:1;min-width:0;background:var(--field);border:1px solid var(--line);border-radius:7px;
-       color:var(--text);padding:7px 9px;
+  /* 输入框包一层：小叉要贴在框内右端，所以右边多留 28px 给它在里面待着 */
+  .algwrap{position:relative;flex:1;min-width:0}
+  #alg{width:100%;min-width:0;background:var(--field);border:1px solid var(--line);
+       border-radius:7px;color:var(--text);padding:7px 28px 7px 9px;
        font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
   #alg:focus{outline:none;border-color:var(--accent-text)}
+  /* 清空：框内右端的小叉。没内容时置灰（和缩放/速度那些「没得可做就灰」一致） */
+  .clr{position:absolute;right:5px;top:50%;transform:translateY(-50%);
+       width:20px;height:20px;padding:0;margin:0;border:0;background:none;border-radius:5px;
+       cursor:pointer;color:var(--muted);opacity:.55;display:grid;place-items:center;
+       transition:opacity .12s,color .12s,background .12s}
+  .clr svg{width:11px;height:11px;display:block;fill:none;stroke:currentColor;
+           stroke-width:2.6;stroke-linecap:round}
+  .clr:hover:not(:disabled){opacity:1;color:var(--accent-text);background:var(--chip-hover)}
+  .clr:disabled{opacity:.2;cursor:default}
+  /* 输入框右边的粘贴键：和输入框一样高，无字图标 */
+  .paste{flex:none;width:34px;height:33px;padding:0;border-radius:7px;cursor:pointer;
+         color:var(--muted);display:grid;place-items:center}
+  .paste svg{width:15px;height:15px;display:block;fill:none;stroke:currentColor;
+             stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+  .paste:hover:not(:disabled){color:var(--accent-text);border-color:var(--accent-text)}
+  /* 读不到剪贴板时的提示：别用报错的红色 */
+  .err.hint{color:var(--muted)}
   #alg.bad{border-color:#c0392b}
 
   .ctrl{display:flex;gap:6px;margin-bottom:9px}
@@ -191,6 +242,17 @@
   .hist .e.rt{color:#2b6f8f}
   /* 单步是「小动作」，一串点下来会有一堆 —— 压淡一点，别把整条历史淹了 */
   .hist .e.mv{opacity:.85}
+  /* 回溯到旧记录之后，后面那几条会变淡 —— 再做动作它们就被丢掉了 */
+  .hist .e.after{opacity:.45}
+  /* 每条右侧的复制键：无边框小图标；点了自己闪一下当反馈（这页没有 toast） */
+  .hist .e > span{flex:1 1 auto;min-width:0}
+  .hist .e .cp{flex:none;margin-left:6px;width:20px;height:20px;padding:0;border:0;
+               background:none;border-radius:5px;cursor:pointer;color:var(--muted);
+               display:grid;place-items:center;transition:color .12s,background .12s}
+  .hist .e .cp svg{width:13px;height:13px;display:block;fill:none;stroke:currentColor;
+                   stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+  .hist .e .cp:hover{color:var(--accent-text);background:var(--chip-hover)}
+  .hist .e .cp.copied{color:var(--on-accent, #fff);background:var(--accent)}
   .hist .e .tag{flex:none;background:var(--accent);color:var(--on-accent, #fff);border-radius:4px;
                 padding:0 4px;font-size:11px;line-height:1.5}
   .hist .e.cur{border-color:var(--accent);color:var(--text)}
@@ -293,7 +355,7 @@
     .phandle svg{transform:rotate(90deg)}
     .stage{min-height:38vh}
   }
-  @media print{ .themebtn,.panel,.orbit,.zoom{display:none} }
+  @media print{ .themebtn,.panel,.orbit,.zoom,.snap{display:none} }
 </style>
 <script>/* 主题必须在首次绘制前定好，否则会先用浅色画一遍再翻深色（闪一下） */
 try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.dataset.theme='dark'}catch(e){}</script>
@@ -305,6 +367,11 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
 <div class="app">
   <main class="stage" id="stage">
     <button class="themebtn" id="themebtn" type="button" title="切到夜晚"></button>
+    <!-- 拍照：把当前局面渲染成一张 PNG 存下来（走编辑器那套 SVG 渲染，不是截屏） -->
+    <button class="snap" id="snap" type="button" title="拍照：把当前魔方存成 PNG"
+            aria-label="拍照"><svg viewBox="0 0 24 24"><path
+      d="M4.4 7.7h2.9l1.4-2h6.6l1.4 2h2.9a1.9 1.9 0 0 1 1.9 1.9v8.5a1.9 1.9 0 0 1-1.9 1.9H4.4a1.9 1.9 0 0 1-1.9-1.9V9.6a1.9 1.9 0 0 1 1.9-1.9z"/><circle
+      cx="12" cy="13.7" r="3.5"/></svg></button>
     <div class="cube" id="cube"></div>
     <!-- 整体旋转（x / y / z）。四个方向是「へ」「く」那样的折角，摆在大按键的四周：
          无边框、只有一条折线，整块 56px 都能点；悬停时染上 accent 并放大一点。
@@ -343,8 +410,16 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     <section class="sec">
       <h2>公式</h2>
       <div class="row">
-        <input id="alg" type="text" spellcheck="false" autocomplete="off"
-               placeholder="输入公式，例如 R U R' U'">
+        <div class="algwrap">
+          <input id="alg" type="text" spellcheck="false" autocomplete="off"
+                 placeholder="输入公式，例如 R U R' U'">
+          <button class="clr" id="clr" type="button" title="清空输入框"
+                  aria-label="清空输入框"><svg viewBox="0 0 24 24"><path
+            d="M6.4 6.4l11.2 11.2M17.6 6.4L6.4 17.6"/></svg></button>
+        </div>
+        <button class="paste" id="paste" type="button" title="粘贴剪贴板里的公式"
+                aria-label="粘贴"><svg viewBox="0 0 24 24"><rect x="5.2" y="4.6" width="13.6"
+          height="16.2" rx="2.6"/><path d="M9.6 3.3h4.8a1.35 1.35 0 0 1 0 2.7H9.6a1.35 1.35 0 0 1 0-2.7z"/></svg></button>
       </div>
       <div class="run">
         <button id="fwd" type="button" title="按公式正向转动（在输入框里按回车同此）"><i>↻</i>正向</button>
@@ -386,6 +461,15 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
       <button class="play" id="play" type="button" title="从当前位置一步步自动播到末尾">
         <i>▷</i><span id="playtxt">自动播放</span>
       </button>
+      <div class="spd">
+        <label for="spd">速度</label>
+        <input type="range" id="spd" min="80" max="800" step="20" value="340">
+        <span class="val" id="spd-v">340ms</span>
+        <button class="mini" id="spd-reset" type="button" title="速度恢复默认（340ms）">默认</button>
+      </div>
+      <label class="tg" id="tg-skip" title="不播动画，直接出结果（倍速调到再快也不如它快）">
+        <input type="checkbox" id="skip"> 跳过动画
+      </label>
       <div class="ctrl">
         <button id="first" type="button" title="回到开头">⏮</button>
         <button id="prev"  type="button" title="上一步">◀</button>
@@ -431,7 +515,10 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   // 相对面必须配对：黄-白、红-橙、绿-蓝。写错就成了镜像魔方。
   var COLOR = { U: '#FFE600', D: '#F4F4F4', F: '#C41E3A',
                 B: '#FF8C1A', R: '#00A651', L: '#0051BA' };
-  var DUR = 340;                   // 转动时长，和 .layer 的 transition 一致
+  // 转动时长（毫秒）：面板里的「速度」滑条直接改它，写进 .layer 的 transition
+  var DUR_DEFAULT = 340, DUR_MIN = 80, DUR_MAX = 800;
+  var DUR = DUR_DEFAULT;
+  var skipAnim = false;            // 跳过动画：不算不问，直接出结果
 
   /* 每个动作：绕哪根 CSS 轴、正向多少度、哪些坐标算这一层。
      推导方式（以 R 为例）：模型里 R 把前面转到顶面（F->U），也就是 +z 变成 +y。
@@ -475,6 +562,7 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   var steps = [], frames = [], at = 0;   // 最近一次提交的步骤与各阶段局面
   var cur = CubeSim.solved();            // 当前局面（累积的）
   var hist = [];                         // 历史：{kind:'alg'|'scramble'|'rotate'|'move', alg}
+  var histAt = -1;                       // 当前停在历史里的哪一条（-1 = 空）
   var queue = [];                        // 单步排队：动画没转完就接着点的那些步子
   // 观察角度（可拖动）。F2L 的 b 版是「绿色为 F 面」，
   // 选到它时要把绿面转到左可见位，否则公式的 L/U 等动作会与看到的面对不上。
@@ -489,8 +577,10 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   function thumb(kind, id) {
     var f = kind === 'f2l' ? id
           : (/^\d+$/.test(id) && id.length < 2 ? '0' + id : id);
-    var size = kind === 'f2l' ? '512x515' : '512x512';
-    return kind + '/' + kind + '-' + f + '-' + size + '.png';
+    var size = kind === 'f2l' ? '256x258' : '256x256';
+    // OLL 有昼夜两版（白天紫顶 / 夜晚黄顶）
+    var tone = kind === 'oll' ? (document.documentElement.dataset.theme === 'dark' ? '-night' : '-day') : '';
+    return kind + '/' + kind + '-' + f + tone + '-' + size + '.png';
   }
 
   var pickKind = null;
@@ -510,8 +600,9 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   function saveState() {
     try {
       localStorage.setItem(STORE, JSON.stringify({
-        cur: cur, hist: hist, alg: algEl.value,
-        steps: steps, base: frames[0] || cur
+        cur: cur, hist: hist, histAt: histAt, alg: algEl.value,
+        steps: steps, base: frames[0] || cur,
+        dur: DUR, skip: skipAnim
       }));
     } catch (e) {}
   }
@@ -557,6 +648,34 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     cubeEl.style.setProperty('--cs', cs + 'px');
     cubeEl.style.setProperty('--half', (cs / 2) + 'px');
   }
+  /* ---------- 转动速度 / 跳过动画 ---------- */
+  var spdEl = document.getElementById('spd'), spdVal = document.getElementById('spd-v');
+  var spdRstEl = document.getElementById('spd-reset');
+  var skipEl = document.getElementById('skip'), tgSkip = document.getElementById('tg-skip');
+  function syncSpd() {
+    var v = Math.round(DUR);
+    spdEl.value = v;
+    spdVal.textContent = v + 'ms';
+    spdRstEl.disabled = Math.abs(v - DUR_DEFAULT) < 1;   // 已经是默认值就没什么可恢复的
+    skipEl.checked = skipAnim;
+    tgSkip.classList.toggle('on', skipAnim);
+  }
+  spdEl.addEventListener('input', function () {
+    DUR = Math.max(DUR_MIN, Math.min(DUR_MAX, +spdEl.value || 340));
+    syncSpd();
+    saveState();
+  });
+  spdRstEl.addEventListener('click', function () {
+    DUR = DUR_DEFAULT;
+    syncSpd();
+    saveState();
+  });
+  skipEl.addEventListener('change', function () {
+    skipAnim = skipEl.checked;
+    syncSpd();
+    saveState();
+  });
+
   function syncZoom() {
     document.getElementById('zin').disabled = zoom >= ZMAX - 0.001;
     document.getElementById('zout').disabled = zoom <= ZMIN + 0.001;
@@ -639,6 +758,8 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   function animate(step, done) {
     var cfg = M3[step.mv];
     if (!cfg) { done(); return; }
+    // 跳过动画：不建 .layer、不等 transition，调用方拿到的 done 是同步的
+    if (skipAnim) { done(); return; }
     var ax = cfg[0], base = cfg[1], inLayer = cfg[2];
     // times 只可能是 ±1 或 ±2，直接乘即可。
     // 之前写成 (times === 2 ? base*2 : times < 0 ? -base : base)，
@@ -680,6 +801,19 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     at = 0;
     paint(from);
     chrome();
+    // 跳过动画：整串一次算完，只画最后一帧（中间每步都重画纯属浪费）
+    if (skipAnim) {
+      var s0 = from;
+      list.forEach(function (mv) {
+        s0 = CubeSim.turn(CubeSim.clone(s0), mv.mv, mv.times);
+        frames.push(s0);
+      });
+      at = list.length;
+      paint(s0);
+      chrome();
+      if (onDone) onDone(s0);
+      return;
+    }
     var st = from, i = 0;
     (function next() {
       if (i >= list.length) { onDone(st); return; }
@@ -725,6 +859,7 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     playBtn.classList.toggle('playing', playing);
     playBtn.disabled = steps.length === 0 || (!playing && busy);
     document.getElementById('playtxt').textContent = playing ? '暂停' : '自动播放';
+    syncClr();                       // 输入框可能是被程序填进来的，这里兜一次
     var pi = playBtn.querySelector('i');
     if (pi) pi.textContent = playing ? '\u23f8' : '\u25b7';
     document.getElementById('scramble').disabled = lock;
@@ -732,17 +867,102 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     saveState();
   }
 
+  /* ---------- 历史回溯 ---------- */
+  // 一条历史 = {alg, rev}；rev 表示当时是取逆执行的
+  function histMoves(h) {
+    var mv = CubeSim.steps(h.alg);
+    return h.rev ? invert(mv) : mv;
+  }
+  // 第 i 条执行完时的局面：从复原态把 0..i 条重做一遍
+  function stateAfter(i) {
+    var st = CubeSim.solved();
+    try {
+      for (var k = 0; k <= i; k++) {
+        histMoves(hist[k]).forEach(function (x) {
+          st = CubeSim.turn(CubeSim.clone(st), x.mv, x.times);
+        });
+      }
+    } catch (e) { return null; }
+    return st;
+  }
+  // 把步骤条摆成一条公式：from = 执行前的局面，位置停在末尾。
+  // 历史回溯和「恢复现场」都用它 —— 两边的摆法必须一致。
+  function showSteps(list, from) {
+    steps = list;
+    frames = [from];
+    list.forEach(function (x) {
+      frames.push(CubeSim.turn(CubeSim.clone(frames[frames.length - 1]), x.mv, x.times));
+    });
+    at = frames.length - 1;
+    movesEl.innerHTML = steps.map(function (x, i) {
+      return '<span data-k="' + (i + 1) + '">' + mvLabel(x) + '</span>';
+    }).join('');
+  }
+  // 点历史里第 i 条：回到「这一条执行完」的局面，并把这条公式摆成可播放的步骤。
+  // 注意不填进输入框 —— 用户要的是回去看那个局面，不是重新打一遍公式。
+  function goHist(i) {
+    if (i < 0 || i >= hist.length) return;
+    var before = stateAfter(i - 1), after = stateAfter(i);
+    if (!before || !after) return;
+    epoch++;                 // 作废可能还在跑的那一步
+    queue.length = 0;
+    playing = false;
+    busy = false;
+    histAt = i;
+    cur = after;
+    showSteps(histMoves(hist[i]), before);
+    paint(cur);
+    renderHist();
+    chrome();
+  }
+
+  /* 「复制这一条」的小图标：两张叠着的纸 */
+  var CP_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+    '<rect x="8.6" y="8.6" width="11.8" height="11.8" rx="2.6"/>' +
+    '<path d="M5.6 15.4h-1A1.6 1.6 0 0 1 3 13.8V4.6A1.6 1.6 0 0 1 4.6 3h9.2a1.6 1.6 0 0 1 1.6 1.6v1"/></svg>';
+  // 复制文本：优先用 clipboard API（file:// 下没有），退路是老的 execCommand
+  function copyText(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(text);
+    }
+    return new Promise(function (resolve, reject) {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      if (ta.select) ta.select();
+      try { document.execCommand('copy'); resolve(); }
+      catch (e) { reject(e); }
+      if (ta.remove) ta.remove();
+    });
+  }
+  // 复制第 i 条的公式（就是历史里显示的那串，反向执行的也照原样复制）
+  function copyHist(i, btn) {
+    var h = hist[i];
+    if (!h) return;
+    lastCopied = h.alg;               // 读不到系统剪贴板时，粘贴键拿它顶
+    copyText(h.alg).then(function () {
+      btn.classList.add('copied');
+      setTimeout(function () { btn.classList.remove('copied'); }, 600);
+    }, function () {});
+  }
+
   function renderHist() {
     document.getElementById('hcount').textContent = hist.length;
     histEl.innerHTML = hist.length ? hist.map(function (h, i) {
       var cls = h.kind === 'scramble' ? ' sc' : h.kind === 'rotate' ? ' rt' :
                 h.kind === 'move' ? ' mv' : '';
-      return '<div class="e' + cls +
-             (i === hist.length - 1 ? ' cur' : '') +
-             '" data-i="' + i + '" title="点一下填回输入框">' +
+      // 当前停在哪一条；回溯点之后的那几条（再做动作就会被丢掉）压暗
+      if (i === histAt) cls += ' cur';
+      else if (i > histAt) cls += ' after';
+      return '<div class="e' + cls + '" data-i="' + i + '" title="' +
+             (i === histAt ? '当前就停在这一步' : '点一下回到这一步结束时的局面') + '">' +
              '<b>' + (i + 1) + '</b>' +
              (h.rev ? '<span class="tag" title="反向执行">\u21ba</span>' : '') +
-             '<span>' + esc(h.alg) + '</span></div>';
+             '<span>' + esc(h.alg) + '</span>' +
+             '<button class="cp" type="button" data-i="' + i +
+             '" title="复制这条公式" aria-label="复制这条公式">' + CP_ICON + '</button></div>';
     }).join('') : '<div class="empty">还没有记录</div>';
   }
 
@@ -769,6 +989,7 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
       list = CubeSim.steps(alg);
     } catch (e) {
       algEl.classList.add('bad');
+      errEl.classList.remove('hint');       // 真报错要用红色，别留着粘贴提示的灰
       errEl.textContent = e.message;
       return;
     }
@@ -791,13 +1012,230 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     var from = cur;
     play(list, from, function (end) {
       cur = end;
+      // 回溯到旧记录之后又做了新动作：后面那几条作废（和撤销栈一个道理），
+      // 否则 hist 折叠出来的局面和 cur 就对不上了
+      if (histAt < hist.length - 1) hist.length = histAt + 1;
       hist.push({ kind: kind || 'alg', alg: label, rev: !!rev });
+      histAt = hist.length - 1;
       renderHist();
       busy = false;
       chrome();
       drainQueue();
     });
   }
+
+  /* ---------- 粘贴 ---------- */
+  // 本页复制过的东西：浏览器不给读剪贴板时拿它顶（改成 file:// 打开也能用）
+  var lastCopied = '';
+  function pasteHint(msg) {
+    algEl.focus();
+    errEl.textContent = msg;
+    errEl.classList.add('hint');
+  }
+  function pasteIntoInput() {
+    function use(text) {
+      if (!text) return false;
+      algEl.value = String(text).replace(/[\r\n]+/g, ' ').trim();
+      algEl.classList.remove('bad');
+      errEl.textContent = '';
+      errEl.classList.remove('hint');
+      algEl.focus();
+      syncClr();
+      return true;
+    }
+    function fallback() {
+      if (use(lastCopied)) return;
+      pasteHint('这个浏览器（或这种打开方式）不让读剪贴板，按 Ctrl+V 吧');
+    }
+    if (navigator.clipboard && navigator.clipboard.readText && window.isSecureContext) {
+      navigator.clipboard.readText().then(function (t) {
+        if (!use(t)) pasteHint('剪贴板是空的');
+      }, fallback);
+    } else {
+      fallback();
+    }
+  }
+  document.getElementById('paste').addEventListener('click', pasteIntoInput);
+
+  /* ---------- 拍照：把当前局面按舞台上的样子存成 PNG ----------
+     舞台上的魔方是 CSS 3D 拼出来的，DOM 截不了图，所以自己把当前局面画成
+     SVG 再栅格化。两件事必须和舞台一模一样，否则拍出来就不是「刚看到的那个」：
+       · 视角：用和 .stage 逐字相同的变换（连矩阵都交给浏览器的 DOMMatrix 解析，
+         手写 rotateX/rotateY 很容易把先后顺序和 y 轴朝下搞反）。拖过的视角也算数。
+       · 颜色：用页面自己的 COLOR 表 —— 编辑器那套渲染里 F 面是 #C00000，
+         舞台上却是 #C41E3A，拍出来会和屏幕上的不是一个红。
+     画法照着舞台上的 CSS 来：每格先铺一层塑料壳（--cubie），再把贴纸内缩一点
+     盖上去，圆角半径都取自 .cubie i.on::after。 */
+  var SNAP_PX = 1024;
+  var SNAP_PERSP = 1400;              // 和 .stage 的 perspective 一致
+  var SNAP_GAP = 0.042;               // 贴纸相对格子的内缩（.cubie i.on::after 的 inset）
+  var SNAP_RADIUS = 0.095;            // 贴纸圆角（同上）
+  var SNAP_PAD = 0.06;                // 四周留白
+  var SNAP_CUBIE = '#16181c';         // 塑料壳，和 theme.css 的 --cubie 同值
+  // 每个法向配一组面内方向，用来铺出一格的四个角（只影响绕向，不影响形状）
+  var SNAP_UV = {
+    '1,0,0':  [[0,1,0], [0,0,1]],   '-1,0,0': [[0,1,0], [0,0,-1]],
+    '0,1,0':  [[1,0,0], [0,0,-1]],  '0,-1,0': [[1,0,0], [0,0,1]],
+    '0,0,1':  [[1,0,0], [0,1,0]],   '0,0,-1': [[1,0,0], [0,-1,0]]
+  };
+  function lineIsect(a, b, c, d) {
+    var dx1 = b[0] - a[0], dy1 = b[1] - a[1], dx2 = d[0] - c[0], dy2 = d[1] - c[1];
+    var det = dx1 * dy2 - dy1 * dx2;
+    if (!det) return [(a[0] + c[0]) / 2, (a[1] + c[1]) / 2];
+    var t = ((c[0] - a[0]) * dy2 - (c[1] - a[1]) * dx2) / det;
+    return [a[0] + dx1 * t, a[1] + dy1 * t];
+  }
+  /* 贴纸的轮廓：先在「这一格自己的平面里」画一个圆角方块（坐标以格子边长为单位，
+     中心在原点），再由调用方映射到三维、逐点投影。
+     关键：内缩和圆角都得在面内量 —— CSS 那边是 inset:0.042cs / border-radius:0.095cs，
+     都是相对方块边长的。上一版拿屏幕上的平均边长去缩，侧面被透视压扁时，
+     一缩就把整张贴纸挤成一条线、塑料缝显得特别宽，和截图对不上。 */
+  function stickerOutline(gap, radius) {
+    var a = 0.5 - gap, r = Math.max(0, Math.min(radius, a));
+    var out = [];
+    [[1, 1], [-1, 1], [-1, -1], [1, -1]].forEach(function (s, k) {
+      var cx = s[0] * (a - r), cy = s[1] * (a - r);
+      for (var i = 0; i < 3; i++) {
+        var t = (k * 90 + i * 45) * Math.PI / 180;     // 每个角取三个点连成圆弧
+        out.push([cx + r * Math.cos(t), cy + r * Math.sin(t)]);
+      }
+    });
+    return out;
+  }
+  /* 收集当前局面里「看得见」的贴纸：位置 + 颜色 + 投影后的四个角。
+     背面剔除用的是投影后法向的 z（和 .cubie i 的 backface-visibility:hidden 同一条判据）。 */
+  function snapCells() {
+    var cs = CS * zoom;                     // 每格边长（和舞台同步，缩放一起算进来）
+    /* 只让 DOMMatrix 做旋转，透视除法自己算。
+       别写成 new DOMMatrix('perspective(1400px) …').transformPoint()：
+       实测浏览器里那个 w 不除（perspective() 被吞掉），得到的是正交投影 ——
+       近的格子不会更大，整张图和舞台对不上。 */
+    var rot = new DOMMatrix('rotateX(' + view.x + 'deg) rotateY(' + view.y + 'deg)');
+    // .stage 的 perspective-origin 是 50% 48%，比魔方中心（50%）高 2% 个舞台高
+    var oy = -0.02 * stageEl.clientHeight;
+    // 模型坐标（x 右、y 上、z 朝观察者）-> 舞台像素；CSS 的 y 朝下，所以取负
+    function at(p) {
+      var q = new DOMPoint(p[0] * cs, -p[1] * cs, p[2] * cs).matrixTransform(rot);
+      var w = 1 - q.z / SNAP_PERSP;         // 透视：朝观察者(z>0)的除得小 -> 看起来更大
+      return { x: q.x / w, y: oy + (q.y - oy) / w, z: q.z };
+    }
+    var out = [];
+    for (var x = -1; x <= 1; x++) {
+      for (var y = -1; y <= 1; y++) {
+        for (var z = -1; z <= 1; z++) {
+          NALL.forEach(function (nk) {
+            var col = cur[x + ',' + y + ',' + z + '|' + nk];
+            if (!col) return;
+            var n = nk.split(',').map(Number), uv = SNAP_UV[nk];
+            var c = [x + n[0] / 2, y + n[1] / 2, z + n[2] / 2];      // 贴纸中心
+            // 背面剔除看法向（不是看中心点）—— 和 CSS 的 backface-visibility:hidden 同一条判据
+            if (at(n).z <= 0) return;
+            // 面内的 (x, y) -> 三维：中心 + x·u + y·v
+            function spot(lx, ly) {
+              var q = at([0, 1, 2].map(function (k) {
+                return c[k] + lx * uv[0][k] + ly * uv[1][k];
+              }));
+              return [q.x, q.y];
+            }
+            /* 塑料壳用「整格的直角四边形」—— 不能跟着贴纸一起倒角：
+               四个格子都倒角之后，格角上会留下一个小洞，舞台上洞后面是方块内部
+               （深色，看不出来），照片后面是白底，就会变成一个个白点、看着镂空。
+               所以这里保持直角，塑料面是严丝合缝的实心。 */
+            var quad = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(function (s) {
+              return spot(s[0] / 2, s[1] / 2);
+            });
+            var stick = stickerOutline(SNAP_GAP, SNAP_RADIUS).map(function (l) {
+              return spot(l[0], l[1]);
+            });
+            out.push({ col: col, quad: quad, sticker: stick, d: at(c).z });
+          });
+        }
+      }
+    }
+    out.sort(function (a, b) { return a.d - b.d; });     // 远的先画
+    return out;
+  }
+  function snapSvg() {
+    var polys = [], all = [];
+    snapCells().forEach(function (cell) {
+      all = all.concat(cell.quad);
+      // class 是给测试认的（也方便直接看图）：整格是塑料壳，里面那圈是贴纸
+      polys.push({ pts: cell.quad, fill: SNAP_CUBIE, cls: 'frame' });
+      polys.push({ pts: cell.sticker, fill: COLOR[cell.col], cls: 'sticker' });
+    });
+    var xs = all.map(function (p) { return p[0]; }), ys = all.map(function (p) { return p[1]; });
+    var minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs);
+    var minY = Math.min.apply(null, ys), maxY = Math.max.apply(null, ys);
+    var pad = SNAP_PAD * Math.max(maxX - minX, maxY - minY);
+    var scale = SNAP_PX / ((maxX - minX) + pad * 2);
+    var W = SNAP_PX, H = Math.round(((maxY - minY) + pad * 2) * scale);
+    var body = polys.map(function (p) {
+      var pts = p.pts.map(function (q) {
+        return ((q[0] - minX + pad) * scale).toFixed(2) + ',' +
+               ((q[1] - minY + pad) * scale).toFixed(2);
+      }).join(' ');
+      return '<polygon class="' + p.cls + '" points="' + pts + '" fill="' + p.fill + '"/>';
+    }).join('');
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W + ' ' + H +
+           '" width="' + W + '" height="' + H + '">' +
+           '<rect width="' + W + '" height="' + H + '" fill="#ffffff"/>' + body + '</svg>';
+  }
+  function snapName() {
+    var t = new Date(), p = function (n) { return (n < 10 ? '0' : '') + n; };
+    var alg = (algEl.value || '').replace(/[^\w']+/g, '-').replace(/^-+|-+$/g, '');
+    return 'cube-' + (alg ? alg + '-' : '') + t.getFullYear() + p(t.getMonth() + 1) +
+           p(t.getDate()) + '-' + p(t.getHours()) + p(t.getMinutes()) + p(t.getSeconds()) + '.png';
+  }
+  function snapHint(msg) {
+    errEl.textContent = msg;
+    errEl.classList.add('hint');
+  }
+  function takePhoto() {
+    var svg = snapSvg();
+    var dim = svg.match(/viewBox="0 0 (\d+(?:\.\d+)?) (\d+(?:\.\d+)?)"/) || [];
+    var w = parseFloat(dim[1]) || SNAP_PX, h = parseFloat(dim[2]) || SNAP_PX;
+    var url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }));
+    var img = new Image();
+    img.onload = function () {
+      var cv = document.createElement('canvas');
+      cv.width = w; cv.height = h;
+      var g = cv.getContext('2d');
+      if (g) {
+        g.fillStyle = '#ffffff';
+        g.fillRect(0, 0, w, h);
+        g.drawImage(img, 0, 0, w, h);
+      }
+      URL.revokeObjectURL(url);
+      cv.toBlob(function (b) {
+        if (!b) { snapHint('拍照失败，换 SVG 的话用编辑器的导出'); return; }
+        var name = snapName();
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(b);
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        if (a.remove) a.remove();
+        setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+        snapHint('已保存 ' + name + '（' + w + '×' + h + '）');
+      }, 'image/png');
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); snapHint('拍照失败'); };
+    img.src = url;
+  }
+  document.getElementById('snap').addEventListener('click', takePhoto);
+
+  /* ---------- 清空输入框 ---------- */
+  var clrEl = document.getElementById('clr');
+  function syncClr() { clrEl.disabled = !algEl.value; }
+  clrEl.addEventListener('click', function () {
+    algEl.value = '';
+    algEl.classList.remove('bad');
+    errEl.textContent = '';
+    errEl.classList.remove('hint');
+    algEl.focus();
+    syncClr();
+  });
+  algEl.addEventListener('input', syncClr);       // 手打也要跟着亮/灰
 
   /* ---------- 单步 / 整体旋转：点一下就执行，动画没完就排队 ---------- */
   // 一次转动 340ms，连点一串（R U R' U'）时人手比动画快得多，
@@ -841,6 +1279,7 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     view.x = VIEW.x;
     view.y = VIEW.y;
     hist = [];
+    histAt = -1;
     steps = [];
     frames = [CubeSim.solved()];
     at = 0;
@@ -863,6 +1302,13 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     if (next < 0 || next > steps.length) { if (done) done(false); return; }
     var my = epoch;
     var mv = steps[dir > 0 ? at : next];
+    if (skipAnim) {                 // 跳过动画：直接落位
+      at = next;
+      paint(frames[at]);
+      chrome();
+      if (done) done(true);
+      return;
+    }
     animate({ mv: mv.mv, times: dir > 0 ? mv.times : -mv.times }, function () {
       // 这一步播放途中被「跳到某处」打断了，就不要再改位置
       if (my !== epoch) { if (done) done(false); return; }
@@ -897,6 +1343,13 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     // 必须先判 playing：播放中 busy 也是 true，先判 busy 就永远暂停不了
     if (playing) { playing = false; chrome(); return; }
     if (busy || !steps.length) return;
+    // 跳过动画时「自动播放」= 直接到最后（没有动画可看，一步步跳没意义）
+    if (skipAnim) {
+      at = steps.length;
+      paint(frames[at]);
+      chrome();
+      return;
+    }
     // 已经播到底了，再按就从头来一遍
     if (at >= steps.length) {
       at = 0;
@@ -979,6 +1432,7 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     // 只填入，不执行 —— 让用户自己确认方向（正向/反向）再按
     algEl.value = el.dataset.alg;
     algEl.focus();
+    syncClr();
   });
 
   document.getElementById('scramble').addEventListener('click', scramble);
@@ -1005,10 +1459,14 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     chrome();
   });
   histEl.addEventListener('click', function (e) {
+    // 复制键排在前面判断：点它只复制，不回溯
+    var cp = e.target.closest ? e.target.closest('.cp') : null;
+    if (cp) { copyHist(+cp.dataset.i, cp); return; }
     var el = e.target.closest ? e.target.closest('.e') : null;
     if (!el) return;
-    algEl.value = hist[+el.dataset.i].alg;
-    algEl.focus();
+    // 和别的按钮同一套：连播中先停下，动画中先等它跑完（再点一次才动）
+    if (pausedFirst() || busy) return;
+    goHist(+el.dataset.i);
   });
   document.addEventListener('keydown', function (e) {
     // Esc 收公式表：不管光标在哪儿都管用（包括正在输入框里打字）
@@ -1025,9 +1483,10 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   /* 拖拽转动视角 */
   var drag = null;
   stageEl.addEventListener('pointerdown', function (e) {
-    // 箭头和主题按钮都不能触发拖拽 —— 一旦 setPointerCapture，
-    // 后续指针事件会被重定向到舞台，click 就落不到按钮上了
-    if (e.target.closest && e.target.closest('.orbit button, .zoom button, .themebtn')) return;
+    // 舞台上的按钮都不能触发拖拽 —— 一旦 setPointerCapture，
+    // 后续指针事件会被重定向到舞台，click 就落不到按钮上了。
+    // 新加按钮（拍照就是这么栽的）记得补进这个清单：漏一个 = 点了没反应。
+    if (e.target.closest && e.target.closest('.orbit button, .zoom button, .snap, .themebtn')) return;
     drag = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y };
     stageEl.classList.add('drag');
     if (stageEl.setPointerCapture) stageEl.setPointerCapture(e.pointerId);
@@ -1046,8 +1505,11 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
 
   /* 夜晚模式 */
   var root = document.documentElement, btn = document.getElementById('themebtn');
+  // 切主题时把选公式栏里已经画出来的缩略图换成另一套
+  function syncThumbs() { renderPick(); }
   function applyTheme(t) {
     root.dataset.theme = t;
+    syncThumbs();        // 切主题时把图/缩略图换成另一套（OLL 分昼夜两版）
     btn.title = t === 'dark' ? '切到白天' : '切到夜晚';
     try { localStorage.setItem('cube-theme', t); } catch (e) {}
   }
@@ -1123,19 +1585,18 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   } else (function () {
     // 没有 hash：有存档就恢复现场，否则从头开始
     var d = loadSaved();
-    if (!d) { reset(); return; }
+    if (!d) { reset(); syncSpd(); return; }
     cur = d.cur;
     hist = Array.isArray(d.hist) ? d.hist : [];
+    // 停在历史里的哪一条：存档里有就用它（回溯过之后刷新，位置也要留住）
+    histAt = (typeof d.histAt === 'number' && d.histAt >= 0 && d.histAt < hist.length)
+             ? d.histAt : hist.length - 1;
     algEl.value = typeof d.alg === 'string' ? d.alg : '';
-    steps = Array.isArray(d.steps) ? d.steps : [];
-    frames = [d.base || cur];
-    steps.forEach(function (x) {
-      frames.push(CubeSim.turn(CubeSim.clone(frames[frames.length - 1]), x.mv, x.times));
-    });
-    at = frames.length - 1;
-    movesEl.innerHTML = steps.map(function (x, i) {
-      return '<span data-k="' + (i + 1) + '">' + mvLabel(x) + '</span>';
-    }).join('');
+    // 速度 / 跳过动画也是「设置」，跟着存档回来
+    if (isFinite(d.dur)) DUR = Math.max(DUR_MIN, Math.min(DUR_MAX, +d.dur));
+    skipAnim = !!d.skip;
+    syncSpd();
+    showSteps(Array.isArray(d.steps) ? d.steps : [], d.base || cur);
     paint(cur);
     renderHist();
     chrome();

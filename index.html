@@ -92,31 +92,31 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
       </span>
     </a>
     <a class="card" href="calc.html">
-      <span class="thumb"><img src="f2l/f2l-05a-512x515.png" alt="魔方计算器"></span>
+      <span class="thumb"><img src="f2l/f2l-05a-256x258.png" alt="魔方计算器"></span>
       <span>
         <h2>计算器</h2>
       </span>
     </a>
     <a class="card" href="practice.html">
-      <span class="thumb"><img src="pll/pll-T-512x512.png" alt="魔方练习"></span>
+      <span class="thumb"><img src="pll/pll-T-256x256.png" alt="魔方练习"></span>
       <span>
         <h2>练习</h2>
       </span>
     </a>
     <a class="card" href="f2l.html">
-      <span class="thumb"><img src="f2l/f2l-01a-512x515.png" alt="F2L"></span>
+      <span class="thumb"><img src="f2l/f2l-01a-256x258.png" alt="F2L"></span>
       <span>
         <h2>F2L<span class="n">39</span></h2>
       </span>
     </a>
     <a class="card" href="oll.html">
-      <span class="thumb"><img src="oll/oll-01-512x512.png" alt="OLL"></span>
+      <span class="thumb"><img src="oll/oll-01-day-256x256.png" alt="OLL" id="ollthumb"></span>
       <span>
         <h2>OLL<span class="n">57</span></h2>
       </span>
     </a>
     <a class="card" href="pll.html">
-      <span class="thumb"><img src="pll/pll-Aa-512x512.png" alt="PLL"></span>
+      <span class="thumb"><img src="pll/pll-Aa-256x256.png" alt="PLL"></span>
       <span>
         <h2>PLL<span class="n">21</span></h2>
       </span>
@@ -131,6 +131,9 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   function applyTheme(t) {
     root.dataset.theme = t;
     btn.title = t === 'dark' ? '切到白天' : '切到夜晚';
+    // 首页那张 OLL 卡片也是 OLL 图，跟着主题换紫/黄顶（别的地方是 SVG/单版图）
+    var ot = document.getElementById('ollthumb');
+    if (ot) ot.src = 'oll/oll-01-' + (t === 'dark' ? 'night' : 'day') + '-256x256.png';
     try { localStorage.setItem('cube-theme', t); } catch (e) {}
   }
   var saved = null;

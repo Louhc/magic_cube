@@ -130,7 +130,7 @@ console.log('\n[8] F2L 角标：显示去掉前导 0，文件名不动');
   const imgs = fs.readdirSync(path.join(ROOT, 'f2l'))
     .filter(f => f.endsWith('.png'));
   ok('磁盘上仍是 01a 这种命名（' + imgs.length + ' 张）',
-    imgs.includes('f2l-01a-512x515.png') && imgs.includes('f2l-21b-512x515.png'),
+    imgs.includes('f2l-01a-256x258.png') && imgs.includes('f2l-21b-256x258.png'),
     imgs.slice(0, 3).join(','));
 }
 
@@ -759,7 +759,8 @@ console.log('\n[19] 公式页的打印按钮');
     ok(p + ' 点了调 window.print()',
       /getElementById\('printbtn'\)\.addEventListener\('click', function \(\) \{ window\.print\(\); \}\)/.test(h));
     // 打印出来当然不能再印这个按钮（主题开关也一样）
-    ok(p + ' 打印时不印按钮', /@media print\{[\s\S]*?\.themebtn,\.printbtn\{display:none\}/.test(h));
+    ok(p + ' 打印时不印按钮',
+      /@media print\{[\s\S]*?\.themebtn,\.printbtn(,\.opts)?\{display:none\}/.test(h));
     // 摆在主题开关左边，别叠上去
     ok(p + ' 和主题开关并排、互不重叠',
       /\.themebtn\{position:absolute;right:16px;top:16px\}/.test(h) &&
@@ -767,6 +768,355 @@ console.log('\n[19] 公式页的打印按钮');
     // 打印那套配色由 theme.css 统一给白底黑字，页面里不应该再写回颜色
     ok(p + ' 打印样式没把配色写死回页面', !/--[\w-]+\s*:\s*#/.test(h.slice(h.indexOf('@media print'))));
   });
+  // 导航条是 nav.js 注入的，公式页自己的打印规则管不到它 ——
+  // 不藏的话速查表打出来最上面会多一条彩色横条
+  const navCss = fs.readFileSync(path.join(ROOT, 'nav.css'), 'utf8');
+  ok('打印时导航条和回到顶部都不印（nav.css 统一管，七页共用）',
+    /@media print\{ \.topnav, \.totop\{display:none\} \}/.test(navCss));
+}
+
+
+console.log('\n[20] OLL 图的昼夜两版 + 图片尺寸/体积');
+{
+  // 白天紫顶、夜晚黄顶：两张图除了顶面颜色完全一样，页面按主题挑
+  const oll = fs.readFileSync(path.join(ROOT, 'oll.html'), 'utf8');
+  ok('OLL 页按主题挑图（白天 day / 夜晚 night）',
+    /var tone = document\.documentElement\.dataset\.theme === 'dark' \? 'night' : 'day';/.test(oll) &&
+    /return 'oll\/oll-' \+ f \+ '-' \+ tone \+ '-256x256\.png';/.test(oll));
+  ok('切主题时把已经画出来的图也换掉（否则要刷新才对）',
+    /function syncOllImages\(\)/.test(oll) &&
+    /root\.dataset\.theme = t;\s*\n\s*syncOllImages\(\);/.test(oll) &&
+    /data-oll="' \+ esc\(n\)/.test(oll));
+  // 练习页 / 计算器选公式栏里的 OLL 缩略图也一样
+  ['practice.html', 'calc.html'].forEach(p => {
+    const h = fs.readFileSync(path.join(ROOT, p), 'utf8');
+    ok(p + ' 的 OLL 缩略图也分昼夜两版',
+      /kind === 'oll' \? \(?document\.documentElement\.dataset\.theme === 'dark' \? '-night' : '-day'\)?/.test(h));
+  });
+
+  // 图片本身：尺寸、存在、体积
+  const pngSize = f => {
+    const b = fs.readFileSync(f);
+    return { w: b.readUInt32BE(16), h: b.readUInt32BE(20), bytes: b.length };
+  };
+  const dirs = { f2l: [256, 258], oll: [256, 256], pll: [256, 256] };
+  let total = 0, big = [], wrong = [], missing = [];
+  Object.keys(dirs).forEach(k => {
+    const [w, h] = dirs[k];
+    fs.readdirSync(path.join(ROOT, k)).filter(f => f.endsWith('.png')).forEach(f => {
+      const p = path.join(ROOT, k, f);
+      const d = pngSize(p);
+      total += d.bytes;
+      if (d.w !== w || d.h !== h) wrong.push(f + '=' + d.w + 'x' + d.h);
+      if (d.bytes > 40 * 1024) big.push(f + '=' + Math.round(d.bytes / 1024) + 'KB');
+    });
+  });
+  ok('三种图的尺寸分别是 256x258 / 256x256 / 256x256', wrong.length === 0, wrong.slice(0, 3).join(' '));
+  ok('单张都不超过 40KB（现在是 3~13KB）', big.length === 0, big.slice(0, 3).join(' '));
+  ok('全部图片合计 < 1.5MB（512 那版是 5.2MB）',
+    total < 1.5 * 1024 * 1024, (total / 1048576).toFixed(2) + 'MB');
+  // OLL 两版成对存在
+  const ollImgs = fs.readdirSync(path.join(ROOT, 'oll')).filter(f => f.endsWith('.png'));
+  const days = ollImgs.filter(f => f.includes('-day-')).length;
+  const nights = ollImgs.filter(f => f.includes('-night-')).length;
+  ok('OLL 昼夜两版各 57 张（共 ' + ollImgs.length + ' 张）',
+    days === 57 && nights === 57, days + ' / ' + nights);
+  // 引用的文件都得在
+  const refs = new Set();
+  ['f2l.html', 'oll.html', 'pll.html', 'practice.html', 'calc.html', 'index.html'].forEach(p => {
+    const h = fs.readFileSync(path.join(ROOT, p), 'utf8');
+    (h.match(/(?:f2l|oll|pll)\/[\w.-]+\.png/g) || []).forEach(m => refs.add(m));
+  });
+  const miss = [...refs].filter(r => !fs.existsSync(path.join(ROOT, r)));
+  ok('页面里引用的图片都存在（' + refs.size + ' 个引用）', miss.length === 0, miss.slice(0, 3).join(' '));
+}
+
+
+console.log('\n[21] PLL 页的「显示颜色」开关 + 无色图');
+{
+  const pll = fs.readFileSync(path.join(ROOT, 'pll.html'), 'utf8');
+  // 样式是「滑动开关」：一条轨道 + 一个滑块（和主题开关同一套语言）。
+  // 真勾选框藏起来（视觉由 .on 决定），但 Tab 还能走到、:focus-within 给焦点圈。
+  ok('PLL 页标题下有个「显示颜色」开关（滑动开关：轨道 + 滑块）',
+    /<label class="tg" id="tg-colors"[\s\S]{0,160}?<input type="checkbox" id="showcolors" checked> 显示颜色/.test(pll) &&
+    /\.tg::before\{content:'';position:absolute;left:0;top:50%;width:36px;height:20px/.test(pll) &&
+    /\.tg\.on::after\{transform:translateX\(16px\)/.test(pll) &&
+    /\.tg input\{position:absolute;width:1px;height:1px;margin:0;opacity:0/.test(pll) &&
+    /\.tg:focus-within::before\{outline:2px solid var\(--accent-text\)/.test(pll));
+  ok('关掉时用另一套图（文件名带 -nc-）',
+    /var nc = showColors \? '' : \(document\.documentElement\.dataset\.theme === 'dark' \? '-nc-night' : '-nc'\);/.test(pll) &&
+    /return 'pll\/pll-' \+ f \+ nc \+ '-256x256\.png';/.test(pll));
+  // 显示颜色时只有一张图（箭头压在黄色顶面上，白天夜里都看得清）——
+  // 曾经多生成过一套彩色夜晚版，是多余的，磁盘上不该再有
+  ok('彩色版不分昼夜：磁盘上没有「彩色夜晚」图',
+    !/var nc = showColors \? \(/.test(pll) &&
+    fs.readdirSync(path.join(ROOT, 'pll'))
+      .filter(f => /-night-256x256\.png$/.test(f) && !/-nc-night-/.test(f)).length === 0);
+  ok('开关摆在右上角，主题按钮下面（和计算器的相机同一竖列）',
+    /\.opts\{position:absolute;right:16px;top:56px;display:flex;justify-content:flex-end\}/.test(pll) &&
+    /\.themebtn\{position:absolute;right:16px;top:16px\}/.test(pll) &&
+    /<div class="opts">[\s\S]{0,220}?id="showcolors"/.test(pll));
+  // 持久化：先读存档决定首次渲染，切开关再写回去
+  ok('开关状态存在 pll-color-v1，先读存档再渲染',
+    /var COLOR_KEY = 'pll-color-v1';/.test(pll) &&
+    /showColors = localStorage\.getItem\(COLOR_KEY\) !== '0';/.test(pll) &&
+    pll.indexOf('localStorage.getItem(COLOR_KEY)') < pll.indexOf('document.getElementById(\'app\')')) ;
+  ok('切开关会写回存档',
+    /localStorage\.setItem\(COLOR_KEY, showColors \? '1' : '0'\)/.test(pll));
+  ok('切开关不重画整张表，只换图片地址',
+    /function syncPllImages\(\)[\s\S]{0,200}?querySelectorAll\('#app img\[data-pll\]'\)/.test(pll) &&
+    /data-pll="' \+ esc\(n\)/.test(pll));
+  // 无色图分昼夜，所以切主题也得把已画出来的图换掉
+  ok('切主题时无色图跟着换成夜晚黄箭头那版',
+    /function applyTheme\(t\)[\s\S]{0,140}?syncPllImages\(\);/.test(pll) &&
+    /root\.dataset\.theme = t;\s*\n\s*syncPllImages\(\);/.test(pll));
+  ok('打印时不印这个开关', /@media print\{[\s\S]*?\.themebtn,\.printbtn,\.opts\{display:none\}/.test(pll));
+
+  // 图片：每个 PLL 编号三张 —— 彩色 / 无色白天（紫箭头）/ 无色夜晚（黄箭头）
+  const src = pll.match(/var SECTIONS = (\[[\s\S]*?\n\]);/);
+  const ids = [...(src ? src[1] : '').matchAll(/"([A-Za-z]{1,2})",\s*"/g)].map(m => m[1]);
+  const uniq = [...new Set(ids)];
+  const miss = [], wrong = [];
+  uniq.forEach(id => {
+    ['', '-nc', '-nc-night'].forEach(v => {
+      const f = 'pll/pll-' + id + v + '-256x256.png';
+      if (!fs.existsSync(path.join(ROOT, f))) miss.push(f);
+      else {
+        const b = fs.readFileSync(path.join(ROOT, f));
+        if (b.readUInt32BE(16) !== 256 || b.readUInt32BE(20) !== 256) {
+          wrong.push(f + '=' + b.readUInt32BE(16) + 'x' + b.readUInt32BE(20));
+        }
+      }
+    });
+  });
+  ok('每个 PLL 编号都有三版：彩色 + 无色白天 + 无色夜晚（' + uniq.length + ' × 3 张）',
+    uniq.length >= 21 && miss.length === 0, miss.slice(0, 3).join(' '));
+  ok('三版尺寸都是 256x256', wrong.length === 0, wrong.slice(0, 3).join(' '));
+  // 磁盘上不能有多余的图（旧版 512 的、彩色夜晚的），数量正好 21 × 3
+  const allPng = fs.readdirSync(path.join(ROOT, 'pll')).filter(f => f.endsWith('.png'));
+  ok('pll/ 下正好 ' + (uniq.length * 3) + ' 张图，没有多余旧图',
+    allPng.length === uniq.length * 3 &&
+    allPng.every(f => /^pll-[A-Za-z]{1,2}(-nc(-night)?)?-256x256\.png$/.test(f)),
+    allPng.length + ' 张');
+  // 无色版应当明显更"轻"：颜色去掉后不透明像素少得多
+  const ncDir = allPng.filter(f => f.includes('-nc'));
+  ok('磁盘上有 ' + (uniq.length * 2) + ' 张无色图（白天+夜晚），单张都很小（约 5KB）',
+    ncDir.length === uniq.length * 2 &&
+    ncDir.every(f => fs.statSync(path.join(ROOT, 'pll', f)).size < 12 * 1024),
+    ncDir.length + ' 张');
+  // 夜晚那 21 张必须是黄箭头版 —— 和白天那版像素不同，否则等于没换
+  const same = uniq.filter(id => {
+    const a = fs.readFileSync(path.join(ROOT, 'pll/pll-' + id + '-nc-256x256.png'));
+    const b = fs.readFileSync(path.join(ROOT, 'pll/pll-' + id + '-nc-night-256x256.png'));
+    return a.equals(b);
+  });
+  ok('无色夜晚版和白天版确实不一样（换了箭头颜色）', same.length === 0, same.slice(0, 3).join(' '));
+
+  /* 光看文件名和体积看不出"图根本没换色"——Aa 的夜晚图就曾经是白天那张，
+     页面照常打开、测试全绿。所以这里自己把 PNG 解开，核箭头到底是什么颜色。
+     这批图都是 8 位调色板 PNG（216 张全是），解码只要几十行。 */
+  const zlib = require('zlib');
+  const decodePng = file => {
+    const b = fs.readFileSync(path.join(ROOT, file));
+    let p = 8, w = 0, h = 0, bd = 0, ct = 0, plte = null, trns = null;
+    const idat = [];
+    while (p + 8 <= b.length) {
+      const len = b.readUInt32BE(p), type = b.toString('ascii', p + 4, p + 8);
+      const data = b.slice(p + 8, p + 8 + len);
+      if (type === 'IHDR') { w = data.readUInt32BE(0); h = data.readUInt32BE(4); bd = data[8]; ct = data[9]; }
+      else if (type === 'PLTE') plte = data;
+      else if (type === 'tRNS') trns = data;
+      else if (type === 'IDAT') idat.push(data);
+      p += 12 + len;
+    }
+    if (bd !== 8 || ct !== 3) throw new Error(file + ': 不是 8 位调色板 PNG (' + bd + '/' + ct + ')');
+    const raw = zlib.inflateSync(Buffer.concat(idat));
+    const idx = Buffer.alloc(w * h);
+    for (let y = 0; y < h; y++) {
+      const ft = raw[y * (w + 1)];
+      const line = raw.slice(y * (w + 1) + 1, y * (w + 1) + 1 + w);
+      for (let x = 0; x < w; x++) {
+        const a = x ? idx[y * w + x - 1] : 0;
+        const bb = y ? idx[(y - 1) * w + x] : 0;
+        const c = (x && y) ? idx[(y - 1) * w + x - 1] : 0;
+        let v = line[x];
+        if (ft === 1) v += a;
+        else if (ft === 2) v += bb;
+        else if (ft === 3) v += (a + bb) >> 1;
+        else if (ft === 4) {
+          const q = a + bb - c, pa = Math.abs(q - a), pb = Math.abs(q - bb), pc = Math.abs(q - c);
+          v += (pa <= pb && pa <= pc) ? a : (pb <= pc ? bb : c);
+        } else if (ft !== 0) throw new Error(file + ': 未知行过滤器 ' + ft);
+        idx[y * w + x] = v & 255;
+      }
+    }
+    // 按 RGBA 数颜色；alpha 取 tRNS（没写就是全不透明）
+    const counts = new Map();
+    for (let i = 0; i < idx.length; i++) {
+      const k = idx[i], o = k * 3;
+      const alpha = trns && k < trns.length ? trns[k] : 255;
+      const key = plte[o] + ',' + plte[o + 1] + ',' + plte[o + 2] + ',' + alpha;
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    return { w, h, counts };
+  };
+  const hueSat = (r, g, b) => {
+    const mx = Math.max(r, g, b) / 255, mn = Math.min(r, g, b) / 255, d = mx - mn;
+    let h = 0;
+    if (d) {
+      if (mx === r / 255) h = ((g - b) / 255 / d) % 6;
+      else if (mx === g / 255) h = (b - r) / 255 / d + 2;
+      else h = (r - g) / 255 / d + 4;
+      if (h < 0) h += 6;
+      h *= 60;
+    }
+    return [h, mx ? d / mx : 0];
+  };
+  // 无色图的箭头紫（hue 235~290, S>0.2）/ 夜晚换成的 #FFE600 / 彩色版顶面的黄
+  const tally = file => {
+    const { counts } = decodePng(file);
+    let purple = 0, night = 0, top = 0;
+    counts.forEach((n, k) => {
+      const v = k.split(',').map(Number);
+      if (v[3] <= 128) return;
+      const hs = hueSat(v[0], v[1], v[2]);
+      if (hs[0] >= 235 && hs[0] <= 290 && hs[1] > 0.2) purple += n;
+      if (v[0] === 255 && v[1] === 230 && v[2] === 0) night += n;
+      if (v[0] >= 250 && v[1] >= 225 && v[1] <= 235 && v[2] <= 10) top += n;
+    });
+    return { purple, night, top };
+  };
+  const purpleBad = [], nightBad = [], pairBad = [], topBad = [];
+  uniq.forEach(id => {
+    const day = tally('pll/pll-' + id + '-nc-256x256.png');
+    const nit = tally('pll/pll-' + id + '-nc-night-256x256.png');
+    const col = tally('pll/pll-' + id + '-256x256.png');
+    if (day.purple < 500 || day.night) purpleBad.push(id + ':' + day.purple + '紫/' + day.night + '黄');
+    if (nit.night < 500 || nit.purple) nightBad.push(id + ':' + nit.night + '黄/' + nit.purple + '紫');
+    if (day.purple !== nit.night) pairBad.push(id + ':' + day.purple + '≠' + nit.night);
+    if (col.top < 5000) topBad.push(id + ':' + col.top);
+  });
+  ok('无色白天版：箭头确实还是紫的、一点黄都没有（' + uniq.length + ' 张）',
+    purpleBad.length === 0, purpleBad.slice(0, 3).join(' '));
+  ok('无色夜晚版：箭头确实是 #FFE600、一个紫像素都没有',
+    nightBad.length === 0, nightBad.slice(0, 3).join(' '));
+  ok('夜晚版就是把白天版那些紫像素原样染黄（逐张计数一一对应）',
+    pairBad.length === 0, pairBad.slice(0, 3).join(' '));
+  ok('彩色版顶面还是黄的（没被无色那套规则误伤）',
+    topBad.length === 0, topBad.slice(0, 3).join(' '));
+}
+
+console.log('\n[22] 计算器舞台：四周的按钮互不重叠');
+{
+  /* 舞台四角一共摆着 9 个浮动按钮：主题开关、拍照，四个方向的整体旋转折角
+     （n/s/w/e），两个滚转（z1/z2），右下角还有一摞放大缩小。
+     它们全是 position:absolute，谁跟谁叠上只能靠算 —— 拍照键最早摆在左上角,
+     正好压在「整体逆时针滚 z'」那个 56px 的大按键上。这里按 CSS 声明的
+     位置把矩形算出来，两两核一遍。 */
+  const calc = fs.readFileSync(path.join(ROOT, 'calc.html'), 'utf8');
+  // 抠出 <style>，再把 @media 整块和注释删掉（打印那块的 .snap{display:none}
+  // 会盖住真正的定位规则，注释里也可能有花括号）
+  const strip = t => {
+    let out = '', i = 0;
+    while (i < t.length) {
+      if (t.startsWith('@media', i)) {
+        let j = t.indexOf('{', i), depth = 0;
+        if (j < 0) break;
+        for (; j < t.length; j++) {
+          if (t[j] === '{') depth++;
+          else if (t[j] === '}' && --depth === 0) { j++; break; }
+        }
+        i = j;
+      } else if (t[i] === '/' && t[i + 1] === '*') {
+        const j = t.indexOf('*/', i + 2);
+        i = j < 0 ? t.length : j + 2;
+      } else out += t[i++];
+    }
+    return out;
+  };
+  const css = strip(calc.slice(calc.indexOf('<style>'), calc.indexOf('</style>')));
+  // 同一个选择器可能出现在好几条规则里（.snap 的定位和宽高就分在两处），
+  // 按 CSS 的规矩合并：后面的同名属性盖前面。取值时也要取最后一条。
+  const rules = {};
+  for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    m[1].split(',').forEach(sel => {
+      const k = sel.trim();
+      rules[k] = rules[k] === undefined ? m[2] : rules[k] + ';' + m[2];
+    });
+  }
+  const decl = (sel, prop) => {
+    if (rules[sel] === undefined) throw new Error('calc.html 里找不到规则 ' + sel);
+    const all = [...rules[sel].matchAll(new RegExp('(?:^|;)\\s*' + prop + '\\s*:\\s*([^;]+)', 'g'))];
+    return all.length ? all[all.length - 1][1].trim() : null;
+  };
+  const val = (sel, prop, base) => {
+    const v = decl(sel, prop);
+    if (v === null) return null;
+    return /%$/.test(v) ? parseFloat(v) / 100 * base : parseFloat(v);
+  };
+  const size = sel => {
+    const w = parseFloat(decl(sel, 'width')), h = parseFloat(decl(sel, 'height'));
+    if (!(w > 0) || !(h > 0)) throw new Error(sel + ' 的宽高没读出来');
+    return [w, h];
+  };
+  const rect = (sel, w, h, W, H) => {
+    const tf = decl(sel, 'transform') || '';
+    const l = val(sel, 'left', W), r = val(sel, 'right', W);
+    const t = val(sel, 'top', H), b = val(sel, 'bottom', H);
+    let x = l !== null ? l : W - r - w;
+    let y = t !== null ? t : H - b - h;
+    if (/translateX\(-50%\)/.test(tf)) x -= w / 2;
+    if (/translateY\(-50%\)/.test(tf)) y -= h / 2;
+    return { sel, x, y, w, h };
+  };
+  // 主题开关的宽高在 nav.css（body .themebtn），页面里只有位置
+  const [obW, obH] = size('.orbit button');
+  const zoomBtns = ((calc.match(/<div class="zoom">([\s\S]*?)<\/div>/) || [])[1] || '')
+    .match(/<button/g) || [];
+  const [zbW, zbH] = size('.zoom button');
+  const items = [
+    ['.themebtn', 56, 28],                       // nav.css: body .themebtn
+    ['.snap', ...size('.snap')],
+    ['.orbit .n', obW, obH], ['.orbit .s', obW, obH],
+    ['.orbit .w', obW, obH], ['.orbit .e', obW, obH],
+    ['.orbit .z1', obW, obH], ['.orbit .z2', obW, obH],
+    // 右下角那摞是 grid：n 个按钮 + (n-1) 个 gap
+    ['.zoom', zbW, zoomBtns.length * zbH + Math.max(0, zoomBtns.length - 1) *
+      parseFloat(decl('.zoom', 'gap'))],
+  ];
+  ok('舞台上的浮动按钮都认得出来（主题开关/拍照/6 个整体旋转/缩放那摞）',
+    items.length === 9 && zoomBtns.length === 3, items.length + ' 个, 缩放 ' + zoomBtns.length + ' 个');
+  const overlap = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w &&
+                           a.y < b.y + b.h && b.y < a.y + a.h;
+  // 舞台宽高：页面右侧固定 322px 面板，所以常见桌面是「窗口宽-322」；
+  // 窄屏（<760px）会变成上下排，舞台占满宽度。
+  // 注：舞台高低于 ~350px 时，左右两个折角（.w/.e，竖着居中）和右下角那摞
+  // 缩放本身就会挤上（老问题，和拍照键无关），所以这里只核 ≥360px 的尺寸；
+  // 拍照键单独再核一遍小尺寸（它在右上角，不会碰到中间那两个）。
+  const sizes = [[1200, 800], [900, 640], [760, 560], [640, 420], [560, 360]];
+  const bad = [], snapBad = [];
+  const all = sizes.concat([[438, 360], [380, 320], [520, 260], [360, 240]]);
+  all.forEach(([W, H]) => {
+    const rs = items.map(([sel, w, h]) => rect(sel, w, h, W, H));
+    for (let i = 0; i < rs.length; i++) {
+      for (let j = i + 1; j < rs.length; j++) {
+        if (!overlap(rs[i], rs[j])) continue;
+        const pair = [rs[i].sel, rs[j].sel].sort().join('×');
+        if (sizes.some(([w2, h2]) => w2 === W && h2 === H)) bad.push(W + '×' + H + ' ' + pair);
+        if (pair.indexOf('.snap') >= 0) snapBad.push(W + '×' + H + ' ' + pair);
+      }
+    }
+  });
+  ok('常见舞台尺寸（' + sizes.length + ' 种）下四周按钮两两不叠',
+    bad.length === 0, bad.slice(0, 3).join(' | '));
+  // 这次报的就是这个：拍照键压在「整体逆时针滚 z'」上
+  ok('拍照键在任何尺寸下都不和别的按钮叠（连更小的舞台也算）',
+    snapBad.length === 0, snapBad.slice(0, 3).join(' | '));
+  // 这条是这次的 bug 本身：拍照键摆在左上角 = 压在 z1（整体逆时针滚）上
+  ok('拍照键在右上角和主题开关并排（不再压着「整体逆时针滚 z\'」）',
+    /\.snap\{position:absolute;right:80px;top:14px/.test(calc) &&
+    !/\.snap\{[^}]*left:14px/.test(calc));
+  ok('拍照键打印时不印', /@media print\{ \.themebtn,\.panel,\.orbit,\.zoom,\.snap\{display:none\} \}/.test(calc));
 }
 
 console.log('\n结果: ' + pass + ' 通过, ' + fail + ' 失败');

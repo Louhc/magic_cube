@@ -52,7 +52,10 @@ body > .app{height:calc(100% - var(--nav-h))}
 }
 .totop.on{opacity:1; pointer-events:auto; transform:none}
 .totop:hover{border-color:var(--line-strong, #aaa)}
-@media print{ .totop{display:none} }
+/* 打印：导航条和回到顶部都不印（导航是注入进来的第一条，不藏的话
+   公式表打出来最上面会多一条彩色横条）。导航占的是文档流里的位置，
+   藏掉之后正文自然上移，不需要再补什么。 */
+@media print{ .topnav, .totop{display:none} }
 
 /* ---------- 当前页的蓝色框：一个会滑动的 .pill ----------
    链接自己不再画背景，背景统一交给 .links 里这个绝对定位的圆角方块。

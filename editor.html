@@ -158,10 +158,23 @@
   .row input[type=color]::-webkit-color-swatch-wrapper{padding:0}
   .row input[type=color]::-webkit-color-swatch{border:none;border-radius:5px}
 
-  .tg{display:inline-flex;align-items:center;gap:6px;background:var(--field);border:1px solid var(--line);
-      border-radius:8px;padding:6px 10px;cursor:pointer;color:var(--muted);font-size:12.5px;user-select:none}
-  .tg input{accent-color:var(--accent);margin:0}
-  .tg.on{color:var(--text);border-color:var(--accent-text)}
+  /* 开关（显示颜色 / 跳过动画 / 明暗…）：一条轨道 + 一个滑块，和主题开关同一套语言。
+     真勾选框藏起来（视觉由 .on 决定），但保留键盘可达性：Tab 能走到，:focus-within 给焦点圈。 */
+  .tg{position:relative;display:inline-flex;align-items:center;padding:1px 0 1px 44px;
+      cursor:pointer;color:var(--muted);font-size:12.5px;user-select:none;
+      transition:color .12s ease}
+  .tg input{position:absolute;width:1px;height:1px;margin:0;opacity:0;pointer-events:none}
+  .tg::before{content:'';position:absolute;left:0;top:50%;width:36px;height:20px;margin-top:-10px;
+              box-sizing:border-box;border-radius:10px;background:var(--line);
+              border:1px solid var(--line-strong);
+              transition:background .15s ease,border-color .15s ease}
+  .tg::after{content:'';position:absolute;left:2px;top:50%;width:16px;height:16px;margin-top:-8px;
+             border-radius:50%;background:var(--panel);box-shadow:0 1px 3px #00000033;
+             transition:transform .18s cubic-bezier(.34,.86,.32,1),background .15s ease}
+  .tg:hover,.tg.on{color:var(--text)}
+  .tg.on::before{background:var(--accent);border-color:var(--accent)}
+  .tg.on::after{transform:translateX(16px);background:var(--on-accent, #fff)}
+  .tg:focus-within::before{outline:2px solid var(--accent-text);outline-offset:2px}
 
   .btns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   button.act{background:var(--field);color:var(--text);border:1px solid var(--line);border-radius:8px;
