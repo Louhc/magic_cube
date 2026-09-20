@@ -56,18 +56,21 @@ PAGES.forEach(p => {
     html.includes('href="nav.css"') && html.includes('src="nav.js"'));
 });
 
-console.log('\n[4b] 首页的 GitHub 源码链接');
+console.log('\n[4b] 首页的 GitHub 纸带');
 {
   const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
-  const m = html.match(/class="ghbtn"[^>]*?href="([^"]+)"/);
-  ok('首页有 GitHub 图标按钮', !!m, '没找到 .ghbtn');
+  const m = html.match(/class="ghribbon"><a href="([^"]+)"/);
+  ok('首页有 GitHub 纸带', !!m, '没找到 .ghribbon');
   ok('指向本仓库、新窗口打开',
     !!m && /^https:\/\/github\.com\/Louhc\/magic_cube\/?$/.test(m[1]) &&
-    /class="ghbtn"[\s\S]{0,200}?target="_blank"/.test(html) &&
-    /class="ghbtn"[\s\S]{0,200}?rel="noopener"/.test(html),
+    /class="ghribbon"[\s\S]{0,200}?target="_blank"/.test(html) &&
+    /class="ghribbon"[\s\S]{0,200}?rel="noopener"/.test(html),
     m && m[1]);
-  ok('图标是内联 SVG（不引外部图片）',
-    /class="ghbtn"[\s\S]{0,400}?<svg[^>]*viewBox="0 0 16 16"/.test(html));
+  ok('斜贴在右上角（旋转 45° + 裁剪框 overflow:hidden）',
+    /\.ghribbon\{[^}]*top:0[^}]*right:0[^}]*overflow:hidden/.test(html) &&
+    /\.ghribbon a\{[^}]*transform:rotate\(45deg\)/.test(html));
+  ok('导航条让出右内边距（否则会被纸带压住）',
+    /\.topnav\{padding-right:\d+px\}/.test(html));
 }
 
 console.log('\n[5] 导航样式表存在且定义了当前页高亮');{
