@@ -362,9 +362,9 @@ console.log('\n[13] 练习页：显示的图形必须是「从复原态执行该
   ok('题目图形取自 apply(solved, 公式)',
     /CubeSim\.apply\(CubeSim\.solved\(\), exec\)/.test(html), '不是从复原态算的');
   // F2L 的 b 版按「绿色为 F 面」写，等价于 y + 公式 + y'（共轭，会真的改局面）
-  ok('F2L 的 b 版按 y+公式+y\' 执行',
-    /scope === 'f2l' && \/b\$\/\.test\(r\[0\]\)\) \? \('y ' \+ r\[1\] \+ " y'"\)/.test(html),
-    'b 版没有做共轭');
+  ok('F2L 的 b 版按 y + 公式 执行',
+    /scope === 'f2l' && \/b\$\/\.test\(r\[0\]\)\) \? \('y ' \+ r\[1\]\)/.test(html),
+    'b 版没有在前面加 y');
   ok('看答案会从复原态播一遍',
     /function reveal\(\)/.test(html) && /var st = CubeSim\.solved\(\);/.test(html));
   ok('导航里有练习页',
@@ -416,7 +416,7 @@ console.log('\n[13] 练习页：显示的图形必须是「从复原态执行该
     const row = ctx5.ALG_LIST[kind5].find(r => r[0] === parts[1]);
     // b 版要按共轭执行，期望值同样处理
     const want5 = (kind5 === 'f2l' && /b$/.test(parts[1]))
-      ? ('y ' + row[1] + " y'") : row[1];
+      ? ('y ' + row[1]) : row[1];
     // sameState 定义在 [12] 的块作用域里，这里自己比
     const eqState = (a, b) => {
       const ka = Object.keys(a).sort(), kb = Object.keys(b).sort();
@@ -747,6 +747,12 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
     ok('从公式表跳过来会先复原（不接着上次的局面）',
       /var hashAlg/.test(fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')) &&
       /if \(hashAlg\) \{[\s\S]{0,200}?reset\(\)/.test(fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')));
+    // F2L 的 b 版以绿面为 F：链接带 @g: 前缀，计算器按 y 公式 y' 填进输入框
+    ok('公式表的链接会给 b 版打绿面标记',
+      /@g:' \+ encodeURIComponent\(alg\)|'@g:'/.test(src2) ||
+      fs.readFileSync(path.join(__dirname, '..', 'f2l.html'), 'utf8').indexOf('@g:') >= 0);
+    ok('计算器认识 @g: 前缀并做共轭',
+      /indexOf\('@g:'\) === 0/.test(src2) && /hashGreen \? \('y ' \+ hashAlg\)/.test(src2));
     ok('计算器会读取 hash 里的公式',
       /location\.hash/.test(fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')));
     // 带上 hash 打开时，输入框应当被填好

@@ -873,17 +873,21 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   // 从公式表点「↗」跳过来时会带 hash。这时要从干净状态开始：
   // 复原魔方 + 清空历史，只把公式填进输入框 —— 否则会接着上次那个
   // 不相干的局面往下做，公式也就不是从复原态执行了。
-  var hashAlg = '';
+  var hashAlg = '', hashGreen = false;
   (function () {
     var h = location.hash || '';
-    if (h.length > 1) {
-      try { hashAlg = decodeURIComponent(h.slice(1)); } catch (e) { hashAlg = h.slice(1); }
-    }
+    if (h.length <= 1) return;
+    h = h.slice(1);
+    // F2L 的 b 版公式按「绿色为 F 面」写，链接会带 @g: 前缀
+    if (h.indexOf('@g:') === 0) { hashGreen = true; h = h.slice(3); }
+    try { hashAlg = decodeURIComponent(h); } catch (e) { hashAlg = h; }
   })();
   if (hashAlg) {
     try { localStorage.removeItem(STORE); } catch (e) {}
     reset();                 // 复原 + 清空历史（reset 里也会清存档）
-    algEl.value = hashAlg;
+    // 绿面为 F 的公式：在前面加一个整体旋转 y（会真的改局面）。
+    // 直接填处理后的写法 —— 看得见的就是会执行的。
+    algEl.value = hashGreen ? ('y ' + hashAlg) : hashAlg;
     algEl.focus();
   } else (function () {
     // 没有 hash：有存档就恢复现场，否则从头开始
