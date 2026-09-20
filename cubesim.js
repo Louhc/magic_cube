@@ -139,9 +139,58 @@ var CubeSim = (function () {
     return out;
   }
 
+  /* ---------- 净旋转：公式做完后整体转了多少 ---------- */
+  function centers(st) {
+    return {
+      U: st['0,1,0|0,1,0'], D: st['0,-1,0|0,-1,0'],
+      F: st['0,0,1|0,0,1'], B: st['0,0,-1|0,0,-1'],
+      R: st['1,0,0|1,0,0'], L: st['-1,0,0|-1,0,0']
+    };
+  }
+
+  // 24 种整体旋转（x/y/z 序列），去重后正好 24 个 —— 用来读公式的净旋转。
+  // 生成方式照抄 tools/cubesim.py 的 _all_rotations。
+  var ROTS = (function () {
+    var seen = {}, out = [];
+    function stateKey(st) {
+      return Object.keys(st).sort().map(function (k) { return k + ':' + st[k]; }).join(';');
+    }
+    function visit(s) {
+      s = s.trim();
+      var k = stateKey(apply(solved(), s));
+      if (!seen[k]) { seen[k] = 1; out.push(s); }
+    }
+    var frontier = [''];
+    for (var depth = 0; depth < 3; depth++) {
+      var nxt = [];
+      frontier.forEach(function (s) {
+        ['x', 'y', 'z'].forEach(function (mv) {
+          [1, 2, 3].forEach(function (t) {
+            nxt.push(s + ' ' + mv + (t === 1 ? '' : t === 2 ? '2' : "'"));
+          });
+        });
+      });
+      frontier = nxt;
+    }
+    visit('');
+    frontier.forEach(visit);
+    return out;
+  })();
+
+  // 公式的净旋转（'' 表示没有）。做法和 tools/cubesim.py 一致：
+  // 看做完公式后中心块转到哪，和 24 种整体旋转逐一比对。
+  function netRotation(alg) {
+    var want = JSON.stringify(centers(apply(solved(), alg)));
+    for (var i = 0; i < ROTS.length; i++) {
+      if (JSON.stringify(centers(apply(solved(), ROTS[i]))) === want) return ROTS[i];
+    }
+    return '';
+  }
+
   return {
     solved: solved, clone: clone, turn: turn, parse: parse, steps: steps,
-    apply: apply, facelets: facelets, FACES: FACES, SLOTS: SLOTS
+    apply: apply, facelets: facelets, FACES: FACES, SLOTS: SLOTS,
+    centers: centers, ROTS: ROTS, netRotation: netRotation
   };
 })();
 

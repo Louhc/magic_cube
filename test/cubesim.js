@@ -47,6 +47,28 @@ console.log('\n[2] 公式解析');
   ok('看不懂的动作会抛错', (() => { try { S.steps('R Q'); return false; } catch (e) { return true; } })());
 }
 
+console.log('\n[2b] 净旋转');
+{
+  ok('ROTS 正好 24 种整体旋转', S.ROTS.length === 24);
+  ok('无净旋转的公式返回空串',
+    S.netRotation("R U R' U'") === '' && S.netRotation("(R U R')") === '');
+  ok('Aa 的净旋转是 x x x（即 x\'）',
+    S.netRotation("x' R2 D2 (R' U' R) D2 (R' U R')") === 'x x x');
+  ok("含 y' 的公式净旋转是 x x' y'（即 y'）",
+    S.netRotation("(R U R' U') y' (r' U' R U) M'") === "x x' y'");
+  ok("含 y 的公式净旋转是 x x' y（即 y）",
+    S.netRotation("(L F' L' F) (L' U2 L U) y (L U L')") === "x x' y");
+  // 净旋转的逆能把转偏的复原态扳回标准朝向（Aa 本身还有角块置换，所以只核对中心）
+  const Aa = "x' R2 D2 (R' U' R) D2 (R' U R')";
+  const r2b = S.netRotation(Aa);
+  const rinv2b = S.steps(r2b).slice().reverse().map(x => ({ mv: x.mv, times: -x.times }));
+  let st2b = S.apply(S.solved(), Aa);
+  rinv2b.forEach(x => { st2b = S.turn(st2b, x.mv, x.times); });
+  const c2b = S.centers(st2b);
+  ok('Aa 后补净旋转的逆，中心朝向回到标准',
+    c2b.U === 'U' && c2b.F === 'F', JSON.stringify(c2b));
+}
+
 console.log('\n[3] 与 Python 版对拍（基准数据由 tools/cubesim.py 固化）');
 {
   const fx = JSON.parse(fs.readFileSync(path.join(__dirname, 'cubesim.fixture.json'), 'utf8'));
@@ -777,10 +799,17 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
     ok('点击公式先执行逆（无动画）',
       /invert\(fwd\)\.forEach\(function \(x\) \{/.test(src2) &&
       /cur = CubeSim\.turn\(cur, x\.mv, x\.times\);/.test(src2));
+    // 带整体旋转的公式（Aa 的 x'）要先把净旋转补上，再在正向末尾补净旋转的逆
+    ok('读取公式净旋转并补上（局面与图同朝向）',
+      /var r = CubeSim\.netRotation\(hashAlg\);/.test(src2) &&
+      /if \(r\) cur = CubeSim\.apply\(cur, r\);/.test(src2));
+    ok('正向末尾补净旋转的逆（结束回到标准复原态）',
+      /var rinv = invert\(CubeSim\.steps\(r\)\);/.test(src2) &&
+      /run\(fwd\.concat\(rinv\), hashAlg, 'alg', false\);/.test(src2));
     ok('逆执行完再正向播一遍（动画）',
-      /run\(fwd, hashAlg, 'alg', false\);/.test(src2));
+      /run\(fwd\.concat\(rinv\), hashAlg, 'alg', false\);/.test(src2));
     ok('正向播放前先停 2 秒',
-      /setTimeout\(function \(\) \{\s*run\(fwd, hashAlg, 'alg', false\);/.test(src2) &&
+      /setTimeout\(function \(\) \{\s*run\(fwd\.concat\(rinv\), hashAlg, 'alg', false\);/.test(src2) &&
       /\}, 2000\)/.test(src2));
     ok('计算器会读取 hash 里的公式',
       /location\.hash/.test(fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')));

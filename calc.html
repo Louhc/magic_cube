@@ -910,17 +910,24 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     // 视角跟着补同样角度（y 在 CSS 是 rotateY(-90)，视角补 +90），画面看着不变。
     try {
       var fwd = CubeSim.steps(hashAlg);
+      // 公式可能带整体旋转（如 Aa 的 x'、21b 的 y'）：做完公式魔方会整体转偏，
+      // 结束时 F 面不再是红色。处理：先把净旋转 r 作用到复原态上、再做公式的逆，
+      // 这样摆出的局面和图片同一朝向（普通公式黄朝上、绿面公式绿朝前）；
+      // 正向播完公式后，再补一步净旋转的逆 r⁻¹，把转偏的朝向扳回标准复原态。
+      var r = CubeSim.netRotation(hashAlg);
+      var rinv = invert(CubeSim.steps(r));
       if (hashGreen) {
-        cur = CubeSim.apply(cur, 'y');
+        cur = CubeSim.apply(cur, 'y');        // 绿面转到前面
         view.y = view.y + 90;
       }
+      if (r) cur = CubeSim.apply(cur, r);
       invert(fwd).forEach(function (x) {
         cur = CubeSim.turn(cur, x.mv, x.times);
       });
       // 先让用户看清「公式要解的局面」，停 2 秒再正向播动画
       paint(cur);
       setTimeout(function () {
-        run(fwd, hashAlg, 'alg', false);
+        run(fwd.concat(rinv), hashAlg, 'alg', false);
       }, 2000);
     } catch (e) {
       // 公式不合法：退回旧行为，只填进输入框，不执行
