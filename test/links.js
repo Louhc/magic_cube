@@ -78,6 +78,12 @@ console.log('\n[4b] 首页的 GitHub 纸带');
   ok('GitHub 经典黑白配色',
     /\.ghribbon a\{[^}]*background:#24292f[^}]*color:#fff/.test(html) &&
     /html\[data-theme="dark"\] \.ghribbon a\{background:#f0f6fc;color:#24292f\}/.test(html));
+  ok('悬浮时加阴影，且阴影有过渡',
+    /\.ghribbon a\{[^}]*box-shadow:[^;}]+[^}]*transition:background \.12s, box-shadow/.test(html) &&
+    /\.ghribbon a:hover\{[^}]*box-shadow:/.test(html));
+  // 夜里的底色是深的，黑色阴影压上去看不见 —— 得换成白色光晕
+  ok('夜里悬浮靠光晕（黑阴影在深色底上等于没有）',
+    /html\[data-theme="dark"\] \.ghribbon a:hover\{[^}]*box-shadow:[^}]*#ffffff/.test(html));
 }
 
 console.log('\n[5] 导航样式表存在且定义了当前页高亮');
@@ -172,6 +178,33 @@ console.log('\n[11] 公式表的单元格不能用 display:flex');
   });
 }
 
+console.log('\n[11b] 「在计算器里打开」的按钮：图标要真、平时要淡');
+{
+  // 原来是个 ↗ 文字符号套个边框，看着像表格里掉了个框。现在是内联 SVG 图标
+  // （跟着 currentColor 走，白天/夜晚不用各写一套）+ 固定大小的圆钮。
+  ['f2l.html', 'oll.html', 'pll.html'].forEach(p => {
+    const h = fs.readFileSync(path.join(ROOT, p), 'utf8');
+    const icon = h.match(/var CALC_ICON = ('(?:[^'\\]|\\.)*'(?:\s*\+\s*'(?:[^'\\]|\\.)*')*);/);
+    const svg = icon ? [...icon[1].matchAll(/'((?:[^'\\]|\\.)*)'/g)].map(m => m[1]).join('') : '';
+    ok(p + ' 的按钮是内联 SVG 图标', /^<svg [^>]*viewBox="0 0 24 24"/.test(svg) &&
+      /stroke="currentColor"/.test(svg) && /fill="currentColor"/.test(svg), svg.slice(0, 40));
+    ok(p + ' 的图标是完整闭合的 XML', /<\/svg>$/.test(svg) &&
+      (svg.match(/</g) || []).length === (svg.match(/>/g) || []).length, svg.slice(-12));
+    ok(p + ' 的图标带了无障碍名字（title + aria-label）',
+      /" title="' \+ tip/.test(h) && /" aria-label="' \+ tip/.test(h));
+    ok(p + ' 的按钮不再用 ↗ 文字符号', !/[\u2197]/.test(h) &&
+      /'" aria-label="' \+ tip \+ '">' \+ CALC_ICON/.test(h));
+    // 一个表格里几十个这种钮，常亮会抢公式的戏：默认淡，指到行/钮才实心
+    ok(p + ' 的按钮默认压暗（opacity:.55）', /a\.tocalc\{[^}]*opacity:\.55/.test(h));
+    ok(p + ' 指到那一行时按钮亮起', /tr:hover a\.tocalc,a\.tocalc:hover,a\.tocalc:focus-visible\{opacity:1\}/.test(h));
+    ok(p + ' 钮本身悬浮时填成 accent 实心、文字用 --on-accent（黄底压白字看不清）',
+      /a\.tocalc:hover,a\.tocalc:focus-visible\{color:var\(--on-accent, #fff\);background:var\(--accent\)/.test(h));
+    ok(p + ' 触屏（没有 hover）时不做淡出，按钮常亮',
+      /@media \(hover:none\)\{a\.tocalc\{opacity:1\}\}/.test(h));
+    ok(p + ' 打印时不印按钮', /@media print\{[\s\S]*?a\.tocalc\{display:none\}/.test(h));
+  });
+}
+
 console.log('\n[12] 每个页面的内联脚本都必须能通过语法检查');
 {
   // 为一个真事故加的：生成器里的转义被多吃了一层，oll.html / pll.html
@@ -245,7 +278,8 @@ console.log('\n[14] 导航高亮框：会滑动的 .pill');
       insertBefore(c) { this.children.unshift(c); return c; },
       setAttribute(k, v) { this[k] = v; },
       getAttribute(k) { return this[k]; },
-      addEventListener(t, fn) { (this._h = this._h || {})[t] = fn; },
+      addEventListener(t, fn) { (this._e = this._e || {});
+                              (this._e[t] = this._e[t] || []).push(fn); },
       querySelectorAll() { return []; }, querySelector() { return null; },
       closest() { return null; }
     };
@@ -261,7 +295,8 @@ console.log('\n[14] 导航高亮框：会滑动的 .pill');
       body, documentElement: el('html'), createElement: el,
       getElementById: () => null, querySelectorAll: () => [],
       readyState: 'loading',          // 让 nav.js 走 DOMContentLoaded 那条路
-      addEventListener(t, fn) { (this._h = this._h || {})[t] = fn; }
+      addEventListener(t, fn) { (this._e = this._e || {});
+                              (this._e[t] = this._e[t] || []).push(fn); }
     };
     const pending = [];
     const ctx = {
@@ -284,8 +319,8 @@ console.log('\n[14] 导航高亮框：会滑动的 .pill');
       ctx, body, links, store, pill: links.children[0], pending,
       linkAt: i => links.children[i + 1],       // [0] 是 .pill
       active: links.children.find(c => c.className === 'on'),
-      domReady: () => { if (doc._h && doc._h.DOMContentLoaded) doc._h.DOMContentLoaded(); },
-      click: doc._h.click
+      domReady: () => (doc._e.DOMContentLoaded || []).forEach(fn => fn()),
+      click: e => (doc._e.click || []).forEach(fn => fn(e))
     };
   }
 
@@ -469,8 +504,9 @@ console.log('\n[14] 导航高亮框：会滑动的 .pill');
       /\.topnav \.pill\{[^}]*position:absolute[^}]*transition:transform/.test(css));
     ok('链接压在方块上面（z-index:1）',
       /\.topnav a\{[^}]*z-index:1/.test(css));
-    ok('当前项底色改由 .pill 提供（链接自身不再画背景）',
-      /\.topnav a\.on\{color:#fff\}/.test(css) && !/\.topnav a\.on\{background/.test(css));
+    ok('当前项底色改由 .pill 提供（链接自身不再画背景，字色跟着 --on-accent）',
+      /\.topnav a\.on\{color:var\(--on-accent, #fff\)\}/.test(css) &&
+      !/\.topnav a\.on\{background/.test(css));
     ok('悬停不再加背景（否则会盖在蓝框上、看着发灰）',
       /\.topnav a:hover\{color:var\(--text, #222\)\}/.test(css) &&
       !/\.topnav a:hover\{[^}]*background/.test(css));
@@ -489,22 +525,24 @@ console.log('\n[14] 导航高亮框：会滑动的 .pill');
 
 console.log('\n[15] 各页的明暗底色约定必须一致');
 {
-  // editor.html 的 :root 基础配色是深色（别的页都是浅色，靠 [data-theme="dark"] 覆盖），
-  // 而它的预设脚本原来只写 dark 分支 —— 白天时 data-theme 不设，页面就落到深色底：
-  // 于是「切到编辑器会莫名其妙变成黑夜」。
-  // 这里对每个页面真跑一遍 <head> 里的预设脚本，算出实际生效的 --bg，再核对三档存档。
+  // 颜色变量现在都在 theme.css 里（七页共用一份），所以这里读的是它。
+  // 这一节仍然对每个页面真跑一遍 <head> 里的预设脚本，算出实际生效的 --bg，
+  // 再核对三档存档 —— 脚本、属性、变量三者得对上，缺一处就会「切页面变配色」。
   const vm = require('vm');
+  const themeCss = fs.readFileSync(path.join(ROOT, 'theme.css'), 'utf8');
 
   const headThemeScript = h => {
     const head = h.slice(0, h.indexOf('</head>'));
     return [...head.matchAll(/<script>([\s\S]*?)<\/script>/g)]
       .map(m => m[1]).filter(b => b.includes('cube-theme')).join('\n');
   };
-  const bgOf = (h, key) => {
+  // 注意 (?:^|\n)：theme.css 的打印块里也有「:root,html[data-theme="dark"]{」，
+  // 不锚行首就会读到打印那套白底
+  const bgOf = key => {
     const re = key === ':root'
-      ? /:root\{[^}]*?--bg:\s*(#[0-9a-fA-F]{6})/
-      : new RegExp('html\\[data-theme="' + key + '"\\]\\{[^}]*?--bg:\\s*(#[0-9a-fA-F]{6})');
-    const m = h.match(re);
+      ? /(?:^|\n):root\{[^}]*?--bg:\s*(#[0-9a-fA-F]{6})/
+      : new RegExp('(?:^|\\n)html\\[data-theme="' + key + '"\\]\\{[^}]*?--bg:\\s*(#[0-9a-fA-F]{6})');
+    const m = themeCss.match(re);
     return m ? m[1] : null;
   };
   const isDark = hex => {
@@ -520,7 +558,7 @@ console.log('\n[15] 各页的明暗底色约定必须一致');
     vm.runInContext(headThemeScript(h), ctx);
     const t = el.dataset.theme;
     // data-theme 没设时，生效的是 :root 的基础值
-    const bg = (t ? bgOf(h, t) : null) || bgOf(h, ':root');
+    const bg = (t ? bgOf(t) : null) || bgOf(':root');
     return { theme: t || '(未设)', bg: bg, dark: isDark(bg) };
   }
 
@@ -546,12 +584,12 @@ console.log('\n[15] 各页的明暗底色约定必须一致');
   }
 }
 
-console.log('\n[16] 白天模式用的是那套暖粉配色');
+console.log('\n[16] 调色板：两套主题都在 theme.css 里，层次和对比度都得站得住');
 {
-  // 用户指定的四色。盯三件事：四色都真用上了、正文是深灰、
-  // 以及 accent 的对比度。accent 既当底色配白字、又当文字色，
-  // #E2B4BD 原色两边都不够（1.8:1 / 1.7:1），所以用了同色系加深过的。
-  const PALETTE = ['#fff5f5', '#f7d6d0', '#e2b4bd', '#4a4a4a'];
+  // 换配色只需要改 theme.css 一个文件，所以这里读的也是它。
+  // 盯的是「关系」而不是具体色号 —— 卡面要比页面亮、正文压卡面要够清楚、
+  // --on-accent 压在 accent 实心底上要够清楚……色号本身随便换。
+  const css = fs.readFileSync(path.join(ROOT, 'theme.css'), 'utf8');
   function lum(hex) {
     const ch = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255)
       .map(c => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)));
@@ -561,38 +599,173 @@ console.log('\n[16] 白天模式用的是那套暖粉配色');
     const s = [lum(a), lum(b)].sort((m, n) => n - m);
     return (s[0] + 0.05) / (s[1] + 0.05);
   }
-  function lightVars(h) {
-    // 编辑器的白天写在 html[data-theme="light"] 里，别的页就是 :root
-    const m = h.match(/html\[data-theme="light"\]\{([\s\S]*?)\n  \}/) ||
-              h.match(/:root\{([\s\S]*?)\n  \}/);
+  const vars = re => {
+    const m = css.match(re);
+    if (!m) return null;
     const out = {};
     [...m[1].matchAll(/(--[\w-]+)\s*:\s*(#[0-9a-fA-F]{6,8})/g)]
       .forEach(x => { out[x[1]] = x[2].toLowerCase(); });
     return out;
-  }
+  };
+  const light = vars(/(?:^|\n):root\{([\s\S]*?)\n\}/);
+  const dark = vars(/(?:^|\n)html\[data-theme="dark"\]\{([\s\S]*?)\n\}/);
+  ok('theme.css 里有白天和夜晚两套变量', !!light && !!dark);
 
+  if (light && dark) {
+    // 两套必须给出同一批变量名 —— 少一个，那一套主题下就会掉回浏览器默认值
+    ok('两套主题定义的变量名完全一致',
+      Object.keys(light).sort().join() === Object.keys(dark).sort().join(),
+      '只在一套里有的：' + Object.keys(light).filter(k => !dark[k])
+        .concat(Object.keys(dark).filter(k => !light[k])).sort().join(' '));
+    ok('--accent-text 默认跟着 --accent（只有当「当底」和「当文字」要分两档时才覆盖）',
+      /--accent-text\s*:\s*var\(--accent\)/.test(css));
+
+    [['白天', light, ['#eef1ff', '#d2daff', '#aac4ff', '#b1b2ff'], '#d2daff', '#3a3f73'],
+     ['夜晚', dark, ['#222831', '#393e46', '#ffd369', '#eeeeee'], '#222831', '#eeeeee']
+    ].forEach(([name, v, PALETTE, wantBg, wantText]) => {
+      const surface = v['--card'] || v['--panel'];
+      const at = v['--accent-text'] || v['--accent'];   // accent 当文字用的那一档
+      const missing = PALETTE.filter(c => !Object.values(v).includes(c));
+      ok(name + '：指定的四色都用上了', missing.length === 0, '缺 ' + missing.join(' '));
+      ok(name + '：页面底是 ' + wantBg, v['--bg'] === wantBg, v['--bg']);
+      ok(name + '：卡面比页面亮一档（卡片才分得出来）',
+        lum(surface) > lum(v['--bg']), 'bg=' + v['--bg'] + ' 卡面=' + surface);
+      // 计算器 / 练习 / 编辑器里，占满屏的是舞台不是 --bg
+      ok(name + '：舞台不比卡面亮',
+        !v['--stage'] || lum(v['--stage']) <= lum(surface),
+        '舞台=' + v['--stage'] + ' 卡面=' + surface);
+      ok(name + '：正文是 ' + wantText, v['--text'] === wantText, v['--text']);
+      ok(name + '：正文压卡面够清楚（' + contrast(v['--text'], surface).toFixed(1) + ':1）',
+        contrast(v['--text'], surface) >= 7, '正文=' + v['--text'] + ' on ' + surface);
+      // 次要文字（表头、说明、图上的编号）—— 最容易糊的就是这一档
+      ok(name + '：次要文字压卡面够清楚（' + contrast(v['--muted'], surface).toFixed(1) + ':1）',
+        contrast(v['--muted'], surface) >= 4.5, 'muted=' + v['--muted'] + ' on ' + surface);
+      // accent 当底、上面压 --on-accent 的字（药丸、标签、选中的按钮…）
+      ok(name + '：--on-accent 压 accent 实心底够清楚（' +
+        contrast(v['--on-accent'], v['--accent']).toFixed(1) + ':1）',
+        contrast(v['--on-accent'], v['--accent']) >= 4.5,
+        'on-accent=' + v['--on-accent'] + ' on ' + v['--accent']);
+      ok(name + '：accent 当文字压卡面够清楚（' + contrast(at, surface).toFixed(1) + ':1）',
+        contrast(at, surface) >= 4.5, 'accent=' + at + ' on ' + surface);
+      ok(name + '：accent 当文字压页面底不算糊（' + contrast(at, v['--bg']).toFixed(1) + ':1）',
+        contrast(at, v['--bg']) >= 3, 'accent=' + at + ' on ' + v['--bg']);
+      ok(name + '：描边色和卡面不是一个色（不然表格没有边）',
+        v['--line'] !== surface && v['--line-strong'] !== surface);
+    });
+  }
+}
+
+console.log('\n[16b] 换配色只改 theme.css 一处');
+{
+  // 「以后想调颜色更方便」就靠这一节守着：颜色变量只许在 theme.css 里定义。
+  // 谁在自己页面里又写一套 --bg，改一处就会漏掉一页。
   PAGES.forEach(p => {
-    const v = lightVars(fs.readFileSync(path.join(ROOT, p), 'utf8'));
-    const used = Object.values(v);
-    const surface = v['--card'] || v['--panel'];
-    ok(p + ' 白天把四色都用上了',
-      PALETTE.every(c => used.includes(c)),
-      '缺 ' + PALETTE.filter(c => !used.includes(c)).join(' '));
-    ok(p + ' 白天页面底是柔粉 #f7d6d0', v['--bg'] === '#f7d6d0', v['--bg']);
-    // 卡面必须是暖白，不能是纯白 —— 纯白放在这套暖调里太跳（原来就是这个问题）
-    ok(p + ' 白天卡面是暖白 #fff5f5（不是纯白）', surface === '#fff5f5', '卡面=' + surface);
-    ok(p + ' 页面比卡面深一档（卡片才不会糊在底色上）',
-      lum(v['--bg']) < lum(surface), 'bg=' + v['--bg'] + ' 卡面=' + surface);
-    ok(p + ' 白天正文是深灰 #4a4a4a', v['--text'] === '#4a4a4a', v['--text']);
-    ok(p + ' 白天 accent 配白字够清楚（' + contrast(v['--accent'], '#ffffff').toFixed(1) + ':1）',
-      contrast(v['--accent'], '#ffffff') >= 4.5, 'accent=' + v['--accent']);
-    ok(p + ' 白天 accent 当文字压卡面够清楚（' +
-      contrast(v['--accent'], surface).toFixed(1) + ':1）',
-      contrast(v['--accent'], surface) >= 4.5, 'accent=' + v['--accent'] + ' on ' + surface);
-    // 页面上偶尔也会当文字/图标用（悬停之类），放宽到大字号标准
-    ok(p + ' 白天 accent 压页面底也不算糊（' +
-      contrast(v['--accent'], v['--bg']).toFixed(1) + ':1）',
-      contrast(v['--accent'], v['--bg']) >= 3, 'accent=' + v['--accent'] + ' on ' + v['--bg']);
+    const h = fs.readFileSync(path.join(ROOT, p), 'utf8');
+    ok(p + ' 链了 theme.css', /<link rel="stylesheet" href="theme\.css">/.test(h));
+    const first = Math.min(...['theme.css', 'nav.css', '<style>']
+      .map(x => h.indexOf(x)).filter(i => i >= 0));
+    ok(p + ' 的 theme.css 排在 nav.css 和页面 <style> 之前（页面要能盖住它）',
+      h.indexOf('theme.css') === first,
+      'theme.css@' + h.indexOf('theme.css') + ' 最早@' + first);
+    const style = h.slice(h.indexOf('<style>'), h.indexOf('</style>'));
+    const own = [...style.matchAll(/(--[\w-]+)\s*:\s*[^;{}]*#[0-9a-fA-F]{3,8}/g)].map(m => m[1]);
+    ok(p + ' 页面里没有自己定义颜色变量', own.length === 0, own.join(' '));
+  });
+  // 打印也是一套配色，同样归 theme.css —— 速查表打印出来要白底黑字，
+  // 而且得压得住夜晚那套（:root 压不过 html[data-theme="dark"]，所以两个选择器都列上）
+  const css = fs.readFileSync(path.join(ROOT, 'theme.css'), 'utf8');
+  ok('theme.css 里带打印用的白底黑字，且能压过夜晚那套',
+    /@media print\{[\s\S]*?:root,html\[data-theme="dark"\]\{[\s\S]*?--bg:#fff/.test(css));
+  ['f2l.html', 'oll.html', 'pll.html'].forEach(p => {
+    const h = fs.readFileSync(path.join(ROOT, p), 'utf8');
+    const pr = h.slice(h.indexOf('@media print'));
+    ok(p + ' 的打印块只管版式，不再自己写颜色', !/--[\w-]+\s*:\s*#/.test(pr));
+  });
+}
+
+console.log('\n[17] 白天 / 夜晚开关（滑动式，七页共用一份标记和样式）');
+{
+  const nav = fs.readFileSync(path.join(ROOT, 'nav.js'), 'utf8');
+  const css = fs.readFileSync(path.join(ROOT, 'nav.css'), 'utf8');
+
+  ok('nav.js 给 #themebtn 注入标记（滑块 + 两端图标）',
+    /getElementById\('themebtn'\)/.test(nav) &&
+    /'<span class="tk"><\/span>'/.test(nav) &&
+    /class="ti sun"/.test(nav) && /class="ti moon"/.test(nav));
+  ok('图标是内联 SVG（字符图标在不同系统上会变成 emoji）',
+    /sun: '<svg/.test(nav) && /moon: '<svg/.test(nav) &&
+    !/[\u2600\u263e]/.test(nav));
+  ok('等 DOM 好了再注入（#themebtn 在 nav.js 后面才解析到）',
+    /document\.addEventListener\('DOMContentLoaded', buildThemeSwitch\)/.test(nav));
+  ok('开关带 role=switch，并同步 aria-checked',
+    /setAttribute\('role', 'switch'\)/.test(nav) && /aria-checked/.test(nav));
+
+  ok('nav.css 画轨道（药丸）',
+    /body \.themebtn\{[^}]*width:56px[^}]*border-radius:14px/.test(css));
+  ok('nav.css 画滑块，并按 data-theme 滑到两端',
+    /\.themebtn \.tk\{[^}]*border-radius:50%/.test(css) &&
+    /html\[data-theme="dark"\] body \.themebtn \.tk\{[^}]*transform:translateX\(28px\)/.test(css));
+  ok('两端图标压在滑块上面（两边都看得见）',
+    /\.themebtn \.ti\{[^}]*position:absolute/.test(css) &&
+    /\.themebtn \.sun\{left:2px/.test(css) && /\.themebtn \.moon\{right:2px\}/.test(css));
+  ok('当前那一边的图标亮、另一边留灰',
+    /html\[data-theme="dark"\] body \.themebtn \.sun\{color:var\(--muted/.test(css) &&
+    /html\[data-theme="dark"\] body \.themebtn \.moon\{color:var\(--on-accent/.test(css));
+  // 夜晚的滑块是 accent 色，上面的月亮得用 --on-accent ——
+  // 否则「亮底压亮字」，月亮会看不见（换主题色时最容易踩的一脚）
+  ok('夜晚滑块用 accent，月亮图标用 --on-accent（一对）',
+    /html\[data-theme="dark"\] body \.themebtn \.tk\{[^}]*background:var\(--accent/.test(css));
+
+  // 各页只保留定位，尺寸/底色这些都交给 nav.css —— 免得七份各写一套互相打架
+  PAGES.forEach(p => {
+    const h = fs.readFileSync(path.join(ROOT, p), 'utf8');
+    const m = h.match(/\.themebtn\{([^}]*)\}/);
+    ok(p + ' 的 .themebtn 只保留定位',
+      !!m && !/width|height|background|border|border-radius/.test(m[1]),
+      m && m[1].trim());
+    ok(p + ' 的按钮里没有写死的图标字符',
+      !/<button class="themebtn"[^>]*>[^<]*[\u2600\u263e]/.test(h));
+  });
+}
+
+console.log('\n[18] 站名');
+{
+  // 站名散在两个地方：首页 <title>/<h1>，以及 nav.js 里的导航条品牌名。
+  // 改名时很容易只改一处，所以在这里对一下。
+  const idx = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  const nav = fs.readFileSync(path.join(ROOT, 'nav.js'), 'utf8');
+  const brand = (nav.match(/brand\.textContent = '([^']+)'/) || [])[1];
+  // h1 里两个字是分开上色的，所以要把标签剥掉再比
+  const h1 = ((idx.match(/<h1>([\s\S]*?)<\/h1>/) || [])[1] || '')
+    .replace(/<[^>]*>/g, '').trim();
+  ok('首页标题就是站名（' + h1 + '）', !!h1 && h1 === '六面', h1);
+  ok('导航条品牌名和首页标题一致（都是「' + brand + '」）',
+    brand === h1 && brand === '六面', '品牌名=' + brand + ' 标题=' + h1);
+  ok('首页 <title> 也是站名',
+    new RegExp('<title>' + (brand || '') + '</title>').test(idx), brand);
+  ok('站名里不再有旧名「工具箱」',
+    !/工具箱/.test(idx) && !/工具箱/.test(nav));
+}
+
+
+console.log('\n[19] 公式页的打印按钮');
+{
+  // 这三页本来就是打印用的；按钮只是省得用户去找浏览器的打印菜单。
+  ['f2l.html', 'oll.html', 'pll.html'].forEach(p => {
+    const h = fs.readFileSync(path.join(ROOT, p), 'utf8');
+    ok(p + ' 头部有打印按钮（内联 SVG 打印机图标，不是字符）',
+      /<button class="printbtn" id="printbtn"[\s\S]{0,400}?<svg[\s\S]{0,700}?<\/svg><\/button>/.test(h) &&
+      !/[\u2399\u2b1a]/.test(h));
+    ok(p + ' 点了调 window.print()',
+      /getElementById\('printbtn'\)\.addEventListener\('click', function \(\) \{ window\.print\(\); \}\)/.test(h));
+    // 打印出来当然不能再印这个按钮（主题开关也一样）
+    ok(p + ' 打印时不印按钮', /@media print\{[\s\S]*?\.themebtn,\.printbtn\{display:none\}/.test(h));
+    // 摆在主题开关左边，别叠上去
+    ok(p + ' 和主题开关并排、互不重叠',
+      /\.themebtn\{position:absolute;right:16px;top:16px\}/.test(h) &&
+      /\.printbtn\{position:absolute;right:80px;top:16px/.test(h));
+    // 打印那套配色由 theme.css 统一给白底黑字，页面里不应该再写回颜色
+    ok(p + ' 打印样式没把配色写死回页面', !/--[\w-]+\s*:\s*#/.test(h.slice(h.indexOf('@media print'))));
   });
 }
 

@@ -5,36 +5,30 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PLL 公式合集</title>
 <link rel="icon" type="image/x-icon" href="cube-64x64.ico">
+<link rel="stylesheet" href="theme.css">
 <link rel="stylesheet" href="nav.css">
 <script>/* 主题必须在首次绘制前定好，否则会先用浅色画一遍再翻深色（闪一下） */
 try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.dataset.theme='dark'}catch(e){}</script>
 <style>
-  /* 默认浅色（白底）；点右上角按钮切夜晚。不跟随系统 —— 这是打印/速查用的表。 */
-  :root{
-    color-scheme: light;
-    /* 白天用一套柔和的暖粉配色（#FFF5F5 / #F7D6D0 / #E2B4BD / #4A4A4A）——
-       页面柔粉 #F7D6D0、卡面暖白 #FFF5F5，比原来的冷蓝白柔和，也不刺眼。accent 是同色系加深过的 #E2B4BD：
-       原色太浅，配白字只有 1.8:1、当文字用只有 1.7:1，都看不清。 */
-    --bg:#F7D6D0; --card:#FFF5F5; --line:#E2B4BD; --line-strong:#CE96A3;
-    --text:#4A4A4A; --muted:#7A6E6E; --head-red:#c0392b; --head-green:#1e8449;
-    --head-band:#E2B4BD; --accent:#A05566; --field:#F7D6D0; --chip:#ffffffb3;
-  }
-  html[data-theme="dark"]{
-    color-scheme: dark;
-    --bg:#151a22; --card:#1b222c; --line:#2a3340; --line-strong:#3a4553;
-    --text:#e7edf5; --muted:#8a98aa; --head-red:#e05a4a; --head-green:#3fbf74;
-    --head-band:#3a2f22; --accent:#5b9bff; --field:#222a35; --chip:#00000080;
-  }
+  /* 默认浅色（白底）；点右上角按钮切夜晚。不跟随系统 —— 这是打印/速查用的表。
+     两套主题的所有颜色变量都在 theme.css 里，这里只管版式。 */
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--text);
        font:14px/1.5 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
   header{position:relative;padding:22px 20px 8px;text-align:center}
   h1{margin:0;font-size:20px;letter-spacing:.02em}
   header p{margin:6px 0 0;color:var(--muted);font-size:12.5px}
-  .themebtn{position:absolute;right:16px;top:16px;width:34px;height:34px;padding:0;
-            border-radius:9px;background:var(--field);border:1px solid var(--line);
-            color:var(--text);font-size:15px;line-height:1;cursor:pointer;transition:.12s}
-  .themebtn:hover{border-color:var(--line-strong)}
+  /* 只管位置 —— 开关本身的样式（尺寸/底色/滑块）在 nav.css 里，七页共用 */
+  .themebtn{position:absolute;right:16px;top:16px}
+  /* 打印：只留按钮，样式交给下面 @media print 里那套白底黑字 */
+  .printbtn{position:absolute;right:80px;top:16px;width:28px;height:28px;padding:0;
+            border-radius:8px;background:var(--field);border:1px solid var(--line);
+            color:var(--muted);cursor:pointer;display:grid;place-items:center;
+            transition:color .12s,border-color .12s}
+  .printbtn:hover{color:var(--accent-text);border-color:var(--accent-text)}
+  .printbtn svg{width:15px;height:15px;display:block;fill:none;stroke:currentColor;
+                stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+
   main{max-width:880px;margin:0 auto;padding:10px 16px 60px}
 
   section{margin:26px 0 0;background:var(--card);border:1px solid var(--line);
@@ -46,7 +40,7 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   table{width:100%;border-collapse:collapse;table-layout:fixed}
   col.pic{width:116px}
   th{padding:9px 12px;font-size:12.5px;font-weight:600;text-align:left;
-     border-bottom:1px solid var(--line);border-right:1px solid var(--line);background:var(--field)}
+     border-bottom:1px solid var(--line);border-right:1px solid var(--line);background:var(--chip)}
   th:last-child{border-right:none}
   td{border-bottom:1px solid var(--line);border-right:1px solid var(--line);vertical-align:middle}
   td:last-child{border-right:none}
@@ -58,23 +52,31 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
      加载完成前高度为 0，加载后整行会被撑高 —— 也是一次跳动 */
   td.pic img{width:100px;height:auto;aspect-ratio:1/1;display:block;border-radius:6px}
   td.pic .no{position:absolute;left:3px;top:1px;font-size:11px;font-weight:600;
-             color:var(--muted);line-height:1;background:var(--chip);padding:1px 3px;border-radius:4px}
+             color:var(--muted);line-height:1;background:var(--badge);padding:1px 3px;border-radius:4px}
   td.f{padding:11px 14px}
-  td.empty{background:var(--field)}
+  td.empty{background:var(--chip)}
   .todo{color:var(--muted);font-size:12.5px;font-style:italic}
 
   code{font:13.5px/1.75 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
        cursor:pointer;word-break:break-word;border-radius:5px;padding:2px 5px;margin:-2px -5px}
-  code:hover{background:var(--field)}
-  code.copied{background:var(--accent);color:#fff}
-  /* 「在计算器里打开」：把公式带过去，省得手抄 */
-  a.tocalc{flex:none;display:inline-block;margin-left:8px;padding:2px 7px;border-radius:5px;
-           text-decoration:none;font:11.5px/1.5 ui-monospace,Menlo,monospace;
-           color:var(--muted);background:var(--field);border:1px solid var(--line);
-           transition:.12s}
-  a.tocalc:hover{color:var(--accent);border-color:var(--accent)}
+  code:hover{background:var(--chip)}
+  code.copied{background:var(--accent);color:var(--on-accent, #fff)}
+  /* 「在计算器里打开」：把公式带过去，省得手抄。
+     一列里几十个这种钮，常亮会抢公式的戏 —— 平时只留一个淡淡的计算器图标，
+     指到哪一行（或指到按钮本身）才亮成实心圆钮。 */
+  a.tocalc{flex:none;display:inline-flex;align-items:center;justify-content:center;
+           width:20px;height:20px;margin-left:8px;border-radius:50%;
+           color:var(--muted);background:transparent;border:1px solid transparent;
+           opacity:.55;text-decoration:none;
+           transition:opacity .14s,color .14s,background .14s,border-color .14s,
+                      transform .14s,box-shadow .14s}
+  a.tocalc svg{width:13px;height:13px;display:block}
+  tr:hover a.tocalc,a.tocalc:hover,a.tocalc:focus-visible{opacity:1}
+  a.tocalc:hover,a.tocalc:focus-visible{color:var(--on-accent, #fff);background:var(--accent);
+           border-color:var(--accent);transform:translateY(-1px);box-shadow:0 2px 7px #00000026}
+  @media (hover:none){a.tocalc{opacity:1}}
   /* 注意：不要在 td 上用 display:flex —— 单元格会不再是 table-cell，
-     行高和列宽随之全乱。让公式和「↗」自然内联排即可。 */
+     行高和列宽随之全乱。让公式和按钮自然内联排即可。 */
   td.f code{vertical-align:middle}
   td.f a.tocalc{vertical-align:middle}
 
@@ -86,7 +88,7 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   tr.open td.pic .box img{box-shadow:0 0 0 2px var(--accent)}
   tr.has-alts td.pic .box::after{content:'be';position:absolute;right:3px;top:1px;
         font-size:10px;color:var(--muted);line-height:1;transition:transform .14s}
-  tr.open td.pic .box::after{transform:rotate(180deg);color:var(--accent)}
+  tr.open td.pic .box::after{transform:rotate(180deg);color:var(--accent-text)}
   .alts{display:none;margin-top:8px}
   tr.open .alts{display:block}
   .alts .r{display:flex;align-items:center;gap:9px;margin:5px 0}
@@ -106,10 +108,10 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     code{font-size:12.5px}
   }
   @media print{
-    html[data-theme]{--bg:#fff;--card:#fff;--text:#000;--field:#f4f6f9}
     body{background:#fff;color:#000}
     header{padding:0 0 8px}
-    .themebtn{display:none}
+    .themebtn,.printbtn{display:none}
+    a.tocalc{display:none}
     section{break-inside:avoid;border-color:#999}
     code:hover{background:none}
     #toast{display:none}
@@ -120,7 +122,11 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
 <script src="nav.js"></script>
 <header>
   <h1>PLL</h1>
-  <button class="themebtn" id="themebtn" type="button" title="切到夜晚">☾</button>
+  <button class="themebtn" id="themebtn" type="button" title="切到夜晚"></button>
+  <button class="printbtn" id="printbtn" type="button" title="打印 / 存成 PDF"
+          aria-label="打印"><svg viewBox="0 0 24 24"><path d="M7 10.5V4h10v6.5"/><path
+    d="M7 18.5H5.2A2.2 2.2 0 0 1 3 16.3v-3.6a2.2 2.2 0 0 1 2.2-2.2h13.6A2.2 2.2 0 0 1 21 12.7v3.6a2.2 2.2 0 0 1-2.2 2.2H17"/><path
+    d="M7 14.5h10v6H7z"/></svg></button>
 </header>
 <main id="app"></main>
 <div id="toast"></div>
@@ -164,13 +170,25 @@ function esc(s) {
     return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c];
   });
 }
+/* 「在计算器里打开」的小图标：一台计算器（显示屏 + 四个键）。
+   内联 SVG，跟着 currentColor 走，白天/夜晚都不用改。 */
+var CALC_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+  '<rect x="4.4" y="2.8" width="15.2" height="18.4" rx="3.2" fill="none" ' +
+  'stroke="currentColor" stroke-width="2.1"/>' +
+  '<path d="M8.1 7.4h7.8" fill="none" stroke="currentColor" stroke-width="2.1" ' +
+  'stroke-linecap="round"/>' +
+  '<circle cx="9.4" cy="12.3" r="1.35" fill="currentColor"/>' +
+  '<circle cx="14.6" cy="12.3" r="1.35" fill="currentColor"/>' +
+  '<circle cx="9.4" cy="16.6" r="1.35" fill="currentColor"/>' +
+  '<circle cx="14.6" cy="16.6" r="1.35" fill="currentColor"/></svg>';
 function toCalc(alg, id) {
   // F2L 的 b 版是「绿色为 F 面」写的，要告诉计算器，让它按 y 公式 y' 执行。
   // 约定：hash 以 @g: 开头表示「绿面朝前」。
   var green = /b$/.test(String(id || ''));
   var frag = (green ? '@g:' : '') + encodeURIComponent(alg);
-  return '<a class="tocalc" href="calc.html#' + frag +
-         '" title="在计算器里打开这条公式' + (green ? '（绿色为 F 面）' : '') + '">↗</a>';
+  var tip = '在计算器里打开这条公式' + (green ? '（绿色为 F 面）' : '');
+  return '<a class="tocalc" href="calc.html#' + frag + '" title="' + tip +
+         '" aria-label="' + tip + '">' + CALC_ICON + '</a>';
 }
 function row(n, alg, alts) {
   // 一条公式里可能有换行 —— 表示同一格内的多条写法，逐行渲染
@@ -209,7 +227,6 @@ document.getElementById('app').innerHTML = html;
 var root = document.documentElement, themeBtn = document.getElementById('themebtn');
 function applyTheme(t) {
   root.dataset.theme = t;
-  themeBtn.textContent = t === 'dark' ? '\u2600' : '\u263e';
   themeBtn.title = t === 'dark' ? '切到白天' : '切到夜晚';
   try { localStorage.setItem('cube-theme', t); } catch (e) {}
 }
@@ -219,6 +236,9 @@ applyTheme(saved === 'dark' ? 'dark' : 'light');
 themeBtn.addEventListener('click', function () {
   applyTheme(root.dataset.theme === 'dark' ? 'light' : 'dark');
 });
+
+// 打印：旁边那个按钮直接调浏览器的打印（可以在打印对话框里选「存成 PDF」）
+document.getElementById('printbtn').addEventListener('click', function () { window.print(); });
 
 /* 点公式复制 */
 var toastEl = document.getElementById('toast'), toastTimer = null;

@@ -3,34 +3,28 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>魔方工具箱</title>
+<title>六面</title>
 <link rel="icon" type="image/x-icon" href="cube-64x64.ico">
+<link rel="stylesheet" href="theme.css">
 <link rel="stylesheet" href="nav.css">
 <style>
   /* 默认浅色；点右上角切夜晚。不跟随系统。
-     白天用一套柔和的暖粉配色（#FFF5F5 / #F7D6D0 / #E2B4BD / #4A4A4A）——
-     页面柔粉 #F7D6D0、卡面暖白 #FFF5F5，比原来的冷蓝白柔和，也不刺眼。accent 是同色系加深过的 #E2B4BD：
-     原色太浅，配白字只有 1.8:1、当文字用只有 1.7:1，都看不清。 */
-  :root{
-    color-scheme: light;
-    --bg:#F7D6D0; --card:#FFF5F5; --line:#E2B4BD; --line-strong:#CE96A3;
-    --text:#4A4A4A; --muted:#7A6E6E; --accent:#A05566; --field:#FFF5F5;
-  }
-  html[data-theme="dark"]{
-    color-scheme: dark;
-    --bg:#151a22; --card:#1b222c; --line:#2a3340; --line-strong:#3a4553;
-    --text:#e7edf5; --muted:#8a98aa; --accent:#5b9bff; --field:#222a35;
-  }
+     配色（两套主题的所有颜色变量）都在 theme.css 里，这里只管版式。 */
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--text);
        font:14px/1.5 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
   header{position:relative;max-width:900px;margin:0 auto;padding:34px 20px 4px;text-align:center}
-  h1{margin:0;font-size:24px;letter-spacing:.03em}
+  /* 站名：大字 + 拉开字距 + 两字分色（"六"用 accent，"面"用正文色）。
+     用 flex + gap 而不是 letter-spacing —— 后者会在最后一个字后面也留一份间距，
+     居中的标题会整体偏左。 */
+  h1{margin:0;display:flex;justify-content:center;align-items:baseline;
+     gap:.16em;font-size:40px;line-height:1.15;font-weight:700}
+  h1 .a{color:var(--accent-text)}
+  h1 .b{color:var(--text)}
   header p{margin:8px 0 0;color:var(--muted);font-size:13px}
-  .themebtn{position:absolute;right:20px;top:34px;width:34px;height:34px;padding:0;
-            border-radius:9px;background:var(--field);border:1px solid var(--line);
-            color:var(--text);font-size:15px;line-height:1;cursor:pointer;transition:.12s}
-  .themebtn:hover{border-color:var(--line-strong)}
+  /* 只管位置 —— 开关本身的样式（尺寸/底色/滑块）在 nav.css 里，七页共用 */
+  .themebtn{position:absolute;right:20px;top:34px}
+
   /* GitHub 纸带：经典的黑白配色 + octocat，45° 斜贴在右上角。
      位置放在导航条【下面】——不再压住导航栏。
      它会和右上角的昼夜按钮抢地方，屏幕不够宽就整条收起来（见媒体查询）。 */
@@ -40,12 +34,15 @@
               display:block;transform:rotate(45deg);pointer-events:auto;
               background:#24292f;color:#fff;text-align:center;text-decoration:none;
               font-size:12px;font-weight:600;white-space:nowrap;
-              box-shadow:0 2px 8px #0003;transition:background .12s}
-  .ghribbon a:hover{background:#000}
+              box-shadow:0 1px 3px #0003;transition:background .12s, box-shadow .16s}
+  /* 悬浮时抬起来一点：底色更深 + 阴影更实 */
+  .ghribbon a:hover{background:#000;box-shadow:0 6px 18px #0006}
   .ghribbon svg{width:14px;height:14px;fill:currentColor;vertical-align:-2px;margin-right:6px}
   /* 夜里翻成白底黑字 —— 两边都是 GitHub 的黑白 */
   html[data-theme="dark"] .ghribbon a{background:#f0f6fc;color:#24292f}
-  html[data-theme="dark"] .ghribbon a:hover{background:#fff}
+  /* 深色底上黑色阴影根本看不见，所以夜里改用「白色光晕 + 一层暗影」来表示抬起 */
+  html[data-theme="dark"] .ghribbon a:hover{background:#fff;
+    box-shadow:0 6px 18px #00000080, 0 0 16px #ffffff5c}
 
   main{max-width:900px;margin:0 auto;padding:6px 16px 52px}
   .cards{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-top:24px}
@@ -58,13 +55,13 @@
   .card .thumb img{max-width:100%;max-height:100%;border-radius:8px}
   /* 没有说明文字了，标题放大一些，卡片才不会显得空 */
   .card h2{margin:0;font-size:20px;font-weight:600;letter-spacing:.02em;line-height:1.2}
-  .card h2 .n{color:var(--accent);font-weight:600;font-size:13px;margin-left:8px;
+  .card h2 .n{color:var(--accent-text);font-weight:600;font-size:13px;margin-left:8px;
               vertical-align:2px;letter-spacing:0}
   .card p{margin:0;color:var(--muted);font-size:12.5px;line-height:1.6}
 
   @media (max-width:720px){
     .cards{grid-template-columns:1fr}
-    h1{font-size:20px}
+    h1{font-size:30px}
   }
   /* 纸带最左探到距视口右边 90px；右上角的昼夜按钮在窄屏会缩到 54px 处，
      两者会撞上 —— 屏宽不够（约 <980px）就干脆不显示纸带。 */
@@ -79,8 +76,8 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
 
 <script src="nav.js"></script>
 <header>
-  <h1>魔方工具箱</h1>
-  <button class="themebtn" id="themebtn" type="button" title="切到夜晚">☾</button>
+  <h1><span class="a">六</span><span class="b">面</span></h1>
+  <button class="themebtn" id="themebtn" type="button" title="切到夜晚"></button>
 </header>
 
 <div class="ghribbon"><a href="https://github.com/Louhc/magic_cube" target="_blank"
@@ -133,7 +130,6 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   var root = document.documentElement, btn = document.getElementById('themebtn');
   function applyTheme(t) {
     root.dataset.theme = t;
-    btn.textContent = t === 'dark' ? '\u2600' : '\u263e';
     btn.title = t === 'dark' ? '切到白天' : '切到夜晚';
     try { localStorage.setItem('cube-theme', t); } catch (e) {}
   }

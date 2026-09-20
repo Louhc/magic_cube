@@ -405,8 +405,13 @@ console.log('\n[13] 练习页：显示的图形必须是「从复原态执行该
     set textContent(v) { this._t = v; }, get textContent() { return this._t === undefined ? '' : this._t; } });
   const els5 = { cube: mk('div'), stage: mk('div'), next: mk('button') };
   const scopeBtns = ['f2l', 'oll', 'pll'].map(k => { const b = mk('button'); b.dataset.scope = k; return b; });
+  // st5 记下页面写进 localStorage 的东西 —— 当前抽到的是第几条，
+  // 只有页面自己知道（同一个题号能收多条写法），测试得读它才判得准。
+  const st5 = {};
   const ctx5 = { console, navigator: {}, window: { addEventListener() {} },
-    setTimeout, clearTimeout, localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
+    setTimeout, clearTimeout,
+    localStorage: { getItem: k => (k in st5 ? st5[k] : null),
+                    setItem: (k, v) => { st5[k] = String(v); }, removeItem: k => { delete st5[k]; } },
     CubeSim: S, location: { hash: '' },
     document: { getElementById: id => els5[id] || (els5[id] = mk('div')),
                 querySelectorAll: sel => sel === '#scope button' ? scopeBtns : [],
@@ -435,10 +440,19 @@ console.log('\n[13] 练习页：显示的图形必须是「从复原态执行该
     }
     const parts = els5.qid.textContent.split(' ');
     const kind5 = parts[0].toLowerCase();
-    const row = ctx5.ALG_LIST[kind5].find(r => r[0] === parts[1]);
+    // 同一个题号可能收了好几条写法（题面相同、答案不同），光按题号 find
+    // 只能拿到第一条 —— 抽到第二条时就误判。页面把当前是第几条写进了
+    // practice-round-v1（last），照它取才对得上。
+    const list5 = ctx5.ALG_LIST[kind5];
+    let rec5 = null;
+    try { rec5 = JSON.parse(st5['practice-round-v1'] || 'null'); } catch (e) {}
+    const idx5 = rec5 && typeof rec5.last === 'number' ? rec5.last : -1;
+    const row = (list5[idx5] && list5[idx5][0] === parts[1]) ? list5[idx5] : null;
+    ok('存档里记的当前题号就是题面上的（' + parts[1] + ' 第 ' + idx5 + ' 条）',
+      !!row && rec5.id === parts[1], rec5 && JSON.stringify(rec5).slice(0, 60));
     // b 版要按共轭执行，期望值同样处理
-    const want5 = (kind5 === 'f2l' && /b$/.test(parts[1]))
-      ? ('y ' + row[1]) : row[1];
+    const want5 = (row && kind5 === 'f2l' && /b$/.test(parts[1]))
+      ? ('y ' + row[1]) : (row ? row[1] : '');
     // sameState 定义在 [12] 的块作用域里，这里自己比
     const eqState = (a, b) => {
       const ka = Object.keys(a).sort(), kb = Object.keys(b).sort();
@@ -549,7 +563,7 @@ console.log('\n[13] 练习页：显示的图形必须是「从复原态执行该
       ok('对应的范围按钮也是选中态', btns6[2].classList.contains('on'));
     }
 
-    // 洗牌袋：切到 PLL（21 题）连点 20 次，应把 21 题各出一次、无一重复
+    // 洗牌袋：切到 PLL 连点到底，应把题库各条各出一次、无一漏掉
     (scopeBtns[2]._h.click || []).forEach(function (f) { f({}); });
     const total = ctx5.ALG_LIST.pll.length;      // 从题库动态取，加公式不用改测试
     const seen = [els5.qid.textContent];
@@ -557,9 +571,9 @@ console.log('\n[13] 练习页：显示的图形必须是「从复原态执行该
       (els5.next._h.click || []).forEach(function (f) { f({}); });
       seen.push(els5.qid.textContent);
     }
-    // PLL 现在有 22 条，其中 Z 收了两条写法 —— 两条的题面（图）相同，
-    // 所以标签都是「PLL Z」，不能用标签去重。改成按"每个标签出现的次数
-    // 正好等于题库里该标签的条数"来验，等价于洗牌袋覆盖了每一条。
+    // 一个题号能收多条写法（Ua / Ub / Z 等）—— 题面（图）相同，标签都是
+    // 「PLL Z」，不能用标签去重。改成按"每个标签出现的次数正好等于题库里
+    // 该标签的条数"来验，等价于洗牌袋覆盖了每一条。
     {
       const counts = {};
       seen.forEach(t => { counts[t] = (counts[t] || 0) + 1; });
@@ -585,6 +599,52 @@ console.log('\n[13] 练习页：显示的图形必须是「从复原态执行该
     (els5.next._h.click || []).forEach(function (f) { f({}); });
     ok('换轮时不紧接着重复上一题', els5.qid.textContent !== seen[seen.length - 1],
       seen[seen.length - 1] + ' -> ' + els5.qid.textContent);
+
+    // 判重按【题号】算，不是按下标：一个题号能收好几条写法（OLL 13/14/29/30/34、
+    // PLL Ga…/Ra/Ua/Ub/Z 都是），题号、题面（图）一模一样，只有答案不同；
+    // 按下标判重就会在换轮处连出两张看起来完全一样的题。
+    // 这里把随机数钉死，逼出「新一轮第一张正好和上一张同题号」的牌堆：
+    // 洗牌后 bag[n-1] 只由第一个随机数决定（= floor(r*n)），让它正对上另一条同题号。
+    {
+      const vm7 = require('vm');
+      const cases = [
+        { scope: 'oll', id: '29', list: ctx5.ALG_LIST.oll },
+        { scope: 'pll', id: 'Ra', list: ctx5.ALG_LIST.pll }
+      ];
+      cases.forEach(function (c) {
+        const dup = c.list.map((r, i) => i).filter(i => c.list[i][0] === c.id);
+        const n = c.list.length, from = dup[0], to = dup[1];
+        ok('题号 ' + c.id + ' 确实收了多条写法（' + dup.length + ' 条）', dup.length > 1);
+        if (dup.length < 2) return;
+        // 存档：上一张是第 from 条，袋已抽空
+        const st7 = {
+          'practice-scope-v1': c.scope,
+          'practice-round-v1': JSON.stringify({ scope: c.scope, id: c.id, bag: [], last: from })
+        };
+        const els7 = { cube: mk('div'), stage: mk('div'), next: mk('button') };
+        const btns7 = ['f2l', 'oll', 'pll'].map(k => { const b = mk('button'); b.dataset.scope = k; return b; });
+        const ctx7 = { console, navigator: {}, window: { addEventListener() {} },
+          setTimeout, clearTimeout,
+          localStorage: { getItem: k => (k in st7 ? st7[k] : null),
+                          setItem: (k, v) => { st7[k] = String(v); }, removeItem: k => { delete st7[k]; } },
+          CubeSim: S, location: { hash: '' },
+          document: { getElementById: id => els7[id] || (els7[id] = mk('div')),
+                      querySelectorAll: sel => sel === '#scope button' ? btns7 : [],
+                      documentElement: mk('html'), createElement: mk,
+                      body: { appendChild() {} }, addEventListener() {} } };
+        ctx7.globalThis = ctx7;
+        vm7.createContext(ctx7);
+        vm7.runInContext('Math.random = function () { return ' + ((to + 0.5) / n) + '; };', ctx7);
+        vm7.runInContext(fs.readFileSync(path.join(__dirname, '..', 'alglist.js'), 'utf8'), ctx7);
+        vm7.runInContext(page, ctx7);
+        const label = c.scope.toUpperCase() + ' ' + c.id;
+        ok('前置条件：现在出的是 ' + label + '（第 ' + from + ' 条）',
+          els7.qid.textContent === label, els7.qid.textContent);
+        (els7.next._h.click || []).forEach(f => f({}));
+        ok('换轮第一张不和上一张同题号（下一张本该是第 ' + to + ' 条）',
+          els7.qid.textContent !== label, label + ' -> ' + els7.qid.textContent);
+      });
+    }
     ok('显示了公式要解决的图形（' + els5.qimg.src + '）',
       /^pll\/pll-[A-Za-z]+-512x512\.png$/.test(els5.qimg.src) &&
       fs.existsSync(path.join(__dirname, '..', els5.qimg.src)), els5.qimg.src);
@@ -597,7 +657,9 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
   // 这一节要跑动画，所以是异步的：末尾再汇总退出。
   const vm = require('vm');
   const mkEl = (t, init) => {
-    const e = { tagName: t, children: [], style: {}, dataset: {},
+    const e = { tagName: t, children: [], dataset: {},
+      // 页面靠 style.setProperty 写 --cs（缩放），桩得支持
+      style: { setProperty(k, v) { this[k] = v; } },
       classList: { _s: new Set(), add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); },
         toggle(c, v) { v === undefined ? (this._s.has(c) ? this._s.delete(c) : this._s.add(c)) : (v ? this._s.add(c) : this._s.delete(c)); },
         contains(c) { return this._s.has(c); } },
@@ -606,7 +668,9 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
       fire(ev, arg) { (this._handlers[ev] || []).forEach(f => f(arg || {})); },
       appendChild(c) { this.children.push(c); return c; },
       querySelectorAll() { return []; }, querySelector() { return null; },
-      setPointerCapture() {}, closest() { return null; }, focus() {}, offsetWidth: 1,
+      setPointerCapture() {}, closest() { return null; }, offsetWidth: 1,
+      focus() { this._focused = true; },
+      setAttribute(k, v) { this['_a_' + k] = String(v); },
       value: init || '',
       set innerHTML(v) { this._h = v; }, get innerHTML() { return this._h || ''; },
       set textContent(v) { this._t = v; }, get textContent() { return this._t === undefined ? '' : this._t; },
@@ -615,20 +679,31 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
   };
   const els = { alg: mkEl('input', 'R U') };
   els.cube = mkEl('div');
+  // 舞台给个尺寸：fit() 才会真的算出 --cs（否则它一开头就 return，
+  // 缩放那几条断言就没有基准值可对）
+  els.stage = mkEl('div');
+  els.stage.clientWidth = 600;
+  els.stage.clientHeight = 600;
   // 六个整体旋转箭头
   els.arrows = ['x', "x'", 'y', "y'", 'z', "z'"].map(mv => {
     const b = mkEl('button');
     b.dataset.mv = mv;
     return b;
   });
+  const st = {};               // 记下页面写进 localStorage 的东西（缩放持久化要查）
   const ctx = { console, navigator: {}, window: { addEventListener() {} },
-    setTimeout, clearTimeout, localStorage: { getItem: () => null, setItem() {} },
+    setTimeout, clearTimeout,
+    // 读一律给 null（等价于首次打开，不去动「恢复现场」那条路），写则记下来
+    localStorage: { getItem: () => null, setItem: (k, v) => { st[k] = String(v); },
+                    removeItem() {} },
     CubeSim: S,
     location: { hash: '' },   // 页面会读 hash 取公式
     document: { getElementById: id => els[id] || (els[id] = mkEl('div')),
                 querySelectorAll: sel => sel === '.orbit button' ? els.arrows : [],
                 documentElement: mkEl('html'), createElement: mkEl,
-                body: { appendChild() {} }, addEventListener() {} } };
+                body: { appendChild() {} },
+                addEventListener(ev, fn) { (ctx._h[ev] = ctx._h[ev] || []).push(fn); } },
+    _h: {} };
   ctx.globalThis = ctx;
   vm.createContext(ctx);
   const src = fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')
@@ -717,12 +792,95 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
       sameState(readCube(), S.solved()),
       '中途 ' + JSON.stringify(midway).slice(0, 40));
 
-    // ---- 整体旋转箭头 ----
+    // ---- 动作按钮：整体旋转箭头 + 单步键盘 ----
     const src2 = fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8');
-    const arrows = [...src2.matchAll(/data-mv="([^"]+)"/g)].map(m => m[1]);
+    // 按容器取 data-mv：现在页面上有两组动作按钮，不能整篇扫
+    const mvsIn = cls => {
+      const m = src2.match(new RegExp('<div class="' + cls + '">([\\s\\S]*?)</div>'));
+      return m ? [...m[1].matchAll(/data-mv="([^"]+)"/g)].map(x => x[1]) : [];
+    };
+    const arrows = mvsIn('orbit');
     ok('有 6 个整体旋转箭头（' + arrows.join(' ') + '）', arrows.length === 6, arrows.join(','));
     ok('覆盖 x/x\' y/y\' z/z\'',
       ['x', "x'", 'y', "y'", 'z', "z'"].every(m => arrows.includes(m)), arrows.join(','));
+
+    // 单步键盘：六个面 × 两个方向，点一下就把这一步做掉
+    const FACES = ['U', 'D', 'L', 'R', 'F', 'B'];
+    const keys = mvsIn('mv');
+    ok('单步键盘有 12 个键（六个面 × 两个方向）：' + keys.join(' '),
+      keys.length === 12, keys.join(','));
+    ok('六个面都齐、顺时针 / 逆时针成对',
+      FACES.every(f => keys.includes(f) && keys.includes(f + "'")), keys.join(','));
+    // 用真模拟器验：每个键都必须是「一步、90°」——写错面或写错方向这里就红
+    const badKey = keys.filter(k => {
+      const l = S.steps(k);
+      return l.length !== 1 || Math.abs(l[0].times) !== 1;
+    });
+    ok('每个单步键都是模拟器认得的单步（一步 90°）', badKey.length === 0, badKey.join(','));
+    ok('单步键走同一套执行入口（动画 + 记进历史，kind=move）',
+      /querySelectorAll\('\.mv button'\)[\s\S]{0,200}?doMove\(b\.dataset\.mv, 'move'\)/.test(src2));
+    ok('整体旋转也走那个入口（kind=rotate）',
+      /querySelectorAll\('\.orbit button'\)[\s\S]{0,200}?doMove\(b\.dataset\.mv, 'rotate'\)/.test(src2));
+    // 一次转动 340ms，连点一串比动画快 —— 必须是排队，不能忙就丢
+    ok('动画没转完时的单击会排队，而不是被丢掉',
+      /if \(busy\) \{ if \(queue\.length < 16\) queue\.push\(mv\); return; \}/.test(src2) &&
+      /function drainQueue\(\)/.test(src2) && /drainQueue\(\);/.test(src2));
+    ok('复原 / 跳转会清掉排队的单步',
+      /function reset\(\) \{[\s\S]{0,200}?queue\.length = 0/.test(src2) &&
+      /function jump\(k\) \{[\s\S]{0,300}?queue\.length = 0/.test(src2));
+
+    // ---- 舞台四周的旋转键：无边框的大按键，形状是折角 / 圆弧 ----
+    const orbitHTML = (src2.match(/<div class="orbit">[\s\S]*?<\/div>/) || [''])[0];
+    ok('旋转键是无边框的大按键（56px 命中区，没有底、没有边）',
+      /\.orbit button\{[^}]*width:56px;height:56px[^}]*border:0;background:none;box-shadow:none/.test(src2));
+    ok('旋转键用的是内联 SVG，不是 ↑↓⟲ 这类字符（字符在不同系统上会变 emoji）',
+      (orbitHTML.match(/<svg /g) || []).length === 6 &&
+      !/[\u2190-\u21ff\u27f0-\u27ff\u2b00-\u2bff]/.test(orbitHTML));
+    // 折角朝哪边，必须和它标的动作对得上 —— 画反了就是真 bug
+    const polyOf = cls => {
+      const m = src2.match(new RegExp('<button class="' + cls + '"[\\s\\S]*?<polyline points="([^"]+)"'));
+      // points="x0 y0 x1 y1 x2 y2" -> 摊平成一串数字
+      return m ? m[1].trim().split(/[\s,]+/).map(Number) : null;
+    };
+    const pointAt = (cls, axis, want) => {
+      const q = polyOf(cls);
+      if (!q || q.length !== 6) return false;
+      const mid = q[axis + 2], ends = [q[axis], q[axis + 4]];
+      return want === 'min' ? mid < Math.min(...ends) : mid > Math.max(...ends);
+    };
+    ok('上翻键（x）的折角朝上', pointAt('n', 1, 'min'));
+    ok('下翻键（x\'）的折角朝下', pointAt('s', 1, 'max'));
+    ok('左转键（y）的折角朝左', pointAt('w', 0, 'min'));
+    ok('右转键（y\'）的折角朝右', pointAt('e', 0, 'max'));
+    ok('滚动的两个键画的是圆弧 + 箭头（不是折角）',
+      /<button class="z1"[\s\S]*?<path\s+d="M[\d. ]+A[\d. ]+ 1 0 [\d. ]+"[\s\S]*?<polyline/.test(src2) &&
+      /<button class="z2"[\s\S]*?<path\s+d="M[\d. ]+A[\d. ]+ 1 1 [\d. ]+"[\s\S]*?<polyline/.test(src2));
+    ok('悬停染色并放大、按下缩一点（用 scale，不动定位用的 transform）',
+      /\.orbit button:hover:not\(:disabled\)\{[^}]*color:var\(--accent-text\);scale:1\.12\}/.test(src2) &&
+      /\.orbit button:active:not\(:disabled\)\{scale:\.96\}/.test(src2));
+    ok('无边框按钮也有焦点圈（键盘走到它时看得见）',
+      /\.orbit button:focus-visible\{[^}]*outline:2px solid var\(--accent-text\)/.test(src2));
+
+    // ---- 面板按钮的「质感」：一份共用配方 + 三个状态 ----
+    ok('面板按钮共用同一份底色配方（不再各写各的 background）',
+      /\.run button, \.ctrl button, \.play, \.openpick, \.tabs button, \.moves span,\s*\n\s*\.mv button, \.phandle\{/.test(src2) &&
+      /background:linear-gradient\(180deg, var\(--btn-bg\) 0%, var\(--btn-bg2\) 100%\)/.test(src2));
+    ok('无边框的旋转键不在那份配方里（否则会被加回底色和边框）',
+      !/\\.mv button, \\.orbit button\\{/.test(src2));
+    ok('凸起靠三层：顶边高光 + 底边暗边 + 落地投影',
+      /inset 0 1px 0 var\(--btn-hi\), inset 0 -1px 0 var\(--btn-shade\),\s*\n\s*0 1px 2px var\(--btn-drop\)/.test(src2));
+    ok('指上去抬 1px、投影变长', /translate:0 -1px;/.test(src2) &&
+      /0 3px 8px var\(--btn-drop\)/.test(src2));
+    ok('按下去换成内阴影（真的陷进去）', /translate:0 1px;/.test(src2) &&
+      /box-shadow:inset 0 2px 5px var\(--btn-shade\)/.test(src2));
+    // 环绕舞台的箭头靠 transform 定位（translateX(-50%) 之类）——
+    // 抬升要是也用 transform，鼠标一指箭头就会跑位
+    ok('抬升用 translate 而不是 transform（否则箭头会跑位）',
+      /translate:0 -1px/.test(src2) && !/button:hover[^{]*\{[^}]*transform:translateY/.test(src2));
+    ok('按钮的颜色只引用 theme.css 的 --btn-*（页面里不写死、也不重定义）',
+      ['--btn-bg', '--btn-bg2', '--btn-hi', '--btn-shade', '--btn-drop']
+        .every(t => src2.includes('var(' + t + ')')) &&
+      !/--btn-[\w-]+\s*:/.test(src2));
     // F 浮标必须在 #cube 里面，才会跟着魔方一起转
     ok('F 面浮标在魔方内部（跟着一起转）', /class="fmark"|fmark/.test(src2) &&
       /'<div class="fmark"/.test(src2));
@@ -757,8 +915,15 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
     // 箭头要能点：拖拽视角的 pointerdown 必须放过它们。
     // 否则 setPointerCapture 会把后续指针事件重定向到舞台，click 落不到按钮上
     // —— 这正是「箭头毫无反应」的原因。
-    ok('拖拽视角时放过箭头按钮',
-      /closest\('\.orbit button, \.themebtn'\)/.test(fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')));
+    // 拖拽会 setPointerCapture，被捕获之后按钮的 click 就没了 ——
+    // 所以「哪些东西不该触发拖拽」这份名单必须把舞台上的按钮都列上。
+    // 缩放三键当初漏了，点了一点反应都没有（滚轮却正常，因为滚轮不走 pointerdown）。
+    ok('拖拽视角时放过箭头按钮和缩放三键',
+      /closest\('\.orbit button, \.zoom button, \.themebtn'\)/
+        .test(fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')));
+    ok('练习页的拖拽也放过缩放三键',
+      /closest\('\.zoom button, \.themebtn'\)/
+        .test(fs.readFileSync(path.join(__dirname, '..', 'practice.html'), 'utf8')));
     ok('输入框里没有默认值',
       !/id="alg"[^>]*value="/.test(fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')));
 
@@ -926,14 +1091,140 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
     ok('切来源时不收起整栏',
       /function syncTabs/.test(src2) && !/pickerEl\.classList\.toggle\('on', !!pickKind\)/.test(src2));
     ok('选公式是右侧独立一列（不是挤在面板下面）',
-      /<aside class="picker" id="picker">/.test(src2) &&
-      /\.picker\.on\{width:300px\}/.test(src2) &&
-      /<aside class="picker" id="picker">/.test(src2) &&
+      /<aside class="picker" id="picker"/.test(src2) &&
+      /\.picker\.on\{width:300px;/.test(src2) &&
       !/<div class="plist" id="plist"><\/div>\s*<\/aside>/.test(src2.slice(0, src2.indexOf('</aside>'))));
     // 必须靠宽度过渡展开，不能用 display:none 切换 —— 那样没法过渡，只能蹦
     ok('选公式列是缓慢展开（宽度过渡）',
-      /transition:width \.3s/.test(src2) && /\.picker\.on\{width:300px\}/.test(src2) &&
+      /transition:width \.3s/.test(src2) && /\.picker\.on\{width:300px;/.test(src2) &&
       !/\.picker\.on\{display:block\}/.test(src2));
+    // 收起要顺手：栏里右上角一个 ×，外加 Esc；三个入口共用 setPicker，状态不会走岔
+    ok('收起键是左边缘的竖向抽屉把手（朝右的折角，不是角落里的 ×）',
+      /<button class="phandle" id="closepick"/.test(src2) &&
+      /\.phandle\{position:absolute;left:0;top:50%;transform:translateY\(-50%\)/.test(src2) &&
+      /class="phandle"[\s\S]{0,300}?<polyline points="9 5 16 12 9 19"/.test(src2) &&
+      !/pclose/.test(src2));
+    ok('把手不在滚动容器里（否则会跟着列表滚走）',
+      /<\/button>\s*\n\s*<div class="inner">/.test(src2));
+    ok('窄屏时把手转成顶部横条（折角跟着转 90°）',
+      /\.phandle\{left:50%;top:0;transform:translateX\(-50%\);\s*\n\s*width:60px;height:18px/.test(src2) &&
+      /\.phandle svg\{transform:rotate\(90deg\)\}/.test(src2));
+    ok('指上去往右抽出来一点（抽屉手感）',
+      /\.phandle:hover\{color:var\(--accent-text\);border-color:var\(--accent-text\);translate:2px 0\}/.test(src2));
+    ok('展开键 / × / Esc 共用同一个 setPicker（不会出现状态不同步）',
+      /function setPicker\(open\)/.test(src2) &&
+      /openBtn\.addEventListener\('click'[\s\S]{0,120}?setPicker\(!pickerEl/.test(src2) &&
+      /getElementById\('closepick'\)\.addEventListener\('click'[\s\S]{0,80}?setPicker\(false\)/.test(src2) &&
+      /e\.key === 'Escape' && pickerEl\.classList\.contains\('on'\)[\s\S]{0,80}?setPicker\(false\)/.test(src2));
+    ok('收起后光标回到输入框（接着敲公式）',
+      /setPicker\(false\);\s*\n\s*algEl\.focus\(\)/.test(src2));
+    ok('展开键报了状态（aria-expanded / aria-controls）',
+      /id="openpick"[^>]*aria-controls="picker"/.test(src2) &&
+      /setPicker[\s\S]{0,300}?aria-expanded/.test(src2));
+    // 收起时里面那些按钮虽然看不见，键盘 Tab 还是会停过去 —— 必须 visibility:hidden，
+    // 而且要等收起动画放完再藏（不然会「啪」地消失，没有过渡）
+    ok('收起时 visibility:hidden，键盘不会停在看不见的按钮上',
+      /\.picker\{[^}]*visibility:hidden/.test(src2) &&
+      /transition:width \.3s cubic-bezier\(\.32,\.8,\.3,1\), visibility 0s linear \.3s/.test(src2) &&
+      /\.picker\.on\{[^}]*visibility:visible/.test(src2));
+    ok('窄屏（上下布局）也跟着改',
+      /transition:max-height \.3s cubic-bezier\(\.32,\.8,\.3,1\), visibility 0s linear \.3s/.test(src2));
+
+    // 真的点一下：× 收起 + 光标回到输入框；Esc 同样能收
+    {
+      const key = k => (ctx._h.keydown || []).forEach(f => f({ key: k }));
+      els.picker.classList.add('on');
+      // 用 getElementById 取：桩里元素是按需创建的，页面没接线时也不会崩
+      ctx.document.getElementById('closepick').fire('click');
+      ok('点公式表右上角的 × 就收起', !els.picker.classList.contains('on'));
+      ok('收起后光标回到输入框（接着敲公式）', els.alg._focused === true);
+      els.openpick.fire('click');
+      ok('公式键仍能展开，并同步 aria-expanded',
+        els.picker.classList.contains('on') && els.openpick['_a_aria-expanded'] === 'true');
+      key('Escape');
+      ok('Esc 也能收起公式表（光标不用在输入框里）',
+        !els.picker.classList.contains('on') &&
+        els.openpick['_a_aria-expanded'] === 'false');
+    }
+
+    // ---- 放大缩小：右下角按钮 + 舞台上滚轮 ----
+    {
+      const p2 = fs.readFileSync(path.join(__dirname, '..', 'practice.html'), 'utf8');
+      ['calc.html', 'practice.html'].forEach((f, i) => {
+        const h = i === 0 ? src2 : p2;
+        ok(f + ' 有放大 / 缩小两个按钮（SVG 放大镜）',
+          /<div class="zoom">[\s\S]{0,600}?id="zin"[\s\S]{0,400}?id="zout"/.test(h) &&
+          (h.match(/<circle cx="10\.5" cy="10\.5" r="6\.5"\/>/g) || []).length === 2);
+        // 这条是给一个真 bug 加的：位置原来写成 CS 的像素值，缩放只改 --cs，
+        // 于是方块变小了、间距没变 —— 整个魔方散成一堆小方块
+        ok(f + ' 小方块位置也按 --cs 算（不然缩放时尺寸和间距对不上，会散开）',
+          /calc\(var\(--cs\) \* ' \+ p\[0\] \+ '\)/.test(h) &&
+          /calc\(var\(--cs\) \* ' \+ \(-p\[1\]\)/.test(h) &&
+          !/\(p\[0\] \* CS\)/.test(h) && !/\(p\[2\] \* CS\)/.test(h));
+        ok(f + ' 缩放只改 --cs / --half，不重画（重画会打断正在转的动画）',
+          /function applyZoom\(\) \{[\s\S]{0,220}?setProperty\('--cs'[\s\S]{0,120}?setProperty\('--half'/.test(h) &&
+          !/function applyZoom\(\) \{[\s\S]{0,300}?paint\(/.test(h));
+        ok(f + ' fit() 走 applyZoom（窗口尺寸变了也不丢缩放）',
+          /CS = Math\.max\(12, Math\.min\(w, h\) \/ 6\.15\);\s*\n\s*applyZoom\(\);/.test(h));
+        // 滚轮：必须 preventDefault + passive:false，否则轮子会连带把页面滚了
+        ok(f + ' 舞台上滚轮能缩放，并且拦掉页面滚动',
+          /stageEl\.addEventListener\('wheel', function \(e\) \{\s*\n\s*e\.preventDefault\(\);/.test(h) &&
+          /\}, \{ passive: false \}\);/.test(h));
+        ok(f + ' 缩放有上下限（0.5× ~ 2.5×），到顶到底按钮置灰',
+          /ZMIN = 0\.5, ZMAX = 2\.5/.test(h) &&
+          /Math\.max\(ZMIN, Math\.min\(ZMAX, z\)\)/.test(h) &&
+          /getElementById\('zin'\)\.disabled = zoom >= ZMAX - 0\.001/.test(h) &&
+          /getElementById\('zout'\)\.disabled = zoom <= ZMIN \+ 0\.001/.test(h));
+        ok(f + ' 打印时不印缩放按钮', /@media print\{[^}]*\.zoom\{display:none\}/.test(h));
+        // 这条也是给真 bug 加的：三个键原来被插到了 </main> 外面，
+        // 于是 absolute 定位是相对窗口算的 —— 直接盖在右边的操作面板上
+        ok(f + ' 缩放的三个键在舞台里面（不是面板上）',
+          h.indexOf('<div class="zoom">') > h.indexOf('<main class="stage"') &&
+          h.indexOf('<div class="zoom">') < h.indexOf('</main>'));
+        ok(f + ' 有「恢复默认大小」键（和放大缩小是一组）',
+          /id="zreset"[\s\S]{0,320}?恢复默认大小/.test(h) &&
+          /getElementById\('zreset'\)\.addEventListener\('click', function \(\) \{ setZoom\(1\); \}\)/.test(h) &&
+          /getElementById\('zreset'\)\.disabled = Math\.abs\(zoom - 1\) < 0\.001/.test(h));
+        ok(f + ' 缩放会存下来（三页共用 cube-zoom-v1）',
+          /var ZOOM_KEY = 'cube-zoom-v1'/.test(h) &&
+          /localStorage\.setItem\(ZOOM_KEY, String\(zoom\)\)/.test(h) &&
+          /zoom = loadZoom\(\);/.test(h));
+        ok(f + ' 开机先读存档再 fit()（否则第一帧会按 100% 画一遍再跳）',
+          h.indexOf('zoom = loadZoom();') < h.indexOf('\n  fit();'));
+      });
+
+      // 真按一下：滚轮向上放大、向下缩小，按钮到顶到底会置灰
+      const cs = () => parseFloat(els.cube.style['--cs']);
+      const wheel = d => els.stage.fire('wheel', { deltaY: d, preventDefault() {} });
+      const base = cs();
+      ok('初始 100%（--cs 就是 fit() 算出来的值）', base > 0, String(base));
+      wheel(-100);
+      ok('舞台上滚轮向上 = 放大（' + base + ' -> ' + cs() + '）', cs() > base);
+      const up = cs();
+      wheel(100); wheel(100);
+      ok('滚轮向下 = 缩小', cs() < up);
+      for (let k = 0; k < 40; k++) els.zin.fire('click');
+      ok('一直放大封顶在 2.5×，并置灰加号',
+        Math.abs(cs() / base - 2.5) < 0.01 && els.zin.disabled === true, String(cs()));
+      for (let k = 0; k < 60; k++) els.zout.fire('click');
+      ok('一直缩小封底在 0.5×，并置灰减号',
+        Math.abs(cs() / base - 0.5) < 0.01 && els.zout.disabled === true, String(cs()));
+      els.zin.fire('click');
+      ok('从底线点一下加号能回来', Math.abs(cs() / base - 0.625) < 0.01, String(cs()));
+      // 恢复默认大小
+      for (let k = 0; k < 8; k++) els.zin.fire('click');
+      ok('放大之后「恢复默认大小」键可用', els.zreset.disabled === false);
+      els.zreset.fire('click');
+      ok('点「恢复默认大小」回到 100%', Math.abs(cs() / base - 1) < 0.001, String(cs()));
+      ok('回到 100% 后该键自己置灰', els.zreset.disabled === true);
+      // 持久化：放大一步，存档里就该是 1.25
+      els.zin.fire('click');
+      ok('缩放写进 localStorage（cube-zoom-v1 = 1.25）',
+        Math.abs(parseFloat(st['cube-zoom-v1']) - 1.25) < 0.001, st['cube-zoom-v1']);
+      els.zreset.fire('click');
+      ok('恢复默认也会写回存档（= 1）', Math.abs(parseFloat(st['cube-zoom-v1']) - 1) < 0.001,
+        st['cube-zoom-v1']);
+    }
     ok('内容宽度固定，收起时靠外层裁剪（不会被挤扁）',
       /overflow:hidden/.test(src2) && /\.picker > \.inner\{width:300px/.test(src2));
     ok('列表项带缩略图', /function thumb\(kind, id\)/.test(src2) && /<img src="' \+ thumb/.test(src2));

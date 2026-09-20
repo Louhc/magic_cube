@@ -5,27 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>魔方练习</title>
 <link rel="icon" type="image/x-icon" href="cube-64x64.ico">
+<link rel="stylesheet" href="theme.css">
 <link rel="stylesheet" href="nav.css">
 <style>
-  :root{
-    color-scheme: light;
-    /* 白天用一套柔和的暖粉配色（#FFF5F5 / #F7D6D0 / #E2B4BD / #4A4A4A）——
-       页面柔粉 #F7D6D0、卡面暖白 #FFF5F5，比原来的冷蓝白柔和，也不刺眼。accent 是同色系加深过的 #E2B4BD：
-       原色太浅，配白字只有 1.8:1、当文字用只有 1.7:1，都看不清。 */
-    --bg:#F7D6D0; --stage:#FFF5F5; --panel:#FFF5F5; --line:#E2B4BD;
-    --text:#4A4A4A; --muted:#7A6E6E; --accent:#A05566;
-    --field:#FFFFFF; --field-hover:#F7D6D0;
-    --line-strong:#CE96A3; --chip:#F7D6D0; --chip-hover:#E2B4BD;
-    --scroll:#E2B4BD; --cubie:#16181c; --ok:#1e8449;
-  }
-  html[data-theme="dark"]{
-    color-scheme: dark;
-    --bg:#0f1319; --stage:#151a22; --panel:#181e27; --line:#2a3340;
-    --text:#e7edf5; --muted:#8a98aa; --accent:#4c8dff;
-    --field:#202836; --field-hover:#2a3547;
-    --line-strong:#3d4c61; --chip:#1a212b; --chip-hover:#232c39;
-    --scroll:#2b3542; --cubie:#0c0e11; --ok:#3fbf74;
-  }
+  /* 两套主题的所有颜色变量都在 theme.css 里，这里只管版式。 */
   *{box-sizing:border-box}
   html,body{height:100%;margin:0}
   body{background:var(--bg);color:var(--text);overflow:hidden;
@@ -37,11 +20,22 @@
          background:var(--stage);perspective:1400px;perspective-origin:50% 48%;
          cursor:grab;user-select:none;touch-action:none;overflow:hidden}
   .stage.drag{cursor:grabbing}
-  .themebtn{position:absolute;right:16px;top:14px;z-index:5;
-            width:34px;height:34px;padding:0;display:grid;place-items:center;
-            background:var(--panel);border:1px solid var(--line);color:var(--muted);
-            border-radius:9px;cursor:pointer;transition:.12s;font-size:15px;line-height:1}
-  .themebtn:hover{color:var(--text);border-color:var(--line-strong);background:var(--chip-hover)}
+  /* 右下角的放大缩小：和四周的折角按钮同一套（无边框、平时淡、指上去染色放大） */
+  .zoom{position:absolute;right:14px;bottom:14px;display:grid;gap:6px;z-index:4}
+  .zoom button{width:40px;height:40px;padding:0;margin:0;border:0;background:none;
+               box-shadow:none;border-radius:12px;cursor:pointer;
+               display:grid;place-items:center;color:var(--muted);opacity:.6;
+               transition:opacity .14s ease,color .14s ease,scale .12s ease}
+  .zoom button svg{width:26px;height:26px;display:block;fill:none;stroke:currentColor;
+                   stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+  .zoom button:hover:not(:disabled){opacity:1;color:var(--accent-text);scale:1.1}
+  .zoom button:active:not(:disabled){scale:.94}
+  .zoom button:focus-visible{opacity:1;color:var(--accent-text);
+                             outline:2px solid var(--accent-text);outline-offset:-6px}
+  .zoom button:disabled{opacity:.22;cursor:default}
+  /* 只管位置 —— 开关本身的样式（尺寸/底色/滑块）在 nav.css 里，七页共用 */
+  .themebtn{position:absolute;right:16px;top:14px;z-index:5}
+
 
   .cube{position:relative;width:0;height:0;transform-style:preserve-3d}
   .layer{position:absolute;left:0;top:0;width:0;height:0;transform-style:preserve-3d}
@@ -72,7 +66,7 @@
   .scope button{flex:1;height:32px;border-radius:8px;cursor:pointer;font:inherit;font-size:12.5px;
                 background:var(--field);border:1px solid var(--line);color:var(--muted);transition:.12s}
   .scope button:hover{color:var(--text);border-color:var(--line-strong)}
-  .scope button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .scope button.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent, #fff)}
 
   .qid{font:600 22px/1.2 ui-monospace,Menlo,Consolas,monospace;
        text-align:center;margin:4px 0 2px;letter-spacing:.02em}
@@ -85,8 +79,8 @@
   .act{display:flex;gap:8px}
   .act button{flex:1;height:34px;border-radius:8px;cursor:pointer;font:inherit;font-size:12.5px;
               background:var(--field);border:1px solid var(--line);color:var(--text);transition:.12s}
-  .act button:hover{border-color:var(--accent);color:var(--accent);background:var(--field-hover)}
-  .act button.main{background:var(--accent);border-color:var(--accent);color:#fff}
+  .act button:hover{border-color:var(--accent-text);color:var(--accent-text);background:var(--field-hover)}
+  .act button.main{background:var(--accent);border-color:var(--accent);color:var(--on-accent, #fff)}
   .act button.main:hover{filter:brightness(1.08);color:#fff}
 
   .ans{display:none;margin-top:14px;padding:11px 12px;border-radius:9px;
@@ -102,7 +96,7 @@
     .panel{width:auto;border-left:none;border-top:1px solid var(--line);max-height:52vh}
     .stage{min-height:38vh}
   }
-  @media print{ .themebtn,.panel{display:none} }
+  @media print{ .themebtn,.panel,.zoom{display:none} }
 </style>
 <script>/* 主题必须在首次绘制前定好，否则会先用浅色画一遍再翻深色（闪一下） */
 try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.dataset.theme='dark'}catch(e){}</script>
@@ -113,8 +107,20 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
 <script src="nav.js"></script>
 <div class="app">
   <main class="stage" id="stage">
-    <button class="themebtn" id="themebtn" type="button" title="切到夜晚">☾</button>
+    <button class="themebtn" id="themebtn" type="button" title="切到夜晚"></button>
     <div class="cube" id="cube"></div>
+    <!-- 放大缩小：点按钮，或者直接把指针放在舞台上滚轮 -->
+    <div class="zoom">
+      <button id="zin" type="button" title="放大（滚轮向上也可以）" aria-label="放大"><svg
+        viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.4 15.4L21 21"/><path
+        d="M10.5 7.6v5.8M7.6 10.5h5.8"/></svg></button>
+      <button id="zout" type="button" title="缩小（滚轮向下也可以）" aria-label="缩小"><svg
+        viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.4 15.4L21 21"/><path
+        d="M7.6 10.5h5.8"/></svg></button>
+      <button id="zreset" type="button" title="恢复默认大小（100%）" aria-label="恢复默认大小"><svg
+        viewBox="0 0 24 24"><path d="M9.5 4.5v5h-5"/><path d="M14.5 4.5v5h5"/><path
+        d="M9.5 19.5v-5h-5"/><path d="M14.5 19.5v-5h5"/></svg></button>
+    </div>
   </main>
 
   <aside class="panel">
@@ -209,8 +215,11 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     var map = byPos(state);
     cubeEl.innerHTML = Object.keys(map).map(function (pos) {
       var p = pos.split(',').map(Number);
+      // 位置必须用 calc(var(--cs) * n) 表达，不能写成 CS 的像素值 ——
+      // 缩放只改 --cs，写死像素的话方块尺寸变了、间距没变，整块会散开
       return '<div class="cubie" data-pos="' + pos + '" style="transform:translate3d(' +
-             (p[0] * CS) + 'px,' + (-p[1] * CS) + 'px,' + (p[2] * CS) + 'px)">' +
+             'calc(var(--cs) * ' + p[0] + '),calc(var(--cs) * ' + (-p[1]) + '),' +
+             'calc(var(--cs) * ' + p[2] + '))">' +
              cubieHTML(map[pos]) + '</div>';
     }).join('');
     applyView();
@@ -222,9 +231,48 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     var w = stageEl.clientWidth, h = stageEl.clientHeight;
     if (!w || !h) return;
     CS = Math.max(12, Math.min(w, h) / 6.15);
-    cubeEl.style.setProperty('--cs', CS + 'px');
-    cubeEl.style.setProperty('--half', (CS / 2) + 'px');
+    applyZoom();
+    syncZoom();
   }
+
+  /* ---------- 放大缩小（右下角按钮 + 舞台上滚轮）----------
+     只改 --cs / --half 两个尺寸变量，不重画 —— 魔方每个尺寸都是
+     calc(var(--cs) * …)，缩放纯粹是 CSS 的事；重画会把正在转的那一层动画打断。 */
+  var zoom = 1, ZMIN = 0.5, ZMAX = 2.5;
+  function applyZoom() {
+    var cs = CS * zoom;
+    cubeEl.style.setProperty('--cs', cs + 'px');
+    cubeEl.style.setProperty('--half', (cs / 2) + 'px');
+  }
+  function syncZoom() {
+    document.getElementById('zin').disabled = zoom >= ZMAX - 0.001;
+    document.getElementById('zout').disabled = zoom <= ZMIN + 0.001;
+    document.getElementById('zreset').disabled = Math.abs(zoom - 1) < 0.001;
+  }
+  function setZoom(z) {
+    var nz = Math.max(ZMIN, Math.min(ZMAX, z));
+    if (Math.abs(nz - zoom) > 0.001) { zoom = nz; applyZoom(); saveZoom(); }
+    syncZoom();
+  }
+  // 缩放是「看魔方的习惯」，三页共用同一个键 —— 在计算器里调大，编辑器里也一样大
+  var ZOOM_KEY = 'cube-zoom-v1';
+  function saveZoom() { try { localStorage.setItem(ZOOM_KEY, String(zoom)); } catch (e) {} }
+  function loadZoom() {
+    var v = NaN;
+    try { v = parseFloat(localStorage.getItem(ZOOM_KEY)); } catch (e) {}
+    return (isFinite(v) && v >= ZMIN && v <= ZMAX) ? v : 1;
+  }
+  zoom = loadZoom();          // 恢复上次的缩放；第一次打开就是 100%
+  document.getElementById('zin').addEventListener('click', function () { setZoom(zoom * 1.25); });
+  document.getElementById('zout').addEventListener('click', function () { setZoom(zoom / 1.25); });
+  document.getElementById('zreset').addEventListener('click', function () { setZoom(1); });
+  // 只有指针在舞台上才缩放（右栏里滚轮要正常滚动）。
+  // passive:false + preventDefault —— 否则轮子会连带把页面也滚了。
+  stageEl.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    var d = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;   // Firefox 有时按「行」给
+    setZoom(zoom * Math.exp(-d * 0.0016));
+  }, { passive: false });
 
   function animate(step, done) {
     var cfg = M3[step.mv];
@@ -265,9 +313,17 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     try { localStorage.setItem(SCOPE_KEY, scope); } catch (e) {}
   }
 
+  /* 两道题算不算「同一题」：题号相同就是同一题。
+     一个格子可以收多条写法（OLL 13/14/29/30/34、PLL Ga…/Ra/Ua/Ub/Z），
+     它们题号、题面（图）一模一样，只有答案不同 —— 连出两张，
+     用户看到的就是同一道题，所以按题号判重，而不是按下标。 */
+  function sameCase(list, a, b) {
+    return a >= 0 && b >= 0 && !!list[a] && !!list[b] && list[a][0] === list[b][0];
+  }
   /* 洗牌袋：把该范围的题洗一遍，逐个取出，取完再洗一轮。
      这样每一题都会出现一次才可能重复；并且换轮时避免第一题和上一题撞。 */
-  function drawIndex(n) {
+  function drawIndex(list) {
+    var n = list.length;
     if (!bag.length) {
       bag = [];
       for (var i = 0; i < n; i++) bag.push(i);
@@ -275,9 +331,14 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
         var k = Math.floor(Math.random() * (j + 1));
         var t = bag[j]; bag[j] = bag[k]; bag[k] = t;
       }
-      // 从末尾取，所以把可能与上一题重复的那张换到开头
-      if (n > 1 && bag[n - 1] === lastIdx) {
-        var t2 = bag[n - 1]; bag[n - 1] = bag[0]; bag[0] = t2;
+      // 从末尾取，所以把可能与上一题撞的那张换到前面去
+      if (n > 1 && sameCase(list, bag[n - 1], lastIdx)) {
+        for (var m = 0; m < n - 1; m++) {
+          if (!sameCase(list, bag[m], lastIdx)) {
+            var t2 = bag[n - 1]; bag[n - 1] = bag[m]; bag[m] = t2;
+            break;
+          }
+        }
       }
     }
     lastIdx = bag.pop();
@@ -301,7 +362,7 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   function pick() {
     var list = (typeof ALG_LIST !== 'undefined' && ALG_LIST[scope]) || [];
     if (!list.length) return;
-    show(list[drawIndex(list.length)]);
+    show(list[drawIndex(list)]);
   }
 
   // 把一道题摆出来（抽到新题、或从存档恢复）
@@ -366,7 +427,7 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   /* 拖拽转视角 */
   var drag = null;
   stageEl.addEventListener('pointerdown', function (e) {
-    if (e.target.closest && e.target.closest('.themebtn')) return;
+    if (e.target.closest && e.target.closest('.zoom button, .themebtn')) return;
     drag = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y };
     stageEl.classList.add('drag');
     if (stageEl.setPointerCapture) stageEl.setPointerCapture(e.pointerId);
@@ -386,7 +447,6 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   var root = document.documentElement, btn = document.getElementById('themebtn');
   function applyTheme(t) {
     root.dataset.theme = t;
-    btn.textContent = t === 'dark' ? '\u2600' : '\u263e';
     btn.title = t === 'dark' ? '切到白天' : '切到夜晚';
     try { localStorage.setItem('cube-theme', t); } catch (e) {}
   }

@@ -44,6 +44,7 @@ function El(tag){
     toBlob(cb, mime){ cb(new Blob(['raster-bytes'], { type: mime || 'image/png' })); },
     click(){ if(this.download) downloads.push(this.download); },
     remove(){}, select(){}, focus(){},
+    offsetWidth: 40, offsetHeight: 24, offsetLeft: 0, offsetTop: 0,
   };
   Object.defineProperty(e,'innerHTML',{get(){return this._html;},set(v){this._html=v;}});
   // 真实 DOM 里 textContent 会把子节点的文字拼起来，桩也得这样，
@@ -71,8 +72,9 @@ const document = {
   querySelector: () => El('div'),
   body: { appendChild(){} },
 };
+const store = { 'cube-theme': 'dark', 'cube-zoom-v1': '1.5' };
 const ctx = {
-  Cube, document, console, setTimeout, clearTimeout, Blob,
+  Cube, document, console, setTimeout, clearTimeout, Blob, store,
   FileReader: function () {
     this.readAsArrayBuffer = b => {
       const src = b && b.parts && b.parts[0];
@@ -85,7 +87,11 @@ const ctx = {
   window:{ innerWidth:1280, innerHeight:820, addEventListener(){} },
   // 编辑器的明暗跟着全站共用的 cube-theme 走。这里模拟「用户选的是夜晚」，
   // 下面的断言都在这个前提下成立；「存档是白天」的情况由 test/links.js [15] 盯着。
-  localStorage:{ getItem: k => (k === 'cube-theme' ? 'dark' : null), setItem(){} },
+  // store 会记下页面写进去的东西 —— 持久化那几条断言要读它。
+  // 另外预置一个 cube-zoom-v1=1.5：验证开机时能把上次的缩放读回来。
+  localStorage:{ getItem: k => (k in store ? store[k] : null),
+                 setItem: (k, v) => { store[k] = String(v); },
+                 removeItem: k => { delete store[k]; } },
   navigator:{}, parseFloat, parseInt, Math, JSON, Object, Array, Set, String,
   URL:{ createObjectURL(b){ objectURLs.push(b); return 'blob:fake'; }, revokeObjectURL(){} },
   // 真实 Image 的 onload 是异步的，但这里同步触发就能把整条导出路径测完
@@ -134,6 +140,9 @@ console.log('(已从 editor.html 实时抽取内联脚本 ' + inline.length + ' 
     const b = El('button');
     b.dataset.mode = m2[1];
     b.textContent = m2[1].toUpperCase();
+    // 模拟真实排布：三个按钮并排、宽度一致，药丸才对得上
+    b.offsetWidth = 40;
+    b.offsetLeft = mb.children.length * 42;
     mb.appendChild(b);
   }
   console.log('(已补出 ' + mb.children.length + ' 个模式按钮)');
@@ -505,16 +514,20 @@ console.log('\n[13] 白天 / 夜晚模式');
 check('存档是夜晚时用夜晚（编辑器以前无视存档，永远是深色）',
   document.documentElement.dataset.theme === 'dark', document.documentElement.dataset.theme);
 check('按钮不放文字，只有图标', !/[\u4e00-\u9fa5]/.test(reg['themebtn'].textContent || ''));
-check('夜晚模式显示太阳图标（点它切到白天）',
-  reg['themebtn'].dataset.icon === 'sun' && /<svg/.test(reg['themebtn']._html), reg['themebtn'].dataset.icon);
+check('夜晚模式：页面只管 data-theme，不再自己往按钮里塞图标',
+  document.documentElement.dataset.theme === 'dark' &&
+  !/[\u2600\u263e]/.test(reg['themebtn']._html || ''),
+  reg['themebtn']._html);
 check('按钮有 tooltip 说明', /白天/.test(reg['themebtn'].title), reg['themebtn'].title);
 reg['themebtn']._ev.click[0]({});
 check('切到白天', document.documentElement.dataset.theme === 'light', document.documentElement.dataset.theme);
 check('白天：色卡颜色不变（固定色）',
   Cube.OLL_SCHEMES.every((sc, i) => reg['schemes'].children[i].style.background === sc.on),
   reg['schemes'].children.map(b => b.style.background).join(' '));
-check('白天模式显示月亮图标（点它切回夜晚）',
-  reg['themebtn'].dataset.icon === 'moon' && /<svg/.test(reg['themebtn']._html), reg['themebtn'].dataset.icon);
+check('白天模式：页面同样不碰按钮内容（图标由 nav.js 统一注入）',
+  document.documentElement.dataset.theme === 'light' &&
+  !/[\u2600\u263e]/.test(reg['themebtn']._html || ''),
+  reg['themebtn']._html);
 check('白天 tooltip 指向夜晚', /夜晚/.test(reg['themebtn'].title), reg['themebtn'].title);
 check('白天：实心格和夜晚同色（这就是本次要修的）',
   ollCell('oll-1-1') === OLL_ON, ollCell('oll-1-1'));
@@ -756,19 +769,23 @@ check('导出的 SVG 含网格 + 划线 + 箭头',
 
 // —— 操作区的排版 ——
 // btns 是两列网格；如果有按钮带跨列的类，它前面的按钮右边会空一格，
-// 后面的按钮被挤到下一行。这里直接盯住"四个按钮都是普通 act"。
+// 后面的按钮被挤到下一行。所以网格里那四个必须是普通 act；
+// 「参数恢复默认」是另起一行的整行按钮（act wide），它在网格外面。
 {
   const sec = html.match(/<h2>操作<\/h2>[\s\S]*?<\/section>/);
   check('找得到操作区', !!sec);
   if (sec) {
-    const btns = sec[0].match(/<button[^>]*>/g) || [];
-    check('操作区有 4 个按钮', btns.length === 4, btns.length + ' 个');
-    check('四个按钮都只带 act（没有跨列独占整行的）',
+    const grid = (sec[0].match(/<div class="btns">([\s\S]*?)<\/div>/) || [])[1] || '';
+    const btns = grid.match(/<button[^>]*>/g) || [];
+    check('网格里是 4 个按钮', btns.length === 4, btns.length + ' 个');
+    check('网格里四个按钮都只带 act（没有跨列独占整行的）',
       btns.every(t => (t.match(/class="([^"]*)"/) || [])[1] === 'act'),
       btns.map(t => (t.match(/class="([^"]*)"/) || [])[1]).join(' | '));
     check('按钮顺序：恢复 / 清除 / 撤销 / 重做',
       ['btn-reset', 'btn-clear', 'btn-undo', 'btn-redo'].every((id, i) => btns[i].includes(id)),
       btns.map(t => (t.match(/id="([^"]*)"/) || [])[1]).join(','));
+    check('网格外面还有整行的「参数恢复默认」', /id="btn-params"/.test(sec[0]) &&
+      /class="act wide"/.test(sec[0]) && /button\.act\.wide\{width:100%/.test(html));
   }
 }
 
@@ -783,6 +800,247 @@ mb[1]._ev.click[0]({});
 check('切回 OLL 朝向保留（仍是完整 OLL 7）',
   ollCell('oll-0-0') === OLL_OFF && bars(true) === 'B@0-0 F@2-1 F@2-2 R@0-2 R@1-2', bars(true));
 mb[0]._ev.click[0]({});
+
+
+/* ---------------- 放大缩小 + 模式持久化 ---------------- */
+{
+  // 这三个键必须挂在画布容器里：absolute 定位相对的是最近的定位祖先，
+  // 挂到外面就会相对窗口算，直接盖到右边面板上
+  check('缩放的三个键在画布容器里（不在右侧面板上）',
+    html.indexOf('class="zoom"') > html.indexOf('class="stage-inner"') &&
+    html.indexOf('class="zoom"') < html.indexOf('class="hint"'));
+  check('画布上有放大 / 缩小 / 恢复默认大小三个键',
+    !!reg['zin'] && !!reg['zout'] && !!reg['zreset'] &&
+    /<div class="zoom">[\s\S]*?id="zin"[\s\S]*?id="zout"[\s\S]*?id="zreset"/.test(html));
+  check('三个键都是无边框的图标键（不是实心方按钮）',
+    /\.zoom button\{[^}]*border:0;background:none/.test(html) &&
+    /\.zoom button svg\{[^}]*stroke:currentColor/.test(html));
+  // 缩放值写在 #host 的 CSS 变量上：render() 会整个换掉 svg，写在 svg 上会被冲掉
+  check('缩放挂在 #host 的 --zoom 上，svg 只是 scale 它',
+    /#host svg\{[^}]*transform:scale\(var\(--zoom,1\)\)/.test(html) &&
+    /function applyZoom\(\) \{ host\.style\.setProperty\('--zoom', zoom\); \}/.test(html));
+  // 桩里预置了 cube-zoom-v1=1.5，开机应当读回来
+  check('开机读回上次的缩放（存档 1.5×）',
+    reg['host'].style['--zoom'] === 1.5, String(reg['host'].style['--zoom']));
+
+  const wheel = d => reg['stage']._ev.wheel[0]({ deltaY: d, preventDefault(){} });
+  wheel(-100);
+  check('画布上滚轮向上 = 放大', reg['host'].style['--zoom'] > 1.5, String(reg['host'].style['--zoom']));
+  for (let i = 0; i < 6; i++) wheel(100);
+  check('滚轮向下 = 缩小', reg['host'].style['--zoom'] < 1.5, String(reg['host'].style['--zoom']));
+
+  reg['zreset']._ev.click[0]({});
+  check('点「恢复默认大小」回到 100%', reg['host'].style['--zoom'] === 1, String(reg['host'].style['--zoom']));
+  check('已经是 100% 时这个键置灰', reg['zreset'].disabled === true);
+  reg['zreset'].disabled = false;
+  reg['zin']._ev.click[0]({});
+  check('放大后恢复键重新可用', reg['zreset'].disabled === false);
+  check('缩放写进存档（三页共用一个键）',
+    Math.abs(parseFloat(store['cube-zoom-v1']) - 1.25) < 0.001, store['cube-zoom-v1']);
+  check('放大到顶 / 缩到底会置灰对应那颗键',
+    /getElementById\('zin'\)\.disabled = zoom >= ZMAX - 0\.001/.test(html) &&
+    /getElementById\('zout'\)\.disabled = zoom <= ZMIN \+ 0\.001/.test(html));
+
+  // 模式持久化：切一下就写进编辑器自己的存档，开机再从存档读
+  mb[2]._ev.click[0]({});                       // PLL
+  check('切模式写进 cube-editor-v1',
+    (JSON.parse(store['cube-editor-v1'] || '{}') || {}).mode === 'pll', store['cube-editor-v1']);
+  check('开机用的是存档里的模式（不是写死 f2l）',
+    /setMode\(savedMode\(savedEditor\), false\)/.test(html) &&
+    /function savedMode\(d\)/.test(html) && /function loadEditor\(\)/.test(html));
+  mb[0]._ev.click[0]({});                       // 切回 F2L，别影响后面的收尾
+  check('切回去也写存档',
+    (JSON.parse(store['cube-editor-v1'] || '{}') || {}).mode === 'f2l', store['cube-editor-v1']);
+}
+
+
+/* ---------------- 模式栏的滑动药丸（和导航栏同款） ---------------- */
+{
+  check('模式栏里有一个滑动的小方块（不是按钮自己画的底色）',
+    /<div class="modebar" id="modebar">\s*\n\s*<span class="mpill"/.test(html) &&
+    /\.mpill\{position:absolute[^}]*transition:transform \.18s/.test(html));
+  check('选中态由药丸提供，按钮不再自己画背景',
+    /\.modebar button\.on\{color:var\(--on-accent, #fff\)\}/.test(html) &&
+    !/\.modebar button\.on\{[^}]*background/.test(html) &&
+    !/\.modebar button:hover\{[^}]*background/.test(html));
+  check('按钮压在药丸上面（z-index）',
+    /\.modebar button\{position:relative;z-index:1/.test(html));
+  // 字色比药丸晚一步变（导航栏踩过的坑：先变色就会在白底上闪一下）
+  check('字色跟着药丸走（选中晚 180ms 变、失去选中立刻变灰）',
+    /\.modebar button\{[^}]*transition:color \.18s ease \.18s/.test(html) &&
+    /\.modebar button:not\(\.on\)\{transition-delay:0s\}/.test(html));
+  check('模式按钮的底色走主题变量（不再是写死的灰蓝）',
+    /\.modebar button\{[^}]*color:var\(--muted\)/.test(html) && !/#7f8fa4/.test(html));
+
+  // 点第二个（OLL）→ 药丸应当滑到它上面
+  mb[1]._ev.click[0]({});
+  check('切模式时药丸滑到选中那一格',
+    reg['mpill'].style.transform === 'translate(' + mb[1].offsetLeft + 'px,' + mb[1].offsetTop + 'px)' &&
+    reg['mpill'].style.width === mb[1].offsetWidth + 'px',
+    reg['mpill'].style.transform);
+  mb[0]._ev.click[0]({});
+  check('滑回去也对',
+    reg['mpill'].style.transform === 'translate(' + mb[0].offsetLeft + 'px,' + mb[0].offsetTop + 'px)',
+    reg['mpill'].style.transform);
+  check('首次定位不播动画（开机时药丸不该从左边飞过来）',
+    /setMode\(savedMode\(savedEditor\), false\)/.test(html) &&
+    /function placeMPill\(el, animate\)/.test(html));
+}
+
+/* ---------------- 三个模式的编辑状态持久化 ---------------- */
+{
+  // 先在这个实例里清空 F2L，看存档有没有跟上
+  reg['btn-clear']._ev.click[0]({});
+  const saved = JSON.parse(store['cube-editor-v1'] || 'null');
+  check('改动会写进存档（mode + snap + opts）',
+    !!saved && saved.mode === 'f2l' && !!saved.snap && !!saved.snap.f2l &&
+    !!saved.snap.oll && !!saved.snap.pll && !!saved.opts,
+    JSON.stringify(saved && Object.keys(saved)));
+  // state 是嵌套的（外层可能是对象或数组），摊平了看
+  const flat = a => (Array.isArray(a) ? a : Object.values(a))
+    .reduce((acc, r) => acc.concat(r && typeof r === 'object' ? flat(r) : r), []);
+  const f2lVals = flat(saved.snap.f2l || []);
+  check('存档里就是刚清空后的 F2L 局面（全部是灰）',
+    f2lVals.length > 0 && f2lVals.every(v => v === Cube.EMPTY),
+    f2lVals.filter(v => v !== Cube.EMPTY).length + ' 个不是灰');
+  check('存档里带着各项选项（cfg / OLL 方案与划线 / PLL 开关与箭头色）',
+    !!saved.opts.cfg && !!saved.opts.scheme &&
+    typeof saved.opts.showOllBars === 'boolean' &&
+    typeof saved.opts.pllShowColors === 'boolean' && !!saved.opts.pllArrowKey,
+    JSON.stringify(saved.opts && Object.keys(saved.opts)));
+
+  // 换一个全新的上下文、灌一份手写的存档再跑一遍 = 模拟刷新
+  const arrowKey = Cube.PLL_ARROW_COLORS[1].key;
+  const schemeOn = Cube.ollScheme('yellow').on;
+  const ollGrid = Cube.cloneOll(Cube.DEFAULT_OLL);
+  // 注意 OLL 的取值语义：0 = 已朝向（实心），非 0 = 未朝向（空心）。
+  // 默认全 0，所以种子要反过来 —— 只留 [0][0] 实心，其余全设成未朝向。
+  ollGrid.forEach((row, i) => row.forEach((_, j) => { ollGrid[i][j] = 1; }));
+  ollGrid[0][0] = 0;
+  const store2 = { 'cube-editor-v1': JSON.stringify({
+    mode: 'oll',
+    snap: { f2l: Cube.cloneState(Cube.DEFAULT_STATE), oll: ollGrid, pll: Cube.pllDefault() },
+    opts: { cfg: Object.assign({}, Cube.DEFAULT_CFG, { elev: 1.2 }), scheme: 'yellow',
+            showOllBars: false, pllShowColors: false, pllArrowKey: arrowKey,
+            export: { name: 'my-cube', size: 256, bg: false } }
+  }) };
+  const reg2 = {};
+  const doc2 = {
+    documentElement: El('html'), elementFromPoint: () => null,
+    getElementById: id => reg2[id] || (reg2[id] = El('div')),
+    createElement: t => El(t), createElementNS: (ns, t) => El(t),
+    addEventListener() {}, querySelector: () => El('div'), body: { appendChild(){} },
+  };
+  const ctx2 = { Cube, document: doc2, console, setTimeout, clearTimeout, Blob,
+    FileReader: ctx.FileReader,
+    window: { innerWidth: 1280, innerHeight: 820, addEventListener(){} },
+    localStorage: { getItem: k => (k in store2 ? store2[k] : null),
+                   setItem: (k, v) => { store2[k] = String(v); } },
+    navigator: {}, parseFloat, parseInt, Math, JSON, Object, Array, Set, String,
+    URL: ctx.URL, Image: ctx.Image };
+  ctx2.globalThis = ctx2;
+  vm.createContext(ctx2);
+  // 模式按钮也补出来（和上面主上下文一样）
+  {
+    const mb2 = doc2.getElementById('modebar');
+    const re = /<button data-mode="([^"]+)"/g; let m;
+    while ((m = re.exec(html))) {
+      const b = El('button');
+      b.dataset.mode = m[1];
+      b.offsetWidth = 40;
+      b.offsetLeft = mb2.children.length * 42;
+      mb2.appendChild(b);
+    }
+  }
+  // 输入框默认值也要灌进去（编辑器启动时会读）
+  {
+    const re = /<input\b[^>]*>/g; let m;
+    while ((m = re.exec(html))) {
+      const tag = m[0], id = (tag.match(/\bid="([^"]+)"/) || [])[1];
+      if (!id) continue;
+      const el = doc2.getElementById(id);
+      const v = (tag.match(/\bvalue="([^"]*)"/) || [])[1];
+      if (v !== undefined) el.value = v;
+      if (/\bchecked\b/.test(tag)) el.checked = true;
+    }
+  }
+  vm.runInContext(inline, ctx2, { filename: 'editor.html:reload' });
+
+  const svg2 = reg2['host'].innerHTML || '';
+  check('重新打开后模式还是 OLL',
+    reg2['modebar'].children[1].classList.contains('on'),
+    reg2['modebar'].children.map(b => b.classList.contains('on')).join());
+  const fills2 = [...new Set((svg2.match(/fill="([^"]+)"/g) || []))].join(' ');
+  check('重新打开后 OLL 的编辑还在，而且用的是存档里的黄色方案',
+    svg2.includes(schemeOn) && /class="cell"/.test(svg2),
+    'schemeOn=' + schemeOn + ' | fills: ' + fills2);
+  check('重新打开后 OLL 划线开关读回来了',
+    reg2['ollbars'].checked === false && !reg2['tg-bars'].classList.contains('on'),
+    'checked=' + reg2['ollbars'].checked + ' 高亮=' + reg2['tg-bars'].classList.contains('on'));
+  check('重新打开后 PLL 显示颜色开关读回来了',
+    reg2['pllcolor'].checked === false && !reg2['tg-pllcolor'].classList.contains('on'));
+  check('重新打开后相机滑块读回来了（cfg.elev = 1.2）',
+    parseFloat(reg2['elev'].value) === 1.2, String(reg2['elev'].value));
+  check('重新打开后导出参数也读回来了（文件名 / 尺寸 / 白底）',
+    reg2['exname'].value === 'my-cube' && String(reg2['exsize'].value) === '256' &&
+    reg2['exbg'].checked === false && !reg2['tg-bg'].classList.contains('on'),
+    reg2['exname'].value + ' / ' + reg2['exsize'].value + ' / ' + reg2['exbg'].checked);
+  check('重新打开时药丸也摆好了（不带动画）',
+    /placeMPill\(syncModeButtons\(\), animate !== false\)/.test(html));
+}
+
+/* ---------------- 一键「参数恢复默认」 ---------------- */
+{
+  // 默认值要和标记里的 value / checked 对得上（测试盯着，免得两边走偏）
+  check('导出默认值和标记一致（cube / 512 / 勾上白底）',
+    /var EX_DEFAULT = \{ name: 'cube', size: 512, bg: true \}/.test(html) &&
+    /id="exname" value="cube"/.test(html) && /id="exsize" value="512"/.test(html) &&
+    /id="exbg" checked/.test(html));
+
+  // 先把各项参数都改一遍
+  reg['elev'].value = '1.2';
+  reg['elev']._ev.input[0]({});
+  reg['exname'].value = 'zzz';
+  reg['exname']._ev.input[0]({});
+  reg['exsize'].value = '256';
+  reg['exsize']._ev.input[0]({});
+  reg['exbg'].checked = false;
+  reg['exbg']._ev.change[0]({});
+  mb[2]._ev.click[0]({});                  // 切到 PLL 才能动箭头色
+  reg['arrowcolors'].children[1]._ev.click[0]({});
+  mb[0]._ev.click[0]({});                  // 切回 F2L
+  const dirty = JSON.parse(store['cube-editor-v1'] || 'null');
+  const dex = (dirty.opts && dirty.opts.export) || {};
+  check('改过的参数（含导出文件名/尺寸/白底）都会写进存档',
+    dirty.opts.cfg.elev === 1.2 && dirty.opts.pllArrowKey === Cube.PLL_ARROW_COLORS[1].key &&
+    dex.name === 'zzz' && dex.size === 256 && dex.bg === false,
+    JSON.stringify(dex));
+  const snapBefore = JSON.stringify(dirty.snap);
+
+  // 一键恢复
+  reg['btn-params']._ev.click[0]({});
+  check('参数恢复默认：相机回到出厂值',
+    parseFloat(reg['elev'].value) === Cube.DEFAULT_CFG.elev, String(reg['elev'].value));
+  check('参数恢复默认：OLL 配色回到默认方案、划线开关回到默认',
+    schemeBtn(Cube.OLL_DEFAULT_SCHEME).classList.contains('on') &&
+    reg['ollbars'].checked === Cube.OLL_CFG.showBars &&
+    reg['tg-bars'].classList.contains('on') === !!Cube.OLL_CFG.showBars);
+  check('参数恢复默认：PLL 显示颜色回到勾上', reg['pllcolor'].checked === true &&
+    reg['tg-pllcolor'].classList.contains('on'));
+  check('参数恢复默认：箭头色回到默认一粒',
+    reg['arrowcolors'].children[0].classList.contains('on') &&
+    !reg['arrowcolors'].children[1].classList.contains('on'));
+  check('参数恢复默认：导出参数回到 cube / 512 / 白底',
+    reg['exname'].value === 'cube' && String(reg['exsize'].value) === '512' &&
+    reg['exbg'].checked === true && reg['tg-bg'].classList.contains('on'));
+  const after = JSON.parse(store['cube-editor-v1'] || 'null');
+  check('恢复默认之后存档里也是默认值',
+    after.opts.cfg.elev === Cube.DEFAULT_CFG.elev && after.opts.export.name === 'cube' &&
+    after.opts.pllArrowKey === Cube.PLL_DEFAULT_ARROW,
+    JSON.stringify({ elev: after.opts.cfg.elev, name: after.opts.export.name }));
+  check('「参数恢复默认」不动画面内容（快照没变）',
+    JSON.stringify(after.snap) === snapBefore);
+}
 
 console.log('\n结果: ' + pass + ' 通过, ' + fail + ' 失败');
 process.exit(fail ? 1 : 0);

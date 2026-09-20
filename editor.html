@@ -5,31 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>魔方配色编辑器</title>
 <link rel="icon" type="image/x-icon" href="cube-64x64.ico">
+<link rel="stylesheet" href="theme.css">
 <style>
-  :root{
-    --bg:#0f1319; --stage:#151a22; --panel:#181e27; --line:#2a3340;
-    --text:#e7edf5; --muted:#8a98aa; --accent:#4c8dff;
-    --field:#202836; --field-hover:#2a3547; --field-focus:#1d2532;
-    --chip:#1a212b; --chip-hover:#232c39; --chip-on-bg:#1e2c46; --chip-on-fg:#cfe0ff;
-    --line-strong:#3d4c61; --muted2:#5b6878;
-    --hint-bg:#12171e; --kbd-bg:#232b36; --kbd-line:#333e4d; --kbd-fg:#c7d2e0;
-    --scroll:#2b3542;
-    --toast-bg:#243044; --toast-fg:#dbe6f5; --toast-line:#3a4c66;
-  }
-  /* 白天模式：整套主色翻过来。用柔和的暖粉配色
-     （#FFF5F5 / #F7D6D0 / #E2B4BD / #4A4A4A）—— 页面柔粉、面板暖白，
-     比冷蓝白不刺眼，也比纯白面板成套。
-     accent 是同色系加深过的 #E2B4BD —— 原色太浅，配白字和当文字用都看不清。 */
-  html[data-theme="light"]{
-    --bg:#F7D6D0; --stage:#FFF5F5; --panel:#FFF5F5; --line:#E2B4BD;
-    --text:#4A4A4A; --muted:#7A6E6E; --accent:#A05566;
-    --field:#FFFFFF; --field-hover:#F7D6D0; --field-focus:#FFFFFF;
-    --chip:#F7D6D0; --chip-hover:#E2B4BD; --chip-on-bg:#E2B4BD; --chip-on-fg:#4A4A4A;
-    --line-strong:#CE96A3; --muted2:#9C8C8C;
-    --hint-bg:#F7D6D0; --kbd-bg:#F7D6D0; --kbd-line:#E2B4BD; --kbd-fg:#4A4A4A;
-    --scroll:#E2B4BD;
-    --toast-bg:#FFF5F5; --toast-fg:#4A4A4A; --toast-line:#E2B4BD;
-  }
+  /* 两套主题的所有颜色变量都在 theme.css 里，这里只管版式。 */
   *{box-sizing:border-box}
   html,body{height:100%;margin:0}
   body{
@@ -41,23 +19,46 @@
 
   /* ---------- 画布 ---------- */
   .stage{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--stage);position:relative}
+  /* 面板色：这条浮在舞台上，用 --chip 会和舞台同色糊掉 */
   .modebar{position:absolute;left:16px;top:14px;z-index:5;display:flex;gap:2px;
-           background:var(--chip);border:1px solid var(--line);border-radius:9px;padding:3px}
-  .modebar button{background:none;border:none;color:#7f8fa4;font:inherit;font-size:11.5px;
-                  font-weight:600;letter-spacing:.09em;padding:4px 13px;border-radius:6px;
-                  cursor:pointer;transition:.12s}
-  .modebar button:hover{color:var(--text);background:var(--chip-hover)}
-  .modebar button.on{background:var(--accent);color:#fff}
-  .stage-inner{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:18px}
+           background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:3px}
+  /* 选中态的底由 .mpill 提供（和导航栏同一个做法）：一个会滑过去的小方块，
+     按钮自己不再画背景，免得盖在药丸上、看着发灰 */
+  .mpill{position:absolute;left:0;top:0;border-radius:6px;background:var(--accent);
+         transition:transform .18s ease,width .18s ease,height .18s ease;pointer-events:none}
+  /* 字色晚一步再变（延迟 = 药丸滑过来的时间）：不然新选中的那个会先压在白底上
+     「闪」一下才亮 —— 导航栏当初就是这个问题。失去选中态那一边不延迟，立刻变灰。 */
+  .modebar button{position:relative;z-index:1;background:none;border:none;color:var(--muted);
+                  font:inherit;font-size:11.5px;font-weight:600;letter-spacing:.09em;
+                  padding:4px 13px;border-radius:6px;cursor:pointer;
+                  transition:color .18s ease .18s}
+  .modebar button:not(.on){transition-delay:0s}
+  .modebar button:hover{color:var(--text)}
+  .modebar button.on{color:var(--on-accent, #fff)}
+  @media (prefers-reduced-motion: reduce){ .mpill{transition:none} }
+  .stage-inner{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;
+               padding:18px;position:relative;overflow:hidden}
   #host{width:100%;height:100%;max-width:min(100%,88vh);max-height:100%;
         display:flex;align-items:center;justify-content:center}
-  #host svg{width:100%;height:100%;display:block;overflow:visible}
+  #host svg{width:100%;height:100%;display:block;overflow:visible;
+            transform:scale(var(--zoom,1));transform-origin:50% 50%}
+  /* 放大缩小：贴在画布右下角（舞台底部那条提示栏不属于画布，所以挂在 stage-inner 里） */
+  .zoom{position:absolute;right:6px;bottom:6px;display:grid;gap:6px;z-index:4}
+  .zoom button{width:40px;height:40px;padding:0;margin:0;border:0;background:none;
+               box-shadow:none;border-radius:12px;cursor:pointer;
+               display:grid;place-items:center;color:var(--muted);opacity:.6;
+               transition:opacity .14s ease,color .14s ease,scale .12s ease}
+  .zoom button svg{width:26px;height:26px;display:block;fill:none;stroke:currentColor;
+                   stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+  .zoom button:hover:not(:disabled){opacity:1;color:var(--accent-text);scale:1.1}
+  .zoom button:active:not(:disabled){scale:.94}
+  .zoom button:focus-visible{opacity:1;color:var(--accent-text);
+                             outline:2px solid var(--accent-text);outline-offset:-6px}
+  .zoom button:disabled{opacity:.22;cursor:default}
 
-  .themebtn{position:absolute;right:16px;top:14px;z-index:5;
-            width:34px;height:34px;padding:0;display:grid;place-items:center;
-            background:var(--panel);border:1px solid var(--line);color:var(--muted);
-            border-radius:9px;cursor:pointer;transition:.12s;user-select:none}
-  .themebtn:hover{color:var(--text);border-color:var(--line-strong);background:var(--chip-hover)}
+  /* 只管位置 —— 开关本身的样式（尺寸/底色/滑块）在 nav.css 里，七页共用 */
+  .themebtn{position:absolute;right:16px;top:14px;z-index:5}
+
   .themebtn svg{display:block}
 
   .hint{margin:0;padding:10px 16px;border-top:1px solid var(--line);
@@ -68,13 +69,13 @@
   #host .cell{cursor:pointer}
   #host .cell .sticker{transition:filter .08s ease,stroke .08s ease}
   #host .cell:hover .sticker{filter:brightness(1.18) saturate(1.1)}
-  #host .cell.is-sel .sticker{stroke:var(--accent);stroke-width:.085}
+  #host .cell.is-sel .sticker{stroke:var(--accent-text);stroke-width:.085}
   /* PLL 拖拽反馈 */
   #host .cell.dragging .sticker{opacity:.92}
   /* 被抓住的格子必须对指针透明：否则 elementFromPoint 只会命中它自己，
      落点永远解析成起点，怎么拖都没反应 —— 这就是之前"没有拖拽感"的一半原因 */
   #host .cell.dragging, #host .cell.dragging *{pointer-events:none}
-  #host .cell.dropok .sticker{stroke:var(--accent);stroke-width:.09}
+  #host .cell.dropok .sticker{stroke:var(--accent-text);stroke-width:.09}
 
   /* ---------- 就地取色圈 ---------- */
   .ring{position:fixed;width:0;height:0;z-index:60;pointer-events:none}
@@ -93,7 +94,7 @@
     transform:rotate(var(--a)) translateY(calc(var(--r) * -1)) rotate(calc(var(--a) * -1));
   }
   .ring .dot:hover{box-shadow:0 0 0 3px #ffffffcc,0 4px 16px #000b}
-  .ring .dot.cur{box-shadow:0 0 0 3px var(--accent),0 4px 14px #000a}
+  .ring .dot.cur{box-shadow:0 0 0 3px var(--accent-text),0 4px 14px #000a}
   .ring::after{
     content:'';position:absolute;left:-3px;top:-3px;width:6px;height:6px;border-radius:50%;
     background:var(--accent);opacity:0;transition:opacity .12s ease;
@@ -125,7 +126,7 @@
     color:var(--text);padding:6px 9px;font:inherit;font-size:12.5px;
   }
   .row input[type=text]:focus,.row input[type=number]:focus{
-    outline:none;border-color:var(--accent);background:var(--field-focus)}
+    outline:none;border-color:var(--accent-text);background:var(--field-focus)}
   .row .unit{flex:none;color:var(--muted2);font-size:11.5px}
 
   .presets{display:flex;gap:5px;margin:0 0 11px 61px}
@@ -133,7 +134,7 @@
                   border-radius:7px;color:var(--muted);padding:5px 0;
                   font:inherit;font-size:11px;cursor:pointer;transition:.1s}
   .presets button:hover{color:var(--text);border-color:var(--line-strong)}
-  .presets button.on{color:var(--chip-on-fg);border-color:var(--accent);background:var(--chip-on-bg)}
+  .presets button.on{color:var(--chip-on-fg);border-color:var(--accent-text);background:var(--chip-on-bg)}
   .namehint{margin:-2px 0 11px 61px;color:var(--muted2);font-size:11px;line-height:1.5;word-break:break-all}
   .namehint b{color:var(--muted);font-weight:600}
 
@@ -142,14 +143,14 @@
   .seg button{flex:1;background:none;border:none;color:var(--muted);font:inherit;font-size:12px;
               padding:6px 0;border-radius:6px;cursor:pointer;transition:.12s}
   .seg button:hover{color:var(--text)}
-  .seg button.on{background:var(--accent);color:#fff}
+  .seg button.on{background:var(--accent);color:var(--on-accent, #fff)}
 
   .schemes{display:flex;gap:7px;flex-wrap:wrap}
   /* 纯色块，不带文字（名字留在 title 里，悬停可看） */
   .schemes button{width:36px;height:36px;border-radius:9px;border:2px solid var(--line);
                   cursor:pointer;padding:0;transition:.12s}
   .schemes button:hover{border-color:var(--line-strong);transform:translateY(-1px)}
-  .schemes button.on{border-color:var(--accent);box-shadow:0 0 0 2px #a0556640}
+  .schemes button.on{border-color:var(--accent-text);box-shadow:0 0 0 2px var(--accent-glow)}
 
   /* 取色器 */
   .row input[type=color]{flex:1;min-width:0;height:32px;padding:2px;background:var(--field);
@@ -160,13 +161,14 @@
   .tg{display:inline-flex;align-items:center;gap:6px;background:var(--field);border:1px solid var(--line);
       border-radius:8px;padding:6px 10px;cursor:pointer;color:var(--muted);font-size:12.5px;user-select:none}
   .tg input{accent-color:var(--accent);margin:0}
-  .tg.on{color:var(--text);border-color:var(--accent)}
+  .tg.on{color:var(--text);border-color:var(--accent-text)}
 
   .btns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   button.act{background:var(--field);color:var(--text);border:1px solid var(--line);border-radius:8px;
              padding:9px 10px;font:inherit;font-size:12.5px;cursor:pointer;transition:background .1s}
   button.act:hover:not(:disabled){background:var(--field-hover);border-color:var(--line-strong)}
   button.act:disabled{opacity:.38;cursor:default}
+  button.act.wide{width:100%;margin-top:8px}
 
   #toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,14px);
          background:var(--toast-bg);color:var(--toast-fg);border:1px solid var(--toast-line);border-radius:9px;
@@ -191,14 +193,27 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
 
 <script src="nav.js"></script>
 <div class="app">
-  <main class="stage">
+  <main class="stage" id="stage">
     <button class="themebtn" id="themebtn"></button>
     <div class="modebar" id="modebar">
+      <span class="mpill" id="mpill"></span>
       <button data-mode="f2l" class="on">F2L</button>
       <button data-mode="oll">OLL</button>
       <button data-mode="pll">PLL</button>
     </div>
-    <div class="stage-inner"><div id="host"></div></div>
+    <div class="stage-inner"><div id="host"></div>
+      <div class="zoom">
+        <button id="zin" type="button" title="放大（滚轮向上也可以）" aria-label="放大"><svg
+          viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.4 15.4L21 21"/><path
+          d="M10.5 7.6v5.8M7.6 10.5h5.8"/></svg></button>
+        <button id="zout" type="button" title="缩小（滚轮向下也可以）" aria-label="缩小"><svg
+          viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.4 15.4L21 21"/><path
+          d="M7.6 10.5h5.8"/></svg></button>
+        <button id="zreset" type="button" title="恢复默认大小（100%）" aria-label="恢复默认大小"><svg
+          viewBox="0 0 24 24"><path d="M9.5 4.5v5h-5"/><path d="M14.5 4.5v5h5"/><path
+          d="M9.5 19.5v-5h-5"/><path d="M14.5 19.5v-5h5"/></svg></button>
+      </div>
+    </div>
     <p class="hint" id="hint">
       点任意贴纸 → <b>就地弹出取色圈</b>，选完即走 · 右键直接清除 · <kbd>Ctrl</kbd>+<kbd>Z</kbd> 撤销
     </p>
@@ -241,6 +256,7 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
         <button class="act" id="btn-undo">撤销</button>
         <button class="act" id="btn-redo">重做</button>
       </div>
+      <button class="act wide" id="btn-params" title="只重置右栏的参数（相机/样式/配色/箭头/导出），画面内容不动">参数恢复默认</button>
     </section>
 
     <section class="sec">
@@ -298,9 +314,16 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   var pll = Cube.pllDefault();               // 8 个顶层块各在哪个槽位（置换）
   var pllShowColors = true;                  // 颜色+箭头 / 仅箭头
   var pllArrowKey = Cube.PLL_DEFAULT_ARROW;  // 箭头颜色预设，默认深紫
+
   function pllArrowColor() { return Cube.pllArrowColorOf(pllArrowKey); }
   var scheme = Cube.OLL_DEFAULT_SCHEME;   // OLL 实心格配色方案（固定色，不随主题变）
   var showOllBars = Cube.OLL_CFG.showBars;  // 边框划线默认透明
+  // 存档键：编辑器的状态是自己的；缩放另外有一个键，三页共用
+  var ZOOM_KEY = 'cube-zoom-v1', MODE_KEY = 'cube-editor-v1';
+  // 读取上次的编辑状态（三个模式的数据 + 选项）。放在这里：下面那些控件
+  // 都是照着状态初始化的，读晚了滑块/开关就会显示默认值而状态是旧的。
+  var savedEditor = loadEditor();
+  restoreEditor(savedEditor);
   // forceLight：导出白底时强制用浅色底那套墨，否则浅墨画在白底上看不见
   function ollOpts(forceLight) {
     return { scheme: scheme, theme: forceLight ? 'light' : theme, showBars: showOllBars };
@@ -355,6 +378,7 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     }
     syncRing();
     syncNameHint();   // 画面比例变了，导出高度也跟着变
+    saveEditor();     // 改完就存（内容、选项、模式都走 render）
   }
 
   // 当前模式的画面尺寸（导出算高度要用）
@@ -509,7 +533,84 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
 
   window.addEventListener('resize', function () {
     if (openId) { closeRing(); render(); }
+    placeMPill(syncModeButtons(), false);
   });
+
+  /* ---------------- 放大缩小（画布右下角按钮 + 滚轮） ----------------
+     缩放值写在 #host 的 --zoom 上，不写在 svg 上 —— render() 会整个换掉 svg，
+     写在父元素上才不会被重画冲掉。
+     svg 上的 CSS transform 会被 getBoundingClientRect 算进去，
+     所以「屏幕坐标 -> SVG 坐标」那套换算（svgGeom）不用改。 */
+  var zoom = 1, ZMIN = 0.5, ZMAX = 2.5;
+  function applyZoom() { host.style.setProperty('--zoom', zoom); }
+  function syncZoom() {
+    document.getElementById('zin').disabled = zoom >= ZMAX - 0.001;
+    document.getElementById('zout').disabled = zoom <= ZMIN + 0.001;
+    document.getElementById('zreset').disabled = Math.abs(zoom - 1) < 0.001;
+  }
+  function setZoom(z) {
+    var nz = Math.max(ZMIN, Math.min(ZMAX, z));
+    if (Math.abs(nz - zoom) > 0.001) { zoom = nz; applyZoom(); saveZoom(); }
+    syncZoom();
+  }
+  document.getElementById('zin').addEventListener('click', function () { setZoom(zoom * 1.25); });
+  document.getElementById('zout').addEventListener('click', function () { setZoom(zoom / 1.25); });
+  document.getElementById('zreset').addEventListener('click', function () { setZoom(1); });
+  // 滚轮：只有指针在画布上才缩放（右栏里要正常滚动），preventDefault 掉默认滚动
+  document.getElementById('stage').addEventListener('wheel', function (e) {
+    e.preventDefault();
+    var d = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;   // Firefox 有时按「行」给
+    setZoom(zoom * Math.exp(-d * 0.0016));
+  }, { passive: false });
+  /* 存档：模式是编辑器自己的（cube-editor-v1），缩放三页共用（cube-zoom-v1）——
+     在计算器里调大的魔方，切到编辑器也是同样大小。 */
+  function saveZoom() { try { localStorage.setItem(ZOOM_KEY, String(zoom)); } catch (e) {} }
+  function loadZoom() {
+    var v = NaN;
+    try { v = parseFloat(localStorage.getItem(ZOOM_KEY)); } catch (e) {}
+    return (isFinite(v) && v >= ZMIN && v <= ZMAX) ? v : 1;
+  }
+  /* 编辑器自己的存档（cube-editor-v1）：当前模式 + 三个模式各自的编辑状态 + 各项选项。
+     数据用的是撤销那套 snapshot()/restore() —— 一份快照就是三个模式的全部内容，
+     所以「切模式再切回来」「刷新再打开」都不会丢东西。
+     选项 = F2L 的相机/样式 cfg、OLL 的方案与划线、PLL 的显示开关与箭头色。 */
+  function saveEditor() {
+    try {
+      localStorage.setItem(MODE_KEY, JSON.stringify({
+        mode: mode,
+        snap: snapshot(),
+        opts: { cfg: cfg, scheme: scheme, showOllBars: showOllBars,
+                pllShowColors: pllShowColors, pllArrowKey: pllArrowKey,
+                export: exportOpts() }
+      }));
+    } catch (e) {}
+  }
+  function loadEditor() {
+    try {
+      var d = JSON.parse(localStorage.getItem(MODE_KEY) || 'null');
+      return (d && typeof d === 'object') ? d : null;
+    } catch (e) { return null; }
+  }
+  /* 把存档灌回状态。任何一项不合法就跳过它 ——
+     宁可少恢复一项，也不要一打开就崩在半路。 */
+  function restoreEditor(d) {
+    if (!d) return;
+    try {
+      if (d.snap && d.snap.f2l) restore(d.snap);
+    } catch (e) {}
+    var o = d.opts || {};
+    if (o.cfg) cfg = Object.assign({}, Cube.DEFAULT_CFG, o.cfg);
+    if (o.scheme && Cube.ollScheme(o.scheme)) scheme = o.scheme;
+    if (typeof o.showOllBars === 'boolean') showOllBars = o.showOllBars;
+    if (typeof o.pllShowColors === 'boolean') pllShowColors = o.pllShowColors;
+    if (o.pllArrowKey && Cube.PLL_ARROW_COLORS.some(function (a) { return a.key === o.pllArrowKey; })) {
+      pllArrowKey = o.pllArrowKey;
+    }
+  }
+  function savedMode(d) { return (d && MODES[d.mode]) ? d.mode : 'f2l'; }
+  zoom = loadZoom();
+  applyZoom();
+  syncZoom();
 
   /* ---------------- PLL 拖拽 ----------------
      拖方块 = 两块对调；拖箭头两端 = 拖哪端哪端跟着走。
@@ -710,26 +811,12 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
 
   /* ---------------- 白天 / 夜晚 ---------------- */
   var themeBtn = document.getElementById('themebtn');
-  // 图标用内联 SVG：☀/☾ 这类字符在不同系统上会落到不同的字体甚至变成 emoji，不稳
-  var THEME_ICON = {
-    sun: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"' +
-         ' stroke-width="2" stroke-linecap="round">' +
-         '<circle cx="12" cy="12" r="4.4"/>' +
-         '<path d="M12 2.2v2.6M12 19.2v2.6M2.2 12h2.6M19.2 12h2.6' +
-         'M5.1 5.1l1.9 1.9M17 17l1.9 1.9M18.9 5.1L17 7M7 17l-1.9 1.9"/></svg>',
-    moon: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"' +
-          ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-          '<path d="M20.2 14.7A8.6 8.6 0 1 1 9.3 3.8a6.9 6.9 0 0 0 10.9 10.9z"/></svg>'
-  };
   function applyTheme(t, silent) {
     theme = (t === 'light') ? 'light' : 'dark';
     document.documentElement.dataset.theme = theme;
     // 和别的页共用同一个键 —— 以前编辑器只在开屏读了一下、从不写，
     // 所以在编辑器里切了主题，切到别的页又变回去
     try { localStorage.setItem('cube-theme', theme); } catch (e) {}
-    // 图标表示"点它切到哪边"：夜晚模式显示太阳，白天模式显示月亮
-    themeBtn.dataset.icon = theme === 'light' ? 'moon' : 'sun';
-    themeBtn.innerHTML = THEME_ICON[themeBtn.dataset.icon];
     themeBtn.title = theme === 'light' ? '切换到夜晚模式' : '切换到白天模式';
     syncSchemes();          // 色卡颜色随主题变
     closeRing();
@@ -779,7 +866,27 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   var presetsEl = document.getElementById('expresets');
   var exHint = document.getElementById('exhint');
 
-  exBg.addEventListener('change', function () { tgBg.classList.toggle('on', exBg.checked); });
+  // 导出这三项也算「参数」，一样存档、一样能被「参数恢复默认」复位。
+  // 默认值写在这里（和标记里 value="cube" / value="512" / checked 对应，测试盯着它们别走偏）
+  var EX_DEFAULT = { name: 'cube', size: 512, bg: true };
+  function exportOpts() {
+    return { name: exName.value, size: exportSize(), bg: !!exBg.checked };
+  }
+  function resetExportOpts() {
+    exName.value = EX_DEFAULT.name;
+    exSize.value = EX_DEFAULT.size;
+    exBg.checked = EX_DEFAULT.bg;
+  }
+  // 读回上次的导出参数
+  var savedEx = (savedEditor && savedEditor.opts && savedEditor.opts.export) || {};
+  if (typeof savedEx.name === 'string') exName.value = savedEx.name;
+  if (isFinite(savedEx.size)) exSize.value = savedEx.size;
+  if (typeof savedEx.bg === 'boolean') exBg.checked = savedEx.bg;
+
+  exBg.addEventListener('change', function () {
+    tgBg.classList.toggle('on', exBg.checked);
+    saveEditor();
+  });
   tgBg.classList.toggle('on', exBg.checked);
 
   function safeName() {
@@ -815,15 +922,18 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   SIZE_PRESETS.forEach(function (v) {
     var b = document.createElement('button');
     b.textContent = String(v);
-    b.addEventListener('click', function () { exSize.value = v; syncPresets(); syncNameHint(); });
+    b.addEventListener('click', function () {
+      exSize.value = v; syncPresets(); syncNameHint(); saveEditor();
+    });
     presetsEl.appendChild(b);
   });
-  exSize.addEventListener('input', function () { syncPresets(); syncNameHint(); });
+  exSize.addEventListener('input', function () { syncPresets(); syncNameHint(); saveEditor(); });
   // 文件名里不允许的字符就地替换掉，省得导出时才发现
   exName.addEventListener('input', function () {
     var clean = exName.value.replace(/[\\/:*?"<>|]+/g, '-');
     if (clean !== exName.value) exName.value = clean;
     syncNameHint();
+    saveEditor();
   });
 
   // 按指定像素宽生成 SVG（等比算高度），宽高写进 <svg> 标签
@@ -977,12 +1087,36 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     }
   });
 
-  function setMode(m) {
+  /* 选中态的小方块：和导航栏一样，切模式时滑过去，而不是"跳"过去。
+     位置用按钮的 offsetLeft/offsetTop —— 绝对定位的子元素正好也是相对
+     padding 边算的，所以药丸和按钮对得上（modebar 自己有 3px 内边距）。 */
+  var mpill = document.getElementById('mpill');
+  function placeMPill(el, animate) {
+    if (!mpill || !el) return;
+    if (!animate) mpill.style.transition = 'none';
+    mpill.style.width = el.offsetWidth + 'px';
+    mpill.style.height = el.offsetHeight + 'px';
+    mpill.style.transform = 'translate(' + el.offsetLeft + 'px,' + el.offsetTop + 'px)';
+    if (!animate) {
+      void mpill.offsetWidth;          // 逼一次重排，免得初始定位也被当成动画
+      mpill.style.transition = '';
+    }
+  }
+  function syncModeButtons() {
+    var active = null;
+    Array.prototype.forEach.call(document.getElementById('modebar').children, function (b) {
+      if (!b.dataset || !b.dataset.mode) return;      // 跳过药丸本身
+      b.classList.toggle('on', b.dataset.mode === mode);
+      if (b.dataset.mode === mode) active = b;
+    });
+    return active;
+  }
+
+  function setMode(m, animate) {
     if (!MODES[m]) return;
     mode = m;
-    Array.prototype.forEach.call(document.getElementById('modebar').children, function (b) {
-      b.classList.toggle('on', b.dataset.mode === m);
-    });
+    saveEditor();
+    placeMPill(syncModeButtons(), animate !== false);
     document.title = '魔方配色编辑器 · ' + MODES[m];
     syncModeUI();
     closeRing();
@@ -1013,12 +1147,38 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     b.addEventListener('click', function () { setMode(b.dataset.mode); });
   });
 
+  /* 一键把右栏参数恢复默认：相机 / 样式 / 配色方案 / 边框划线 / 箭头色 / 导出设置。
+     画面内容（画上去的贴纸、朝向、置换）不归它管 —— 那是各模式里
+     「恢复默认配色 / 恢复默认朝向 / 还原为已复原」那三个按钮的事。 */
+  document.getElementById('btn-params').addEventListener('click', function () {
+    cfg = Object.assign({}, Cube.DEFAULT_CFG);
+    scheme = Cube.OLL_DEFAULT_SCHEME;
+    showOllBars = Cube.OLL_CFG.showBars;
+    pllShowColors = true;
+    pllArrowKey = Cube.PLL_DEFAULT_ARROW;
+    resetExportOpts();
+    // 控件跟着回写（不然状态是默认的、面板还显示旧值）
+    syncControls();
+    syncPresets();
+    syncSchemes();
+    syncArrowColors();
+    pllColorEl.checked = pllShowColors;
+    tgPllColor.classList.toggle('on', pllShowColors);
+    olBarsEl.checked = showOllBars;
+    tgBars.classList.toggle('on', showOllBars);
+    tgBg.classList.toggle('on', exBg.checked);
+    syncNameHint();
+    closeRing();
+    render();              // 里面的 saveEditor() 顺手把这份默认值写进存档
+    toast('参数已恢复默认');
+  });
+
   syncControls();
   syncPresets();
   syncSchemes();
   applyTheme(theme, true);
   syncHistoryButtons();
-  setMode(mode);
+  setMode(savedMode(savedEditor), false);   // 首次定位不要动画
 })();
 </script>
 </body>

@@ -1,0 +1,104 @@
+/* ==========================================================================
+   主题调色板 —— 七个页面共用这一份
+   --------------------------------------------------------------------------
+   想换配色，只改这个文件就够了：页面自己的 <style> 里不再定义任何颜色变量
+   （test/links.js 有一节专门盯着这件事，谁偷偷在自己页面里定义 --bg 会红）。
+
+   怎么改：
+     · 只想换个色相  -> 改下面两套里的十六进制值，别的都不用动
+     · 想加一套主题  -> 再加一个 html[data-theme="xxx"]{...} 块，
+                        并把 nav.js 里的开关接上
+     · 卡面/描边/输入框这些中间档，是照着「角色」给的：
+         --bg 最底 -> --card/--panel 卡面（比底亮一档）
+         -> --chip 凹进去的小块（比卡面深一档）-> --line 描边
+       深色主题里「亮一档」是反过来的，只要保住这层关系，层次就不会糊。
+
+   每个变量是干什么的：
+     --bg / --stage     页面底 / 舞台（计算器·练习·编辑器里占满屏的那块）
+     --card / --panel   卡面、面板（--panel 是计算器/编辑器里的叫法，同值）
+     --field            输入框、按钮这类「浮在卡面上」的底
+     --field-hover      它们的悬停态        --field-focus  聚焦态
+     --chip             凹进去的小块（表头行、代码悬停底）--chip-hover 悬停态
+     --chip-on-bg/fg    选中态的小块（编辑器预设按钮）
+     --line             分隔线、细描边      --line-strong  要跳出来的描边
+     --text             正文               --muted  次要文字（表头、说明、编号）
+     --muted2           更弱的提示文字
+     --accent           主色：当实心底（上面配 --on-accent 的字），也当文字/图标用
+     --on-accent        压在 --accent 实心底上的字和图标
+     --accent-text      accent 当文字用的那一档；默认 = --accent。
+                        只有当某套配色里「当底」和「当文字」需要两个深浅时才覆盖它
+                        （比如上一版夜晚的深蓝：当底要够深才压得住白字，
+                          当文字又得够亮才看得清，只好分两档）
+     --accent-glow      accent 的光环/投影（带透明度）
+     --badge            图片上的小角标底（半透明）
+     --head-red/-green  公式表表头的语义色（红 F / 绿 F）
+     --head-band        公式表每节标题的底色条
+     --hint-bg / --kbd-bg / --kbd-line / --kbd-fg   编辑器里的提示条和键帽
+     --toast-bg / --toast-fg / --toast-line         右下角复制提示
+     --scroll           滚动条滑块      --cubie  魔方塑料壳（正交视图的底色）
+     --btn-bg / --btn-bg2    按钮底色的上下两端（浅渐变 = 有一点光泽）
+     --btn-hi / --btn-shade / --btn-drop
+                        按钮的顶边高光 / 底边暗边（按下时也当内阴影）/ 落地投影
+   ========================================================================== */
+
+/* 白天：浅蓝紫 —— #B1B2FF / #AAC4FF / #D2DAFF / #EEF1FF
+   这一套四个色都很浅，最深那个 #B1B2FF 当正文压卡面只有 1.7:1 —— 所以：
+     页面 #D2DAFF、卡面 #EEF1FF、描边 #AAC4FF、强调描边与悬停底 #B1B2FF（四色都用上了）
+   正文和 accent 只能在同色系里往下压：
+     --text   #3A3F73  8.7:1（压页面底也有 7.1:1）
+     --muted  #5A60A0  次要文字（表头、说明、图上编号）5.2:1
+     --accent #5A5FBF  #B1B2FF 配白字只有 2.6:1、当文字 2.9:1，两头都不够；
+                       压深成同色系蓝紫：配白字 5.5:1、当文字 4.9:1
+     其余派生档：--muted2 #8A90C8、--chip-on-bg #C7D0FD、--btn-bg2 #E4E9FF */
+:root{
+  color-scheme: light;
+  --bg:#D2DAFF; --stage:#D2DAFF; --card:#EEF1FF; --panel:#EEF1FF;
+  --line:#AAC4FF; --line-strong:#B1B2FF;
+  --text:#3A3F73; --muted:#5A60A0;
+  --accent:#5A5FBF; --on-accent:#FFFFFF; --accent-text:var(--accent);
+  --accent-glow:#5a5fbf40;
+  --field:#FFFFFF; --field-hover:#D2DAFF; --field-focus:#FFFFFF;
+  --chip:#D2DAFF; --chip-hover:#B1B2FF; --chip-on-bg:#C7D0FD; --chip-on-fg:#3A3F73;
+  --badge:#ffffffb3;
+  --head-red:#c0392b; --head-green:#1a7440; --head-band:#AAC4FF;
+  --muted2:#8A90C8; --hint-bg:#D2DAFF; --kbd-bg:#D2DAFF; --kbd-line:#AAC4FF; --kbd-fg:#3A3F73;
+  --scroll:#AAC4FF; --toast-bg:#EEF1FF; --toast-fg:#3A3F73; --toast-line:#AAC4FF;
+  /* 按钮的「厚度」：底色是上亮下暗的浅渐变，--btn-hi 是顶边那道高光，
+     --btn-shade 既是底边的暗边、也是按下去时的内阴影，--btn-drop 是落地投影 */
+  --btn-bg:#FFFFFF; --btn-bg2:#E4E9FF;
+  --btn-hi:#ffffffd9; --btn-shade:#2a2f5e1f; --btn-drop:#2a2f5e29;
+  --cubie:#16181c;
+}
+
+/* 夜晚：石墨灰 + 暖黄 —— #222831 / #393E46 / #FFD369 / #EEEEEE
+   黄当主色，压在它上面的字必须是深的（--on-accent #222831，10.4:1）——
+   黄色配白字只有 1.4:1，等于看不清。 */
+html[data-theme="dark"]{
+  color-scheme: dark;
+  --bg:#222831; --stage:#222831; --card:#393E46; --panel:#393E46;
+  --line:#4A505A; --line-strong:#5C636D;
+  --text:#EEEEEE; --muted:#ADB3BD;
+  --accent:#FFD369; --on-accent:#222831;
+  --accent-glow:#FFD36940;
+  --field:#434952; --field-hover:#4A505A; --field-focus:#434952;
+  --chip:#2C323B; --chip-hover:#4A505A; --chip-on-bg:#4A505A; --chip-on-fg:#EEEEEE;
+  --badge:#222831cc;
+  --head-red:#FF9482; --head-green:#7BD9A0; --head-band:#1B1F26;
+  --muted2:#8A9099; --hint-bg:#1B1F26; --kbd-bg:#393E46; --kbd-line:#4A505A; --kbd-fg:#EEEEEE;
+  --scroll:#4A505A; --toast-bg:#434952; --toast-fg:#EEEEEE; --toast-line:#4A505A;
+  --btn-bg:#464D58; --btn-bg2:#3B414A;
+  --btn-hi:#ffffff1a; --btn-shade:#00000059; --btn-drop:#00000059;
+  --cubie:#16181C;
+}
+
+/* 打印：不管当前是白天还是夜晚、data-theme 有没有被设过，一律白底黑字。
+   :root 压不过 html[data-theme="dark"]（少一个属性选择器），所以两个都列上；
+   theme.css 在页面自己的 <style> 之前加载，页面里的打印版式照样盖得住。 */
+@media print{
+  :root,html[data-theme="dark"]{
+    --bg:#fff; --stage:#fff; --card:#fff; --panel:#fff;
+    --text:#000; --muted:#555; --line:#bbb; --line-strong:#999;
+    --chip:#f4f6f9; --badge:#fff; --head-band:#eef1f5;
+    --head-red:#a33; --head-green:#156b3a; --accent:#7a4a58; --on-accent:#fff;
+  }
+}

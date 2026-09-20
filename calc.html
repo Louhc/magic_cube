@@ -5,27 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>魔方计算器</title>
 <link rel="icon" type="image/x-icon" href="cube-64x64.ico">
+<link rel="stylesheet" href="theme.css">
 <link rel="stylesheet" href="nav.css">
 <style>
-  :root{
-    color-scheme: light;
-    /* 白天用一套柔和的暖粉配色（#FFF5F5 / #F7D6D0 / #E2B4BD / #4A4A4A）——
-       页面柔粉 #F7D6D0、卡面暖白 #FFF5F5，比原来的冷蓝白柔和，也不刺眼。accent 是同色系加深过的 #E2B4BD：
-       原色太浅，配白字只有 1.8:1、当文字用只有 1.7:1，都看不清。 */
-    --bg:#F7D6D0; --stage:#FFF5F5; --panel:#FFF5F5; --line:#E2B4BD;
-    --text:#4A4A4A; --muted:#7A6E6E; --accent:#A05566;
-    --field:#FFFFFF; --field-hover:#F7D6D0;
-    --line-strong:#CE96A3; --chip:#F7D6D0; --chip-hover:#E2B4BD;
-    --scroll:#E2B4BD; --cubie:#16181c;
-  }
-  html[data-theme="dark"]{
-    color-scheme: dark;
-    --bg:#0f1319; --stage:#151a22; --panel:#181e27; --line:#2a3340;
-    --text:#e7edf5; --muted:#8a98aa; --accent:#4c8dff;
-    --field:#202836; --field-hover:#2a3547;
-    --line-strong:#3d4c61; --chip:#1a212b; --chip-hover:#232c39;
-    --scroll:#2b3542; --cubie:#0c0e11;
-  }
+  /* 两套主题的所有颜色变量都在 theme.css 里，这里只管版式。 */
   *{box-sizing:border-box}
   html,body{height:100%;margin:0}
   body{
@@ -40,27 +23,48 @@
          background:var(--stage);perspective:1400px;perspective-origin:50% 48%;
          cursor:grab;user-select:none;touch-action:none;overflow:hidden}
   .stage.drag{cursor:grabbing}
-  .themebtn{position:absolute;right:16px;top:14px;z-index:5;
-            width:34px;height:34px;padding:0;display:grid;place-items:center;
-            background:var(--panel);border:1px solid var(--line);color:var(--muted);
-            border-radius:9px;cursor:pointer;transition:.12s;font-size:15px;line-height:1}
-  .themebtn:hover{color:var(--text);border-color:var(--line-strong);background:var(--chip-hover)}
+  /* 只管位置 —— 开关本身的样式（尺寸/底色/滑块）在 nav.css 里，七页共用 */
+  .themebtn{position:absolute;right:16px;top:14px;z-index:5}
 
-  /* 四周的整体旋转按钮：不参与 3D，所以不会跟着魔方一起转 */
+
+  /* 四周的整体旋转按钮：不参与 3D，所以不会跟着魔方一起转。
+     做成「无边框的大按键」—— 只有一条折线（へ / く）或一段圆弧，
+     整块 56px 都是命中区；平时淡，指上去染色并放大，按下去缩一点。
+     注意抬升/缩放用的是 scale（不是 transform）：这几个按钮靠 transform 定位。 */
   .orbit{position:absolute;inset:0;pointer-events:none;z-index:4}
-  .orbit button{position:absolute;pointer-events:auto;width:34px;height:34px;padding:0;
-    border-radius:9px;cursor:pointer;font-size:14px;line-height:1;
-    background:var(--chip);border:1px solid var(--line);color:var(--muted);
-    transition:border-color .12s,color .12s,background .12s}
-  .orbit button:hover:not(:disabled){color:var(--accent);border-color:var(--accent);
-                                     background:var(--chip-hover)}
-  .orbit button:disabled{opacity:.35;cursor:default}
-  .orbit .n{left:50%;top:12px;transform:translateX(-50%)}
-  .orbit .s{left:50%;bottom:12px;transform:translateX(-50%)}
-  .orbit .w{left:14px;top:50%;transform:translateY(-50%)}
-  .orbit .e{right:14px;top:50%;transform:translateY(-50%)}
-  .orbit .z1{left:14px;top:56px}
-  .orbit .z2{left:56px;top:56px}
+  .orbit button{position:absolute;pointer-events:auto;width:56px;height:56px;padding:0;
+    margin:0;border:0;background:none;box-shadow:none;border-radius:14px;
+    display:grid;place-items:center;cursor:pointer;
+    color:var(--muted);opacity:.55;
+    transition:opacity .14s ease,color .14s ease,scale .12s ease,background .14s ease}
+  /* fill / stroke 都是可继承的 SVG 属性，写在这里，标记里就只剩形状 */
+  .orbit button svg{width:40px;height:40px;display:block;
+    fill:none;stroke:currentColor;stroke-width:2.1;
+    stroke-linecap:round;stroke-linejoin:round}
+  .orbit button:hover:not(:disabled){opacity:1;color:var(--accent-text);scale:1.12}
+  .orbit button:active:not(:disabled){scale:.96}
+  .orbit button:focus-visible{opacity:1;color:var(--accent-text);outline:2px solid var(--accent-text);
+                              outline-offset:-6px}
+  .orbit button:disabled{opacity:.25;cursor:default}
+  .orbit .n{left:50%;top:2px;transform:translateX(-50%)}
+  .orbit .s{left:50%;bottom:2px;transform:translateX(-50%)}
+  .orbit .w{left:2px;top:50%;transform:translateY(-50%)}
+  .orbit .e{right:2px;top:50%;transform:translateY(-50%)}
+  .orbit .z1{left:2px;top:2px}
+  .orbit .z2{left:58px;top:2px}
+  /* 右下角的放大缩小：和四周的折角按钮同一套（无边框、平时淡、指上去染色放大） */
+  .zoom{position:absolute;right:14px;bottom:14px;display:grid;gap:6px;z-index:4}
+  .zoom button{width:40px;height:40px;padding:0;margin:0;border:0;background:none;
+               box-shadow:none;border-radius:12px;cursor:pointer;
+               display:grid;place-items:center;color:var(--muted);opacity:.6;
+               transition:opacity .14s ease,color .14s ease,scale .12s ease}
+  .zoom button svg{width:26px;height:26px;display:block;fill:none;stroke:currentColor;
+                   stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+  .zoom button:hover:not(:disabled){opacity:1;color:var(--accent-text);scale:1.1}
+  .zoom button:active:not(:disabled){scale:.94}
+  .zoom button:focus-visible{opacity:1;color:var(--accent-text);
+                             outline:2px solid var(--accent-text);outline-offset:-6px}
+  .zoom button:disabled{opacity:.22;cursor:default}
 
   .cube{position:relative;width:0;height:0;transform-style:preserve-3d}
   /* F 面标牌：贴在前面的中心方块上，跟着魔方一起转，
@@ -113,11 +117,49 @@
   .sec > h2 .pos{font-variant-numeric:tabular-nums;letter-spacing:0;text-transform:none;
                  font-weight:400;font-size:12px}
 
+  /* ---------- 按钮的「质感」----------
+     所有按钮共用同一层厚度：底是上亮下暗的浅渐变、顶边一道高光、底边一道暗边、
+     外面一层短投影 —— 看着像从面板上凸起来；指上去再抬 1px、投影变长；
+     按下去高光换成内阴影，整个人陷进去。颜色全部来自 theme.css 的 --btn-*，
+     以后换主题色不用动这里。
+     抬升用的是 translate 而不是 transform —— 环绕舞台的那几个折角按钮靠 transform
+     定位（translateX(-50%) 之类），用 transform 会被这里覆盖、按钮会跑位。
+     舞台四周那几个折角按钮是无边框的，不在这份配方里（见上面的 .orbit）。 */
+  .run button, .ctrl button, .play, .openpick, .tabs button, .moves span,
+  .mv button, .phandle{
+    background:linear-gradient(180deg, var(--btn-bg) 0%, var(--btn-bg2) 100%);
+    border:1px solid var(--line);
+    box-shadow:inset 0 1px 0 var(--btn-hi), inset 0 -1px 0 var(--btn-shade),
+               0 1px 2px var(--btn-drop);
+    transition:border-color .14s ease, color .14s ease, background .14s ease,
+               box-shadow .14s ease, translate .1s ease;
+  }
+  .run button:hover:not(:disabled), .ctrl button:hover:not(:disabled),
+  .play:hover:not(:disabled), .openpick:hover:not(:disabled),
+  .tabs button:hover:not(:disabled), .moves span:hover,
+  .mv button:hover:not(:disabled), .phandle:hover{
+    translate:0 -1px;
+    box-shadow:inset 0 1px 0 var(--btn-hi), inset 0 -1px 0 var(--btn-shade),
+               0 3px 8px var(--btn-drop);
+  }
+  .run button:active:not(:disabled), .ctrl button:active:not(:disabled),
+  .play:active:not(:disabled), .openpick:active:not(:disabled),
+  .tabs button:active:not(:disabled), .moves span:active,
+  .mv button:active:not(:disabled), .phandle:active{
+    translate:0 1px;
+    box-shadow:inset 0 2px 5px var(--btn-shade);
+  }
+  /* 单步键盘：6 列 × 2 行 —— 上面一排顺时针，下面一排逆时针 */
+  .mv{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
+  .mv button{height:32px;padding:0;border-radius:8px;cursor:pointer;
+             font:600 12.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .mv button:hover:not(:disabled){color:var(--accent-text);border-color:var(--accent-text)}
+
   .row{display:flex;align-items:center;gap:9px;margin-bottom:9px}
   #alg{flex:1;min-width:0;background:var(--field);border:1px solid var(--line);border-radius:7px;
        color:var(--text);padding:7px 9px;
        font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
-  #alg:focus{outline:none;border-color:var(--accent)}
+  #alg:focus{outline:none;border-color:var(--accent-text)}
   #alg.bad{border-color:#c0392b}
 
   .ctrl{display:flex;gap:6px;margin-bottom:9px}
@@ -127,16 +169,14 @@
   .run button{flex:1;min-width:0;height:34px;border-radius:8px;cursor:pointer;
               display:flex;align-items:center;justify-content:center;gap:6px;
               font:inherit;font-size:12.5px;letter-spacing:.02em;
-              background:var(--field);border:1px solid var(--line);color:var(--text);
-              transition:border-color .12s,color .12s,background .12s}
+              color:var(--text)}
   .run button i{font-style:normal;font-size:15px;line-height:1;color:var(--muted);
                 transition:color .12s,transform .12s}
-  .run button:hover:not(:disabled){border-color:var(--accent);color:var(--accent);
+  .run button:hover:not(:disabled){border-color:var(--accent-text);color:var(--accent-text);
                                    background:var(--field-hover)}
-  .run button:hover:not(:disabled) i{color:var(--accent)}
+  .run button:hover:not(:disabled) i{color:var(--accent-text)}
   .run button#fwd:hover:not(:disabled) i{transform:rotate(45deg)}
   .run button#rev:hover:not(:disabled) i{transform:rotate(-45deg)}
-  .run button:active:not(:disabled){transform:translateY(1px)}
   .run button:disabled{opacity:.4;cursor:default}
 
   /* 历史记录 */
@@ -149,67 +189,78 @@
              font-variant-numeric:tabular-nums}
   .hist .e.sc{color:#a3711f}
   .hist .e.rt{color:#2b6f8f}
-  .hist .e .tag{flex:none;background:var(--accent);color:#fff;border-radius:4px;
+  /* 单步是「小动作」，一串点下来会有一堆 —— 压淡一点，别把整条历史淹了 */
+  .hist .e.mv{opacity:.85}
+  .hist .e .tag{flex:none;background:var(--accent);color:var(--on-accent, #fff);border-radius:4px;
                 padding:0 4px;font-size:11px;line-height:1.5}
   .hist .e.cur{border-color:var(--accent);color:var(--text)}
   .hist .empty{color:var(--muted);font-size:12.5px;opacity:.7}
   .ctrl button{flex:1;height:32px;padding:0;border-radius:7px;cursor:pointer;
-               background:var(--field);border:1px solid var(--line);color:var(--text);
-               font-size:13px;line-height:1;transition:.12s}
+               color:var(--text);font-size:13px;line-height:1}
   .ctrl button:hover:not(:disabled){border-color:var(--line-strong);background:var(--field-hover)}
   .ctrl button:disabled{opacity:.35;cursor:default}
 
   .play{width:100%;height:32px;margin-bottom:8px;border-radius:8px;cursor:pointer;
         display:flex;align-items:center;justify-content:center;gap:6px;
-        font:inherit;font-size:12.5px;background:var(--field);
-        border:1px solid var(--line);color:var(--text);transition:.12s}
-  .play:hover:not(:disabled){border-color:var(--accent);color:var(--accent);
+        font:inherit;font-size:12.5px;color:var(--text)}
+  .play:hover:not(:disabled){border-color:var(--accent-text);color:var(--accent-text);
                              background:var(--field-hover)}
   .play i{font-style:normal;font-size:14px;line-height:1;color:var(--muted)}
-  .play:hover:not(:disabled) i{color:var(--accent)}
-  .play.playing{background:var(--accent);border-color:var(--accent);color:#fff}
-  .play.playing i,.play.playing span{color:#fff}
+  .play:hover:not(:disabled) i{color:var(--accent-text)}
+  .play.playing{background:var(--accent);border-color:var(--accent);color:var(--on-accent, #fff)}
+  .play.playing i,.play.playing span{color:var(--on-accent, #fff)}
   .play:disabled{opacity:.4;cursor:default}
 
   .moves{display:flex;flex-wrap:wrap;gap:4px;min-height:24px}
   .moves span{font:12.5px/1 ui-monospace,Menlo,Consolas,monospace;color:var(--muted);
-              background:var(--field);border:1px solid var(--line);border-radius:5px;
-              padding:5px 7px;cursor:pointer;transition:.1s}
+              border-radius:5px;padding:5px 7px;cursor:pointer}
   .moves span:hover{border-color:var(--line-strong);color:var(--text)}
   .moves span.done{color:var(--text);border-color:var(--line-strong)}
-  .moves span.cur{background:var(--accent);border-color:var(--accent);color:#fff}
+  .moves span.cur{background:var(--accent);border-color:var(--accent);color:var(--on-accent, #fff)}
 
   /* 选公式：三个来源按钮一排，下面是可滚动的公式表 */
   .openpick{width:100%;height:32px;margin-bottom:8px;border-radius:8px;cursor:pointer;
             display:flex;align-items:center;justify-content:center;gap:6px;
-            font:inherit;font-size:12.5px;background:var(--field);
-            border:1px solid var(--line);color:var(--text);transition:.12s}
-  .openpick:hover:not(:disabled){border-color:var(--accent);color:var(--accent);
+            font:inherit;font-size:12.5px;color:var(--text)}
+  .openpick:hover:not(:disabled){border-color:var(--accent-text);color:var(--accent-text);
                                  background:var(--field-hover)}
   .openpick i{font-style:normal;font-size:13px;line-height:1;color:var(--muted)}
-  .openpick:hover:not(:disabled) i{color:var(--accent)}
-  .openpick.on{background:var(--accent);border-color:var(--accent);color:#fff}
-  .openpick.on i{color:#fff}
+  .openpick:hover:not(:disabled) i{color:var(--accent-text)}
+  .openpick.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent, #fff)}
+  .openpick.on i{color:var(--on-accent, #fff)}
   .openpick:disabled{opacity:.4;cursor:default}
 
   /* 展开栏顶部的来源切换 */
   .tabs{display:flex;gap:6px;margin-bottom:10px}
   .tabs button{flex:1;height:28px;border-radius:7px;cursor:pointer;font:inherit;font-size:12px;
-               letter-spacing:.03em;background:var(--field);border:1px solid var(--line);
-               color:var(--muted);transition:.12s}
+               letter-spacing:.03em;color:var(--muted)}
   .tabs button:hover:not(:disabled){color:var(--text);border-color:var(--line-strong)}
-  .tabs button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .tabs button.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent, #fff)}
   .tabs button:disabled{opacity:.4;cursor:default}
   /* 选公式列：缓慢展开。
      不能用 display:none 切换 —— 那样没法过渡，只能"蹦"出来。
-     改成外层宽度 0 -> 300px + overflow:hidden，内层宽度固定，所以内容不会被挤扁。 */
-  .picker{width:0;flex:none;overflow:hidden;background:var(--panel);
-          transition:width .3s cubic-bezier(.32,.8,.3,1)}
-  .picker.on{width:300px}
+     改成外层宽度 0 -> 300px + overflow:hidden，内层宽度固定，所以内容不会被挤扁。
+     收起时还要 visibility:hidden（延迟到收起动画结束）—— 否则里面那些按钮
+     虽然看不见，键盘 Tab 还是会一站一站停过去。 */
+  .picker{position:relative;width:0;flex:none;overflow:hidden;background:var(--panel);
+          visibility:hidden;
+          transition:width .3s cubic-bezier(.32,.8,.3,1), visibility 0s linear .3s}
+  .picker.on{width:300px;visibility:visible;
+             transition:width .3s cubic-bezier(.32,.8,.3,1), visibility 0s}
   .picker > .inner{width:300px;height:100%;overflow-y:auto;
-                   padding:14px 12px 40px;border-left:1px solid var(--line)}
-  .picker > .inner > h2{margin:0 0 10px;font-size:11.5px;letter-spacing:.09em;
-                        text-transform:uppercase;color:var(--muted);font-weight:600}
+                   padding:14px 14px 40px 20px;border-left:1px solid var(--line)}
+  /* 收起：贴在这一列左边缘中部的竖把手（像抽屉的拉手）——
+     比角落里的 × 顺手，也不占顶部一行。把手是 .picker 的直接子元素，
+     不在 .inner 里 —— 那个是滚动容器，放进去会跟着列表滚走。 */
+  .phandle{position:absolute;left:0;top:50%;transform:translateY(-50%);
+           width:18px;height:60px;padding:0;border-radius:0 10px 10px 0;
+           display:grid;place-items:center;cursor:pointer;color:var(--muted);z-index:1}
+  .phandle svg{width:12px;height:12px;display:block;
+               fill:none;stroke:currentColor;stroke-width:2.6;
+               stroke-linecap:round;stroke-linejoin:round}
+  /* 指上去往右「抽」出来一点，按下去再收回去 */
+  .phandle:hover{color:var(--accent-text);border-color:var(--accent-text);translate:2px 0}
+  .phandle:active{translate:1px 0}
   .picker > .inner::-webkit-scrollbar{width:10px}
   .picker > .inner::-webkit-scrollbar-thumb{background:var(--scroll);border-radius:6px;
                                             border:2px solid var(--panel)}
@@ -229,14 +280,20 @@
   @media (max-width:760px){
     .app{flex-direction:column}
     .panel{width:auto;border-left:none;border-top:1px solid var(--line);max-height:52vh}
-    /* 窄屏是上下布局，这里改成高度过渡 */
-    .picker{width:auto;max-height:0;transition:max-height .3s cubic-bezier(.32,.8,.3,1)}
-    .picker.on{width:auto;max-height:46vh}
-    .picker > .inner{width:auto;height:auto;border-left:none;
-                     border-top:1px solid var(--line);max-height:46vh}
+    /* 窄屏是上下布局，这里改成高度过渡（visibility 的延迟跟着一起改） */
+    .picker{width:auto;max-height:0;
+            transition:max-height .3s cubic-bezier(.32,.8,.3,1), visibility 0s linear .3s}
+    .picker.on{width:auto;max-height:46vh;
+               transition:max-height .3s cubic-bezier(.32,.8,.3,1), visibility 0s}
+    .picker > .inner{width:auto;height:auto;border-left:none;max-height:46vh;
+                     border-top:1px solid var(--line);padding:24px 14px 30px}
+    /* 上下布局时把手转成顶部横条：往下推 = 收起（折角也跟着转 90°） */
+    .phandle{left:50%;top:0;transform:translateX(-50%);
+             width:60px;height:18px;border-radius:0 0 10px 10px}
+    .phandle svg{transform:rotate(90deg)}
     .stage{min-height:38vh}
   }
-  @media print{ .themebtn,.panel{display:none} }
+  @media print{ .themebtn,.panel,.orbit,.zoom{display:none} }
 </style>
 <script>/* 主题必须在首次绘制前定好，否则会先用浅色画一遍再翻深色（闪一下） */
 try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.dataset.theme='dark'}catch(e){}</script>
@@ -247,19 +304,41 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
 <script src="nav.js"></script>
 <div class="app">
   <main class="stage" id="stage">
-    <button class="themebtn" id="themebtn" type="button" title="切到夜晚">☾</button>
+    <button class="themebtn" id="themebtn" type="button" title="切到夜晚"></button>
     <div class="cube" id="cube"></div>
-    <!-- 整体旋转（x / y / z）。箭头摆在魔方四周，方向一眼可辨 -->
+    <!-- 整体旋转（x / y / z）。四个方向是「へ」「く」那样的折角，摆在大按键的四周：
+         无边框、只有一条折线，整块 56px 都能点；悬停时染上 accent 并放大一点。
+         折线和圆弧的样式统一在 .orbit button svg 里给（fill/stroke 是可继承的）。 -->
     <div class="orbit">
-      <button class="n" data-mv="x"  type="button" title="整体上翻 x">↑</button>
-      <button class="s" data-mv="x'" type="button" title="整体下翻 x'">↓</button>
-      <button class="w" data-mv="y"  type="button" title="整体左转 y">←</button>
-      <button class="e" data-mv="y'" type="button" title="整体右转 y'">→</button>
-      <button class="z1" data-mv="z'" type="button" title="整体逆时针滚 z'">⟲</button>
-      <button class="z2" data-mv="z"  type="button" title="整体顺时针滚 z">⟳</button>
+      <button class="n" data-mv="x"  type="button" title="整体上翻 x"
+        aria-label="整体上翻 x"><svg viewBox="0 0 24 24"><polyline points="5 15.5 12 8.5 19 15.5"/></svg></button>
+      <button class="s" data-mv="x'" type="button" title="整体下翻 x'"
+        aria-label="整体下翻 x'"><svg viewBox="0 0 24 24"><polyline points="5 8.5 12 15.5 19 8.5"/></svg></button>
+      <button class="w" data-mv="y"  type="button" title="整体左转 y"
+        aria-label="整体左转 y"><svg viewBox="0 0 24 24"><polyline points="15.5 5 8.5 12 15.5 19"/></svg></button>
+      <button class="e" data-mv="y'" type="button" title="整体右转 y'"
+        aria-label="整体右转 y'"><svg viewBox="0 0 24 24"><polyline points="8.5 5 15.5 12 8.5 19"/></svg></button>
+      <button class="z1" data-mv="z'" type="button" title="整体逆时针滚 z'"
+        aria-label="整体逆时针滚 z'"><svg viewBox="0 0 24 24"><path
+          d="M10.03 4.66A7.6 7.6 0 1 0 17.37 6.63"/><polyline points="20.55 7.69 17.37 6.63 18.43 9.81"/></svg></button>
+      <button class="z2" data-mv="z"  type="button" title="整体顺时针滚 z"
+        aria-label="整体顺时针滚 z"><svg viewBox="0 0 24 24"><path
+          d="M13.97 4.66A7.6 7.6 0 1 1 6.63 6.63"/><polyline points="3.45 7.69 6.63 6.63 5.57 9.81"/></svg></button>
+    </div>
+
+    <!-- 放大缩小：点按钮，或者直接把指针放在舞台上滚轮 -->
+    <div class="zoom">
+      <button id="zin" type="button" title="放大（滚轮向上也可以）" aria-label="放大"><svg
+        viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.4 15.4L21 21"/><path
+        d="M10.5 7.6v5.8M7.6 10.5h5.8"/></svg></button>
+      <button id="zout" type="button" title="缩小（滚轮向下也可以）" aria-label="缩小"><svg
+        viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.4 15.4L21 21"/><path
+        d="M7.6 10.5h5.8"/></svg></button>
+      <button id="zreset" type="button" title="恢复默认大小（100%）" aria-label="恢复默认大小"><svg
+        viewBox="0 0 24 24"><path d="M9.5 4.5v5h-5"/><path d="M14.5 4.5v5h5"/><path
+        d="M9.5 19.5v-5h-5"/><path d="M14.5 19.5v-5h5"/></svg></button>
     </div>
   </main>
-
   <aside class="panel">
     <section class="sec">
       <h2>公式</h2>
@@ -271,13 +350,35 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
         <button id="fwd" type="button" title="按公式正向转动（在输入框里按回车同此）"><i>↻</i>正向</button>
         <button id="rev" type="button" title="取逆执行：顺序倒过来，每一步再取反"><i>↺</i>反向</button>
       </div>
-      <button class="openpick" id="openpick" type="button"
-              title="展开公式表，选一条填进输入框"><i>&#9776;</i><span>公式</span></button>
+      <button class="openpick" id="openpick" type="button" aria-controls="picker"
+              aria-expanded="false" title="展开 / 收起公式表，选一条填进输入框"
+              ><i>&#9776;</i><span>公式</span></button>
       <div class="ctrl">
         <button id="scramble" type="button">打乱</button>
         <button id="reset" type="button">复原</button>
       </div>
       <div class="err" id="err"></div>
+    </section>
+
+    <!-- 单步：点一下就把这一步做掉（动画 + 记进历史，和整体旋转同一套）。
+         六个面 × 两个方向；上排顺时针、下排逆时针，同一列上下对应同一个面。
+         动画还没转完就接着点不会丢步子 —— 会排队依次执行。 -->
+    <section class="sec">
+      <h2>单步</h2>
+      <div class="mv">
+        <button type="button" data-mv="U" title="U 面顺时针 90°">U</button>
+        <button type="button" data-mv="D" title="D 面顺时针 90°">D</button>
+        <button type="button" data-mv="L" title="L 面顺时针 90°">L</button>
+        <button type="button" data-mv="R" title="R 面顺时针 90°">R</button>
+        <button type="button" data-mv="F" title="F 面顺时针 90°">F</button>
+        <button type="button" data-mv="B" title="B 面顺时针 90°">B</button>
+        <button type="button" data-mv="U'" title="U 面逆时针 90°">U'</button>
+        <button type="button" data-mv="D'" title="D 面逆时针 90°">D'</button>
+        <button type="button" data-mv="L'" title="L 面逆时针 90°">L'</button>
+        <button type="button" data-mv="R'" title="R 面逆时针 90°">R'</button>
+        <button type="button" data-mv="F'" title="F 面逆时针 90°">F'</button>
+        <button type="button" data-mv="B'" title="B 面逆时针 90°">B'</button>
+      </div>
     </section>
 
     <section class="sec">
@@ -300,8 +401,13 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     </section>
   </aside>
 
-  <!-- 选公式：点开时在右侧展开一整列 -->
-  <aside class="picker" id="picker">
+  <!-- 选公式：点开时在右侧展开一整列。
+       收起有三个入口：这一列右上角的 ×（最顺手）、公式键本身、Esc。 -->
+  <aside class="picker" id="picker" aria-label="公式表">
+    <!-- 收起把手：贴在左边缘中部，像抽屉拉手 -->
+    <button class="phandle" id="closepick" type="button"
+            title="收起公式表（Esc 也行）" aria-label="收起公式表"><svg
+      viewBox="0 0 24 24"><polyline points="9 5 16 12 9 19"/></svg></button>
     <div class="inner">
       <div class="tabs">
         <button data-pick="f2l" type="button">F2L</button>
@@ -368,7 +474,8 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
 
   var steps = [], frames = [], at = 0;   // 最近一次提交的步骤与各阶段局面
   var cur = CubeSim.solved();            // 当前局面（累积的）
-  var hist = [];                         // 历史：{kind:'alg'|'scramble', alg}
+  var hist = [];                         // 历史：{kind:'alg'|'scramble'|'rotate'|'move', alg}
+  var queue = [];                        // 单步排队：动画没转完就接着点的那些步子
   // 观察角度（可拖动）。F2L 的 b 版是「绿色为 F 面」，
   // 选到它时要把绿面转到左可见位，否则公式的 L/U 等动作会与看到的面对不上。
   var VIEW = { x: -24, y: -32 };
@@ -436,10 +543,49 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     // 立方体投影后的跨度约为边长的 1.4 倍（旋转后）。
     // 除数 4.3 会让它基本撑满，实际观感偏大，所以整体再收 30% -> 6.15
     CS = Math.max(12, Math.min(w, h) / 6.15);
-    cubeEl.style.setProperty('--cs', CS + 'px');
-    cubeEl.style.setProperty('--half', (CS / 2) + 'px');
+    applyZoom();
+    syncZoom();
     paint(cur);
   }
+
+  /* ---------- 放大缩小（右下角按钮 + 舞台上滚轮）----------
+     只改 --cs / --half 两个尺寸变量，不重画 —— 魔方每个尺寸都是
+     calc(var(--cs) * …)，缩放纯粹是 CSS 的事；重画会把正在转的那一层动画打断。 */
+  var zoom = 1, ZMIN = 0.5, ZMAX = 2.5;
+  function applyZoom() {
+    var cs = CS * zoom;
+    cubeEl.style.setProperty('--cs', cs + 'px');
+    cubeEl.style.setProperty('--half', (cs / 2) + 'px');
+  }
+  function syncZoom() {
+    document.getElementById('zin').disabled = zoom >= ZMAX - 0.001;
+    document.getElementById('zout').disabled = zoom <= ZMIN + 0.001;
+    document.getElementById('zreset').disabled = Math.abs(zoom - 1) < 0.001;
+  }
+  function setZoom(z) {
+    var nz = Math.max(ZMIN, Math.min(ZMAX, z));
+    if (Math.abs(nz - zoom) > 0.001) { zoom = nz; applyZoom(); saveZoom(); }
+    syncZoom();
+  }
+  // 缩放是「看魔方的习惯」，三页共用同一个键 —— 在计算器里调大，编辑器里也一样大
+  var ZOOM_KEY = 'cube-zoom-v1';
+  function saveZoom() { try { localStorage.setItem(ZOOM_KEY, String(zoom)); } catch (e) {} }
+  function loadZoom() {
+    var v = NaN;
+    try { v = parseFloat(localStorage.getItem(ZOOM_KEY)); } catch (e) {}
+    return (isFinite(v) && v >= ZMIN && v <= ZMAX) ? v : 1;
+  }
+  zoom = loadZoom();          // 恢复上次的缩放；第一次打开就是 100%
+  document.getElementById('zin').addEventListener('click', function () { setZoom(zoom * 1.25); });
+  document.getElementById('zout').addEventListener('click', function () { setZoom(zoom / 1.25); });
+  document.getElementById('zreset').addEventListener('click', function () { setZoom(1); });
+  // 只有指针在舞台上才缩放（右栏里滚轮要正常滚动）。
+  // passive:false + preventDefault —— 否则轮子会连带把页面也滚了。
+  stageEl.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    var d = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;   // Firefox 有时按「行」给
+    setZoom(zoom * Math.exp(-d * 0.0016));
+  }, { passive: false });
 
   /* ---------- 画魔方 ---------- */
   // 局面是 "x,y,z|nx,ny,nz" -> 颜色字母。按位置归拢成 26 个小方块。
@@ -470,8 +616,11 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     cubeEl.innerHTML = Object.keys(map).map(function (pos) {
       var p = pos.split(',').map(Number);
       // CSS 的 y 朝下，模型的 y 朝上 -> 取负
+      // 位置必须用 calc(var(--cs) * n) 表达，不能写成 CS 的像素值 ——
+      // 缩放只改 --cs，写死像素的话方块尺寸变了、间距没变，整块会散开
       return '<div class="cubie" data-pos="' + pos + '" style="transform:translate3d(' +
-             (p[0] * CS) + 'px,' + (-p[1] * CS) + 'px,' + (p[2] * CS) + 'px)">' +
+             'calc(var(--cs) * ' + p[0] + '),calc(var(--cs) * ' + (-p[1]) + '),' +
+             'calc(var(--cs) * ' + p[2] + '))">' +
              cubieHTML(map[pos]) + '</div>';
     // 「F」指的是当前朝向的前面 —— 做了 x/y/z 之后前面会换成别的面，
     // 所以字色取「前面那张中心贴纸」的颜色，而不是固定用 COLOR.F。
@@ -566,9 +715,8 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     });
     fwdEl.disabled = lock;
     revEl.disabled = lock;
-    Array.prototype.forEach.call(document.querySelectorAll('.orbit button'), function (b) {
-      b.disabled = lock;
-    });
+    // 整体旋转和单步这两组「动作按钮」在动画中不禁用 —— 点了会排队，
+    // 连点一串（比如 R U R' U'）才不会被吃掉中间几步
     openBtn.disabled = lock;
     Array.prototype.forEach.call(document.querySelectorAll('.tabs button'), function (b) {
       b.disabled = lock;
@@ -587,7 +735,9 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   function renderHist() {
     document.getElementById('hcount').textContent = hist.length;
     histEl.innerHTML = hist.length ? hist.map(function (h, i) {
-      return '<div class="e' + (h.kind === 'scramble' ? ' sc' : h.kind === 'rotate' ? ' rt' : '') +
+      var cls = h.kind === 'scramble' ? ' sc' : h.kind === 'rotate' ? ' rt' :
+                h.kind === 'move' ? ' mv' : '';
+      return '<div class="e' + cls +
              (i === hist.length - 1 ? ' cur' : '') +
              '" data-i="' + i + '" title="点一下填回输入框">' +
              '<b>' + (i + 1) + '</b>' +
@@ -629,7 +779,7 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     run(list, alg, kind, rev);
   }
 
-  /* 播放一串步骤并记入历史。提交公式、整体旋转、打乱都走这里。 */
+  /* 播放一串步骤并记入历史。提交公式、整体旋转、打乱、单步都走这里。 */
   function run(list, label, kind, rev) {
     playing = false;
     busy = true;
@@ -645,7 +795,23 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
       renderHist();
       busy = false;
       chrome();
+      drainQueue();
     });
+  }
+
+  /* ---------- 单步 / 整体旋转：点一下就执行，动画没完就排队 ---------- */
+  // 一次转动 340ms，连点一串（R U R' U'）时人手比动画快得多，
+  // 直接「忙就丢弃」会吃掉中间几步 —— 所以排队，动画一完就接着执行下一个。
+  function drainQueue() {
+    if (!queue.length) return;
+    var mv = queue.shift();
+    run(CubeSim.steps(mv), mv, 'move', false);
+  }
+  function doMove(mv, kind) {
+    // 连播中点动作按钮：先停下（和别的操作一致，要点第二下才真的执行）
+    if (pausedFirst()) return;
+    if (busy) { if (queue.length < 16) queue.push(mv); return; }
+    run(CubeSim.steps(mv), mv, kind || 'move', false);
   }
 
   /* ---------- 打乱 / 复原 ---------- */
@@ -666,6 +832,7 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
 
   function reset() {
     if (pausedFirst()) return;
+    queue.length = 0;          // 复原 = 停手，排队的单步作废
     if (busy) return;
     playing = false;
     try { localStorage.removeItem(STORE); } catch (e) {}
@@ -756,6 +923,7 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     epoch++;              // 作废正在播的那一步，免得它回头覆盖位置
     playing = false;
     busy = false;
+    queue.length = 0;     // 跳到某一步 = 换个位置看，排队的单步作废
     at = Math.max(0, Math.min(steps.length, k));
     paint(frames[at]);
     chrome();
@@ -771,16 +939,25 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     algEl.classList.remove('bad');
     errEl.textContent = '';
   });
-  // 选公式：点来源按钮展开列表，点某一条就填进输入框并直接执行
-  // 一个按钮开合整栏；来源在栏内切换（切换时不收起）
-  openBtn.addEventListener('click', function () {
-    if (pausedFirst()) return;
-    var open = !pickerEl.classList.contains('on');
+  // 选公式：点来源按钮展开列表，点某一条就填进输入框。
+  // 开合统一走 setPicker —— 展开键、栏里的 × 、Esc 三个入口共用一套状态，
+  // 不会出现「aria-expanded 说开着、其实已经收了」这种不同步。
+  function setPicker(open) {
     if (open && !pickKind) pickKind = 'oll';
     pickerEl.classList.toggle('on', open);
     openBtn.classList.toggle('on', open);
+    openBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
     syncTabs();
     renderPick();
+  }
+  openBtn.addEventListener('click', function () {
+    if (pausedFirst()) return;
+    setPicker(!pickerEl.classList.contains('on'));
+  });
+  // 栏右上角的 × ：收起并把光标送回输入框，接着敲公式
+  document.getElementById('closepick').addEventListener('click', function () {
+    setPicker(false);
+    algEl.focus();
   });
   function syncTabs() {
     Array.prototype.forEach.call(document.querySelectorAll('.tabs button'), function (o) {
@@ -805,12 +982,13 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   });
 
   document.getElementById('scramble').addEventListener('click', scramble);
-  // 整体旋转：动画 + 记进历史（它确实改变了哪一面是 F）
+  // 动作按钮（整体旋转 + 单步）：点一下播一个动画，并记进历史
+  // （整体旋转记 'rotate'，单步记 'move' —— 渲染历史时用不同颜色区分）
   Array.prototype.forEach.call(document.querySelectorAll('.orbit button'), function (b) {
-    b.addEventListener('click', function () {
-      if (pausedFirst() || busy) return;
-      run(CubeSim.steps(b.dataset.mv), b.dataset.mv, 'rotate', false);
-    });
+    b.addEventListener('click', function () { doMove(b.dataset.mv, 'rotate'); });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('.mv button'), function (b) {
+    b.addEventListener('click', function () { doMove(b.dataset.mv, 'move'); });
   });
   document.getElementById('reset').addEventListener('click', reset);
   document.getElementById('play').addEventListener('click', autoPlay);
@@ -833,6 +1011,12 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     algEl.focus();
   });
   document.addEventListener('keydown', function (e) {
+    // Esc 收公式表：不管光标在哪儿都管用（包括正在输入框里打字）
+    if (e.key === 'Escape' && pickerEl.classList.contains('on')) {
+      setPicker(false);
+      algEl.focus();
+      return;
+    }
     if (e.target === algEl) return;
     if (e.key === 'ArrowLeft') stepBy(-1);
     else if (e.key === 'ArrowRight') stepBy(1);
@@ -843,7 +1027,7 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   stageEl.addEventListener('pointerdown', function (e) {
     // 箭头和主题按钮都不能触发拖拽 —— 一旦 setPointerCapture，
     // 后续指针事件会被重定向到舞台，click 就落不到按钮上了
-    if (e.target.closest && e.target.closest('.orbit button, .themebtn')) return;
+    if (e.target.closest && e.target.closest('.orbit button, .zoom button, .themebtn')) return;
     drag = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y };
     stageEl.classList.add('drag');
     if (stageEl.setPointerCapture) stageEl.setPointerCapture(e.pointerId);
@@ -864,7 +1048,6 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   var root = document.documentElement, btn = document.getElementById('themebtn');
   function applyTheme(t) {
     root.dataset.theme = t;
-    btn.textContent = t === 'dark' ? '\u2600' : '\u263e';
     btn.title = t === 'dark' ? '切到白天' : '切到夜晚';
     try { localStorage.setItem('cube-theme', t); } catch (e) {}
   }

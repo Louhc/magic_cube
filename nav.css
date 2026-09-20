@@ -27,8 +27,8 @@
    看着像「蓝框滑到了却发灰」，再等鼠标移开才变蓝。 */
 .topnav a:hover{color:var(--text, #222)}
 /* 当前项的底色由 .pill 提供，链接自己只留白字 */
-.topnav a.on{color:#fff}
-.topnav a.on:hover{color:#fff}
+.topnav a.on{color:var(--on-accent, #fff)}
+.topnav a.on:hover{color:var(--on-accent, #fff)}
 
 /* 编辑器是「整页高度」的 flex 布局（body > .app 撑满 100%），
    导航条插在它前面，所以要给它让出一条的高度。 */
@@ -61,7 +61,7 @@ body > .app{height:calc(100% - var(--nav-h))}
 .topnav .links{position:relative}
 .topnav .pill{
   position:absolute; top:0; left:0; z-index:0; pointer-events:none;
-  border-radius:7px; background:var(--accent, #A05566);
+  border-radius:7px; background:var(--accent, #5A5FBF);
   transition:transform .18s ease, width .18s ease, height .18s ease;
 }
 /* 链接要压在方块上面 */
@@ -80,4 +80,49 @@ body.nav-fade > *:not(.topnav){opacity:0}
   .topnav .pill{transition:none}
   body > *:not(.topnav){transition:none}
   body.nav-fade > *:not(.topnav){opacity:1}
+}
+
+/* ---------- 白天 / 夜晚：滑动开关 ----------
+   一条药丸轨道 + 一个小滑块 + 两端的太阳/月亮。滑块停在当前那一边，
+   位置完全由 <html data-theme> 决定 —— 各页只要照旧切 data-theme，
+   不用管这个按钮长什么样。标记由 nav.js 注入（七个页面共用一份）。
+
+   这里写的是 body .themebtn：比各页自己那份 .themebtn 优先级高，
+   刚好盖住尺寸和底色这些，而各页的 position / right / top 仍然生效。 */
+body .themebtn{
+  width:56px; height:28px; padding:0; border-radius:14px; cursor:pointer;
+  /* 轨道用 --line / --line-strong（各页两套主题都定义了）——
+     别用 --chip：它在 oll/pll 是「图上的半透明白」，在 index/f2l 又没定义 */
+  background:var(--line, #AAC4FF); border:1px solid var(--line-strong, #B1B2FF);
+  transition:background .12s, border-color .12s;
+}
+body .themebtn:hover{background:var(--line-strong, #B1B2FF)}
+/* 滑块：垫在图标下面，靠 data-theme 在两端之间滑 */
+body .themebtn .tk{
+  position:absolute; top:50%; left:2px; width:22px; height:22px; margin-top:-11px;
+  border-radius:50%; background:var(--panel, var(--card, #fff));
+  box-shadow:0 1px 3px #00000030;
+  transition:transform .2s cubic-bezier(.34,.86,.32,1);
+}
+html[data-theme="dark"] body .themebtn .tk{
+  transform:translateX(28px);
+  /* 夜晚的滑块用 accent（黄），上面那个月亮用 --on-accent（深色）——
+     两个颜色是一对，换主题色也不会出现「亮底压亮字」。
+     滑块压在 --line 的轨道上，悬停时轨道变 --line-strong，也照样浮得起来。 */
+  background:var(--accent, #5A5FBF);
+}
+/* 两端的太阳 / 月亮：压在滑块上面，所以两边图标始终看得见 */
+body .themebtn .ti{
+  position:absolute; top:0; bottom:0; width:22px; display:grid; place-items:center;
+  color:var(--muted, #ADB3BD); transition:color .18s;
+}
+body .themebtn .ti svg{width:14px; height:14px; display:block}
+body .themebtn .sun{left:2px; color:var(--text, #222)}
+body .themebtn .moon{right:2px}
+/* 当前那一边的图标亮起来，另一边留灰的。
+   夜晚那个月亮压在 accent 色的滑块上，所以要用 --on-accent（跟着滑块走）。 */
+html[data-theme="dark"] body .themebtn .sun{color:var(--muted, #ADB3BD)}
+html[data-theme="dark"] body .themebtn .moon{color:var(--on-accent, #222)}
+@media (prefers-reduced-motion: reduce){
+  body .themebtn .tk, body .themebtn .ti{transition:none}
 }

@@ -27,7 +27,7 @@
 
   var brand = document.createElement('span');
   brand.className = 'brand';
-  brand.textContent = '魔方工具箱';
+  brand.textContent = '六面';
 
   var links = document.createElement('span');
   links.className = 'links';
@@ -171,5 +171,40 @@
     };
     window.addEventListener('scroll', sync, { passive: true });
     sync();
+  }
+
+  /* ---------- 白天 / 夜晚开关的标记 ----------
+     七个页面共用一份：各页只管切 <html data-theme>，按钮长什么样交给这里
+     和 nav.css（滑块位置也是纯 CSS 按 data-theme 定的）。
+     要填的 #themebtn 在各页 <body> 里，nav.js 这会儿还没解析到，所以等 DOM 好了再填。 */
+  var THEME_SVG = {
+    sun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"' +
+         ' stroke-linecap="round"><circle cx="12" cy="12" r="4.4"/>' +
+         '<path d="M12 2.2v2.6M12 19.2v2.6M2.2 12h2.6M19.2 12h2.6' +
+         'M5.1 5.1l1.9 1.9M17 17l1.9 1.9M18.9 5.1L17 7M7 17l-1.9 1.9"/></svg>',
+    moon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"' +
+          ' stroke-linecap="round" stroke-linejoin="round">' +
+          '<path d="M20.2 14.7A8.6 8.6 0 1 1 9.3 3.8a6.9 6.9 0 0 0 10.9 10.9z"/></svg>'
+  };
+  function buildThemeSwitch() {
+    var b = document.getElementById('themebtn');
+    if (!b || (b.querySelector && b.querySelector('.tk'))) return;   // 没有 / 已填过
+    b.innerHTML = '<span class="tk"></span>' +
+                  '<span class="ti sun">' + THEME_SVG.sun + '</span>' +
+                  '<span class="ti moon">' + THEME_SVG.moon + '</span>';
+    b.setAttribute('role', 'switch');
+    b.setAttribute('aria-label', '白天 / 夜晚');
+    var sync = function () {
+      b.setAttribute('aria-checked',
+        document.documentElement.dataset.theme === 'dark' ? 'true' : 'false');
+    };
+    sync();
+    // 各页自己的点击处理注册得更早、会先跑，所以这里读到的是刚切完的状态
+    b.addEventListener('click', sync);
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', buildThemeSwitch);
+  } else {
+    buildThemeSwitch();
   }
 })();
