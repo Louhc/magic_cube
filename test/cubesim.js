@@ -747,9 +747,12 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
       ok(f + ' 里每条公式都有「在计算器里打开」',
         /class="tocalc"/.test(t) && /calc\.html#/.test(t));
     });
+    ok('刷新恢复现场、只有新导航才重置',
+      /nav\.type === 'reload'/.test(src2) && /if \(hashAlg && !isReload\)/.test(src2),
+      '没有区分刷新和新导航');
     ok('从公式表跳过来会先复原（不接着上次的局面）',
       /var hashAlg/.test(fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')) &&
-      /if \(hashAlg\) \{[\s\S]{0,200}?reset\(\)/.test(fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')));
+      /if \(hashAlg && !isReload\) \{[\s\S]{0,240}?reset\(\)/.test(fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')));
     // F2L 的 b 版以绿面为 F：链接带 @g: 前缀，计算器按 y 公式 y' 填进输入框
     ok('公式表的链接会给 b 版打绿面标记',
       /@g:' \+ encodeURIComponent\(alg\)|'@g:'/.test(src2) ||

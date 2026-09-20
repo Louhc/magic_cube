@@ -889,7 +889,15 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     if (h.indexOf('@g:') === 0) { hashGreen = true; h = h.slice(3); }
     hashAlg = h;
   })();
-  if (hashAlg) {
+  // 刷新 ≠ 点链接过来。刷新时 hash 还在地址栏里，但用户要的是
+  // 「和切走再回来一样」恢复现场；只有真的从公式表点过来才重置。
+  // 用浏览器给的导航类型区分：reload 是刷新，navigate 是新导航。
+  var isReload = false;
+  try {
+    var nav = performance.getEntriesByType('navigation')[0];
+    isReload = !!nav && nav.type === 'reload';
+  } catch (e) {}
+  if (hashAlg && !isReload) {
     try { localStorage.removeItem(STORE); } catch (e) {}
     reset();                 // 复原 + 清空历史（reset 里也会清存档）
     // 框里填【原公式】，不要加前缀 —— 用户看的就是表里那条
