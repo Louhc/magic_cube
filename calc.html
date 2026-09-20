@@ -885,10 +885,12 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   if (hashAlg) {
     try { localStorage.removeItem(STORE); } catch (e) {}
     reset();                 // 复原 + 清空历史（reset 里也会清存档）
-    // 绿面为 F 的公式：在前面加一个整体旋转 y（会真的改局面）。
-    // 直接填处理后的写法 —— 看得见的就是会执行的。
-    algEl.value = hashGreen ? ('y ' + hashAlg) : hashAlg;
+    // 框里填【原公式】，不要加前缀 —— 用户看的就是表里那条
+    algEl.value = hashAlg;
     algEl.focus();
+    // 绿面为 F 的公式：先真的执行一个 y（整体旋转，动画播一遍并记进历史），
+    // 把绿面转到前面来；之后按执行就是接着这个朝向做公式。
+    if (hashGreen) run(CubeSim.steps('y'), 'y', 'rotate', false);
   } else (function () {
     // 没有 hash：有存档就恢复现场，否则从头开始
     var d = loadSaved();

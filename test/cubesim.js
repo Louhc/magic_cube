@@ -751,8 +751,14 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
     ok('公式表的链接会给 b 版打绿面标记',
       /@g:' \+ encodeURIComponent\(alg\)|'@g:'/.test(src2) ||
       fs.readFileSync(path.join(__dirname, '..', 'f2l.html'), 'utf8').indexOf('@g:') >= 0);
-    ok('计算器认识 @g: 前缀并做共轭',
-      /indexOf\('@g:'\) === 0/.test(src2) && /hashGreen \? \('y ' \+ hashAlg\)/.test(src2));
+    ok('计算器认识 @g: 前缀',
+      /indexOf\('@g:'\) === 0/.test(src2));
+    // 框里填原公式；y 是真的执行一次（转一下魔方），不是写进框里
+    ok('@g: 时框里填原公式（不加 y）',
+      /algEl\.value = hashAlg;/.test(src2) &&
+      !/algEl\.value = hashGreen \?/.test(src2));
+    ok('@g: 时先真的执行一个 y',
+      /if \(hashGreen\) run\(CubeSim\.steps\('y'\)/.test(src2));
     ok('计算器会读取 hash 里的公式',
       /location\.hash/.test(fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')));
     // 带上 hash 打开时，输入框应当被填好
