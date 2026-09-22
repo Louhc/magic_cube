@@ -42,7 +42,9 @@ console.log('\n[2] 页面里的每个内部链接都指向真实文件');
 console.log('\n[3] 导航条覆盖全部页面');
 {
   const nav = fs.readFileSync(path.join(ROOT, 'nav.js'), 'utf8');
-  const listed = [...nav.matchAll(/\['([^']+\.html)'/g)].map(m => m[1]);
+  // 只从 PAGES 那张表里取（表里除了入口页，还有「同一个入口管的其它页」）
+  const table = nav.slice(nav.indexOf('var PAGES = ['), nav.indexOf('];', nav.indexOf('var PAGES = [')));
+  const listed = [...table.matchAll(/'([\w-]+\.html)'/g)].map(m => m[1]);
   ok('nav.js 列了 ' + listed.length + ' 个页面', listed.length === PAGES.length, listed.join(','));
   ok('nav.js 与磁盘上的页面完全一致',
     PAGES.every(p => listed.includes(p)) && listed.every(p => PAGES.includes(p)),
@@ -68,7 +70,7 @@ console.log('\n[4b] 首页的 GitHub 纸带');
     m && m[1]);
   // 位置：贴在导航条【下面】，不能压住导航栏；也不该再让导航让内边距
   ok('贴在导航条下方（不覆盖导航栏）',
-    /\.ghribbon\{[^}]*top:var\(--nav-h, 42px\)[^}]*right:0[^}]*overflow:hidden/.test(html) &&
+    /\.ghribbon\{[^}]*top:var\(--nav-h, 63px\)[^}]*right:0[^}]*overflow:hidden/.test(html) &&
     !/\.topnav\{padding-right/.test(html));
   ok('45° 斜贴', /\.ghribbon a\{[^}]*transform:rotate\(45deg\)/.test(html));
   ok('内容是 octocat 图标 + 英文',
@@ -92,6 +94,19 @@ console.log('\n[5] 导航样式表存在且定义了当前页高亮');
   ok('nav.css 有 .topnav 与选中态', /\.topnav\{/.test(css) && /\.topnav a\.on\{/.test(css));
   ok('nav.css 给编辑器的全高布局让了高度',
     /body > \.app\{height:calc\(100% - var\(--nav-h\)\)\}/.test(css), '缺少 .app 高度补偿');
+  // 导航条高度和字号（和面板里的字号配一配）；用到兜底值的地方必须和它对得上
+  const navH = (css.match(/:root\{\s*--nav-h:\s*(\d+)px/) || [])[1];
+  ok('导航条高度是 63px（原来 42px 的 1.5 倍）', navH === '63', navH);
+  ok('导航文字 14px（原 13px + 1）',
+    /\.topnav\{[\s\S]*?font:14px\/1 system-ui/.test(css));
+  const fallbacks = [];
+  PAGES.forEach(p => {
+    const h = fs.readFileSync(path.join(ROOT, p), 'utf8');
+    [...h.matchAll(/var\(--nav-h,\s*(\d+)px\)/g)].forEach(m => fallbacks.push(p + ':' + m[1]));
+  });
+  ok('用到 --nav-h 兜底值的地方（' + fallbacks.length + ' 处）和它本身对得上',
+    fallbacks.length > 0 && fallbacks.every(x => x.split(':')[1] === navH),
+    fallbacks.join(' '));
 }
 
 console.log('\n[6] 回到顶部按钮');
@@ -102,9 +117,11 @@ console.log('\n[6] 回到顶部按钮');
   ok('按钮是纯图标（无可见文字）', /textContent = '\\u2191'/.test(js),
     '按钮文字不是 ↑');
   ok('滚动事件驱动显隐', /\.totop\.on/.test(css) && /classList\.toggle\('on'/.test(js));
-  const withBtn = [...js.matchAll(/\['([^']+)',\s*'[^']*',\s*1\]/g)].map(m => m[1]);
-  ok('只有三个公式页需要它（' + withBtn.join(',') + '）',
-    withBtn.join(',') === 'f2l.html,oll.html,pll.html', withBtn.join(','));
+  // 第三项是 1 表示要「回到顶部」；后面还可能跟「同一个入口管的其它页」
+  const withBtn = [...js.matchAll(/\['([^']+)',\s*'[^']*',\s*1[,\]]/g)].map(m => m[1]);
+  ok('长页才需要它：三个公式页 + 教程（' + withBtn.slice().sort().join(',') + '）',
+    withBtn.slice().sort().join(',') ===
+      'f2l.html,oll.html,pll.html,tutorial-basic.html', withBtn.join(','));
 }
 
 console.log('\n[7] 三个公式页都有分节计数与编号角标');
@@ -298,11 +315,18 @@ console.log('\n[14] 导航高亮框：会滑动的 .pill');
       addEventListener(t, fn) { (this._e = this._e || {});
                               (this._e[t] = this._e[t] || []).push(fn); }
     };
-    const pending = [];
+    const pending = [], observers = [];
     const ctx = {
       console, clearTimeout() {},
+      // 换主题时 nav.js 会盯着 data-theme（切换期间给 <html> 挂 theme-anim），
+      // 桩里记下回调，测试里手动触发
+      MutationObserver: function (cb) { this.observe = () => observers.push(cb); },
       // defer=true 时把回调攒起来，好检查「蓝框到位前 / 到位后」两个阶段
       setTimeout(fn) { pending.push(fn); if (!opts.defer) fn(); return 0; },
+      // 导航里「教程」入口要读 localStorage 找上次看的那一篇
+      localStorage: { getItem: k => (k in store ? store[k] : null),
+                      setItem: (k, v) => { store[k] = String(v); },
+                      removeItem: k => { delete store[k]; } },
       sessionStorage: { getItem: k => (k in store ? store[k] : null),
                         setItem: (k, v) => { store[k] = String(v); },
                         removeItem: k => { delete store[k]; } },
@@ -316,8 +340,10 @@ console.log('\n[14] 导航高亮框：会滑动的 .pill');
     const navEl = body.children[0];
     const links = navEl.children[1];            // [0] 是 brand
     return {
-      ctx, body, links, store, pill: links.children[0], pending,
+      ctx, body, links, store, pill: links.children[0], pending, observers,
       linkAt: i => links.children[i + 1],       // [0] 是 .pill
+      // 导航项会变多，测试里一律按文字找，别写下标
+      linkTo: t => links.children.find(c => String(c.textContent).indexOf(t) >= 0),
       active: links.children.find(c => c.className === 'on'),
       domReady: () => (doc._e.DOMContentLoaded || []).forEach(fn => fn()),
       click: e => (doc._e.click || []).forEach(fn => fn(e))
@@ -334,7 +360,43 @@ console.log('\n[14] 导航高亮框：会滑动的 .pill');
     return { e, got: () => prevented };
   }
 
+  /* 换主题：变量每帧都在变，元素自己那些「悬停变色」的过渡会被每帧重启 ——
+     主页卡片的边框就会抖一下。所以切换期间要给 <html> 挂 theme-anim，
+     让元素的过渡让路（规则在 theme.css），走完再摘掉。 */
+  {
+    const r = run('oll.html', { defer: true });
+    ok('nav.js 盯着 data-theme 的变化', r.observers.length === 1, String(r.observers.length));
+    if (r.observers[0]) r.observers[0]();
+    ok('切主题时给 <html> 挂 theme-anim',
+      r.ctx.document.documentElement.classList.contains('theme-anim'));
+    r.pending.forEach(fn => fn());
+    ok('变量过渡走完（260ms）就摘掉，不一直压着元素的过渡',
+      !r.ctx.document.documentElement.classList.contains('theme-anim'));
+  }
+
   // 结构：.links 里有个 .pill，排在最前面（垫在链接下面）
+  /* 「回到顶部」按钮：长页才有；一个入口管好几页时，每一页都要有 */
+  {
+    const has = r => r.body.children.some(c => c.className === 'totop');
+    ok('教程进阶页也有「回到顶部」（它和初级共用一个导航入口）', has(run('tutorial-advanced.html')));
+    ok('教程初级页有', has(run('tutorial-basic.html')));
+    ok('计算器这种非长页没有', !has(run('calc.html')));
+    const css = fs.readFileSync(path.join(ROOT, 'nav.css'), 'utf8');
+    const totopBox = css.slice(css.indexOf('.totop{'), css.indexOf('}', css.indexOf('.totop{')));
+    ok('按钮是带圆角的正方形（不是圆的）',
+      /border-radius:11px/.test(totopBox) && !/border-radius:50%/.test(totopBox), totopBox.slice(0, 90));
+  }
+
+  /* 一个入口管好几页（教程初级 / 进阶）：导航要跳到「上次看的那一篇」 */
+  {
+    const a = run('oll.html', { store: { 'cube-last:tutorial-basic.html': 'tutorial-advanced.html' } });
+    ok('看过进阶之后，导航里「教程」指向进阶页',
+      (a.linkTo('教程').href || '').indexOf('tutorial-advanced.html') >= 0, a.linkTo('教程').href);
+    const b = run('oll.html');
+    ok('没看过就默认初级页',
+      (b.linkTo('教程').href || '').indexOf('tutorial-basic.html') >= 0, b.linkTo('教程').href);
+  }
+
   const r0 = run('oll.html');
   ok('.links 里有 .pill', !!r0.pill && r0.pill.className === 'pill',
     r0.pill && r0.pill.className);
@@ -353,7 +415,7 @@ console.log('\n[14] 导航高亮框：会滑动的 .pill');
   {
     const r = run('oll.html');
     const before = r.pill.style.transform;
-    const c = fire(r.linkAt(6));                 // PLL，当前页是 OLL
+    const c = fire(r.linkTo('PLL'));              // 当前页是 OLL，点 PLL
     r.click(c.e);
     ok('点别的导航项：蓝框滑过去（transform 变了）',
       c.got() && r.pill.style.transform !== before,
@@ -365,7 +427,7 @@ console.log('\n[14] 导航高亮框：会滑动的 .pill');
   // 看着就像「框先滑过去、字过一会儿才冒出来」
   {
     const r = run('oll.html', { defer: true });
-    const from = r.active, to = r.linkAt(6);
+    const from = r.active, to = r.linkTo('PLL');
     const c = fire(to);
     r.click(c.e);
     ok('点下去：旧项立刻褪回灰字',
@@ -406,7 +468,7 @@ console.log('\n[14] 导航高亮框：会滑动的 .pill');
       'preventDefault=' + c.got() + ' 类=' + [...r.body.classList._s].join(','));
     ok('点首页卡片：蓝框滑到对应那一项（编辑器）',
       r.pill.style.transform ===
-        'translate(' + r.linkAt(1).offsetLeft + 'px,' + r.linkAt(1).offsetTop + 'px)',
+        'translate(' + r.linkTo('编辑器').offsetLeft + 'px,' + r.linkTo('编辑器').offsetTop + 'px)',
       r.pill.style.transform);
     r.pending.forEach(fn => fn());
     ok('内容淡完才跳页', r.ctx.location.href === 'editor.html', r.ctx.location.href);
@@ -423,7 +485,7 @@ console.log('\n[14] 导航高亮框：会滑动的 .pill');
       'preventDefault=' + c.got() + ' 类=' + [...r.body.classList._s].join(','));
     ok('点公式的 ↗：蓝框滑到「计算器」',
       r.pill.style.transform ===
-        'translate(' + r.linkAt(2).offsetLeft + 'px,' + r.linkAt(2).offsetTop + 'px)',
+        'translate(' + r.linkTo('计算器').offsetLeft + 'px,' + r.linkTo('计算器').offsetTop + 'px)',
       r.pill.style.transform);
     r.pending.forEach(fn => fn());
     ok('跳页时 # 里的公式没丢', r.ctx.location.href === 'calc.html#R_U_R',
@@ -489,7 +551,7 @@ console.log('\n[14] 导航高亮框：会滑动的 .pill');
   // 系统设了「减少动态效果」：既不滑也不淡，直接跳
   {
     const r = run('oll.html', { reduce: true });
-    const c = fire(r.linkAt(6));
+    const c = fire(r.linkTo('PLL'));
     r.click(c.e);
     ok('「减少动态效果」：不拦、不滑、不淡',
       !c.got() && !r.body.classList.contains('nav-fade'),
@@ -651,6 +713,18 @@ console.log('\n[16] 调色板：两套主题都在 theme.css 里，层次和对�
         contrast(at, v['--bg']) >= 3, 'accent=' + at + ' on ' + v['--bg']);
       ok(name + '：描边色和卡面不是一个色（不然表格没有边）',
         v['--line'] !== surface && v['--line-strong'] !== surface);
+      // 主按钮（计算器的播放键）：实心底 + 上面的图标 + 更重的投影，
+      // 三样都得从卡面上「跳出来」，不然当不成主按钮
+      ok(name + '：主按钮的图标压得住它的底色（' +
+        contrast(v['--primary-fg'], v['--primary2']).toFixed(1) + ':1）',
+        contrast(v['--primary-fg'], v['--primary2']) >= 3,
+        'primary-fg=' + v['--primary-fg'] + ' on primary2=' + v['--primary2']);
+      ok(name + '：主按钮比卡面重（' + contrast(v['--primary2'], surface).toFixed(1) + ':1）',
+        contrast(v['--primary2'], surface) >= 3 && lum(v['--primary2']) !== lum(surface),
+        'primary2=' + v['--primary2'] + ' on ' + surface);
+      ok(name + '：主按钮上下两端有色差（才看得出是「有厚度」的实心块）',
+        lum(v['--primary']) !== lum(v['--primary2']),
+        'primary=' + v['--primary'] + ' primary2=' + v['--primary2']);
     });
   }
 }
@@ -676,10 +750,78 @@ console.log('\n[16b] 换配色只改 theme.css 一处');
   const css = fs.readFileSync(path.join(ROOT, 'theme.css'), 'utf8');
   ok('theme.css 里带打印用的白底黑字，且能压过夜晚那套',
     /@media print\{[\s\S]*?:root,html\[data-theme="dark"\]\{[\s\S]*?--bg:#fff/.test(css));
+  // 三个「面板」页（计算器 / 练习 / 编辑器）共用同一套版式语言：
+  // 小标题都是正文色 + 加粗 + 底下一道细线。谁偷偷改回灰的，并排一看就不一样了。
+  ['calc.html', 'practice.html', 'editor.html'].forEach(p => {
+    const h = fs.readFileSync(path.join(ROOT, p), 'utf8');
+    ok(p + ' 的小标题和别的面板页同一档（正文色 + 加粗 + 细线）',
+      /\.sec > h2\{[^}]*color:var\(--text\);font-weight:700;[^}]*border-bottom:1px solid var\(--line\)/.test(h));
+  });
   ['f2l.html', 'oll.html', 'pll.html'].forEach(p => {
     const h = fs.readFileSync(path.join(ROOT, p), 'utf8');
     const pr = h.slice(h.indexOf('@media print'));
     ok(p + ' 的打印块只管版式，不再自己写颜色', !/--[\w-]+\s*:\s*#/.test(pr));
+  });
+}
+
+console.log('\n[16c] 白天/夜晚切换：颜色能插值，整页淡过去');
+{
+  const css = fs.readFileSync(path.join(ROOT, 'theme.css'), 'utf8');
+  const root = css.match(/(?:^|\n):root\{([\s\S]*?)\n\}/)[1];
+  const names = [...root.matchAll(/(--[\w-]+)\s*:\s*[^;]+;/g)].map(m => m[1]);
+  ok('theme.css 里的颜色变量数得出来（' + names.length + ' 个）', names.length > 30, names.length);
+
+  // 自定义属性默认是「字符串替换」，不能插值 —— 必须注册成颜色型，切换才能淡过去
+  const reg = {};
+  [...css.matchAll(/@property\s+(--[\w-]+)\s*\{\s*syntax:\s*'<color>'\s*;\s*inherits:\s*true\s*;\s*initial-value:\s*([^;]+);/g)]
+    .forEach(m => { reg[m[1]] = m[2].trim(); });
+  const missing = names.filter(n => !reg[n]);
+  ok('每个颜色变量都注册成 @property <color>', missing.length === 0, missing.join(' '));
+  const withVar = Object.keys(reg).filter(n => /var\(/.test(reg[n]));
+  ok('initial-value 都是实打实的颜色（@property 里不解析 var()）',
+    withVar.length === 0, withVar.join(' '));
+
+  // 过渡挂在 :root 上，并且尊重系统的「减少动态效果」
+  const rm = css.match(/@media \(prefers-reduced-motion: no-preference\)\{\s*:root\{([\s\S]*?)\n  \}/);
+  ok('过渡挂在 :root 上，并受 prefers-reduced-motion 保护', !!rm);
+  const inTrans = rm ? rm[1] : '';
+  // 1px 的细线故意不参与过渡（逐帧重绘 + 分数像素比 = 边框闪）——
+  // 这份名单是故意的，写死在这里；其它颜色一个都不许漏
+  const NO_ANIM = ['--line', '--line-strong', '--kbd-line', '--toast-line'];
+  const noTrans = names.filter(n => inTrans.indexOf(n + ' ') < 0);
+  ok('除了 1px 细线那 ' + NO_ANIM.length + ' 个，其它颜色都在过渡列表里（' +
+     (names.length - NO_ANIM.length) + ' 项）',
+    noTrans.length === NO_ANIM.length && noTrans.every(n => NO_ANIM.includes(n)),
+    noTrans.join(' '));
+  ok('细线那 ' + NO_ANIM.length + ' 个确实没进过渡列表（边框不会再逐帧重绘）',
+    NO_ANIM.every(n => inTrans.indexOf(n + ' ') < 0) &&
+    /画成 1px 线的那几个颜色故意不参与过渡/.test(css));
+  ok('时长是 240ms 这一档（再长就像「页面在变色」了）',
+    /--bg 240ms ease/.test(inTrans) && !/--bg \d{4,}ms/.test(inTrans));
+
+  // 元素自己的过渡（比如主页卡片 .card{transition:border-color .14s}）会和变量过渡打架：
+  // 变量每帧都在变 → 元素那条约每帧重启一次 → 边框看着抖一下。
+  // 所以切换期间要有一条把它们全关掉的规则，但要放行主题开关里的滑块。
+  ok('切换期间关掉元素自己的过渡（放行主题开关滑块 .tk）',
+    /html\.theme-anim \*:not\(\.tk\)[^{]*\{\s*transition:\s*none !important/.test(css) &&
+    /html\.theme-anim \*:not\(\.tk\)::before/.test(css) &&
+    /html\.theme-anim \*:not\(\.tk\)::after/.test(css));
+  const navJs = fs.readFileSync(path.join(ROOT, 'nav.js'), 'utf8');
+  ok('nav.js 用 MutationObserver 盯 data-theme，挂/摘 theme-anim',
+    /new MutationObserver\(/.test(navJs) &&
+    /attributeFilter:\s*\['data-theme'\]/.test(navJs) &&
+    /classList\.add\('theme-anim'\)/.test(navJs) &&
+    /classList\.remove\('theme-anim'\)/.test(navJs));
+  ok('摘掉的时机比变量过渡（240ms）稍晚一点',
+    /\}, 260\)/.test(navJs));
+
+  // 首屏不能补一段动画：head 里的脚本要在首次样式计算前把 data-theme 定好
+  // （首次样式计算不触发 transition，所以只要定得够早，打开页面就是「已到位」的样子）
+  PAGES.forEach(p => {
+    const h = fs.readFileSync(path.join(ROOT, p), 'utf8');
+    const head = h.slice(0, h.indexOf('</head>'));
+    ok(p + ' 在 head 里就定好主题（首屏不会补一段变色动画）',
+      /dataset\.theme\s*=/.test(head) && /localStorage\.getItem\('cube-theme'\)/.test(head));
   });
 }
 
@@ -768,6 +910,33 @@ console.log('\n[19] 公式页的打印按钮');
     // 打印那套配色由 theme.css 统一给白底黑字，页面里不应该再写回颜色
     ok(p + ' 打印样式没把配色写死回页面', !/--[\w-]+\s*:\s*#/.test(h.slice(h.indexOf('@media print'))));
   });
+console.log('\n[19b] 打印分页：表格接着排，标题不当孤儿');
+{
+  // 原来是 section{break-inside:avoid} + overflow:hidden：整张表成了不可拆分的一块，
+  // 这一页装不下就整节推到下一页，PLL 那种只有一个标题的页首也会被孤零零留在上一页。
+  ['f2l.html', 'oll.html', 'pll.html'].forEach(p => {
+    const h = fs.readFileSync(path.join(ROOT, p), 'utf8');
+    const pr = h.slice(h.indexOf('@media print'));
+    ok(p + ' 的表格能跨页接着排（卡片不再整块不可拆分）',
+      /section\{break-inside:auto;overflow:visible/.test(pr) &&
+      !/section\{break-inside:avoid/.test(pr));
+    ok(p + ' 只禁止「一行被劈开」，标题不落在页尾',
+      /tr\{break-inside:avoid\}/.test(pr) &&
+      /header\{[^}]*break-after:avoid\}/.test(pr) &&
+      /section > h2\{[^}]*break-after:avoid/.test(pr));
+    ok(p + ' 打印时不留正文那 60px 底部空白', /main\{padding:0\}/.test(pr));
+    ok(p + ' 打印时表格框线加粗、公式文字调大',
+      /table\{border:2px solid #333\}/.test(pr) && /th,td\{border:1px solid #333\}/.test(pr) &&
+      /code\{font-size:15px;font-weight:600\}/.test(pr));
+  });
+  const f2l = fs.readFileSync(path.join(ROOT, 'f2l.html'), 'utf8');
+  ok('F2L 的红/绿 F 表头换页后重复（<thead> + table-header-group）',
+    /<thead>/.test(f2l) && /thead\{display:table-header-group\}/.test(f2l));
+  const rest = ['oll.html', 'pll.html'].map(p => fs.readFileSync(path.join(ROOT, p), 'utf8'));
+  ok('OLL/PLL 没有表头行，不需要 table-header-group',
+    rest.every(h => !/<thead>/.test(h)) && rest.every(h => !/table-header-group/.test(h)));
+}
+
   // 导航条是 nav.js 注入的，公式页自己的打印规则管不到它 ——
   // 不藏的话速查表打出来最上面会多一条彩色横条
   const navCss = fs.readFileSync(path.join(ROOT, 'nav.css'), 'utf8');
@@ -775,6 +944,53 @@ console.log('\n[19] 公式页的打印按钮');
     /@media print\{ \.topnav, \.totop\{display:none\} \}/.test(navCss));
 }
 
+
+console.log('\n[19c] 教程页：公式都能送进计算器，进阶页的 OLL 步骤图跟昼夜换');
+{
+  ['tutorial-basic.html', 'tutorial-advanced.html'].forEach(p => {
+    const h = fs.readFileSync(path.join(ROOT, p), 'utf8');
+    const n = (h.match(/class="tocalc"/g) || []).length;
+    // 每条公式一个 ↗，链接里带 hash；计算器只认 calc.html#...
+    ok(p + ' 有 ' + n + ' 条公式带 ↗（都指向 calc.html#）',
+      n >= 7 && n === (h.match(/href="calc\.html#/g) || []).length);
+    ok(p + ' 点公式能复制（<code> + copied 态 + toast）',
+      /document\.addEventListener\('click'/.test(h) && /closest\('code'\)/.test(h) &&
+      /classList\.add\('copied'\)/.test(h) && /id="toast"/.test(h));
+    ok(p + ' 打印时把按钮 / ↗ / toast 都藏起来', /@media print\{[\s\S]*?display:none/.test(h));
+    ok(p + ' 打印时正文左右留白（不贴纸边）',
+      /@media print\{[\s\S]*?main\{padding:0 12mm/.test(h));
+    const pr = h.slice(h.indexOf('@media print'));
+    ok(p + ' 打印美化：卡片改成细分隔线、步骤号画成描边小方块',
+      /section\{margin:0;padding:4mm 0 0;border:0;border-top:1px solid #ccc/.test(pr) &&
+      /\.n\{display:inline-grid;width:auto;min-width:6mm/.test(pr) &&
+      /border:1px solid #666/.test(pr));
+    ok(p + ' 打印美化：字号 / 图宽 / 公式框都按纸面调过',
+      /body\{background:#fff;color:#000;font-size:10\.5pt/.test(pr) &&
+      /\.one img\{width:46mm\}/.test(pr) &&
+      /code\{font-size:11pt;font-weight:600/.test(pr));
+    ok(p + ' 右边步骤目录落在「回到顶部」按钮上方',
+      /\.steps\{right:18px;bottom:calc\(18px \+ 40px \+ 14px\)/.test(h));
+    ok(p + ' 右边目录会标识当前看到哪一步（滚动高亮）',
+      /querySelectorAll\('\.steps a\[href\^="#"\]'\)/.test(h) &&
+      /classList\.toggle\('on', i === best\)/.test(h));
+  });
+  // 教程页的配图是编辑器导出的 256x258（透明底，和 f2l 那批同规格），
+  // 逐张核对存在 + 尺寸，别出现「引了一张不在的图」
+  const imgs = [];
+  ['tutorial-basic.html', 'tutorial-advanced.html'].forEach(p => {
+    const h = fs.readFileSync(path.join(ROOT, p), 'utf8');
+    (h.match(/src="tutorial\/[\w.-]+\.png"/g) || []).forEach(m => {
+      const f = m.slice(5, -1);
+      if (imgs.indexOf(f) < 0) imgs.push(f);
+    });
+  });
+  const bad = imgs.filter(f => {
+    const b = fs.readFileSync(path.join(ROOT, f));
+    return b.readUInt32BE(16) !== 256 || b.readUInt32BE(20) !== 258;
+  });
+  ok('教程配图 ' + imgs.length + ' 张都在、都是 256x258', imgs.length >= 5 && bad.length === 0,
+    bad.slice(0, 3).join(' '));
+}
 
 console.log('\n[20] OLL 图的昼夜两版 + 图片尺寸/体积');
 {

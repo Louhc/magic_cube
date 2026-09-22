@@ -40,8 +40,10 @@ python3 tools/verify.py --find T  pll     # PLL 用字母编号（Aa..Z）
    PLL 是「12 条侧面色带」。
 3. 比对。**只有分毫不差才算通过**，差一步 AUF 也算对不上。
 
-页面上的**备选公式**也一并校验：每条都带着"先转几下的 AUF 标注"，
+页面上**如果有备选公式**，也一并校验：每条都带着"先转几下的 AUF 标注"，
 校验时会先做那个 AUF、再做公式，确认能解开图上的局面。
+（现在 OLL / PLL 的数据里只剩主公式了 —— 那段备选写法连同页面上展开它的交互都去掉了，
+这条校验留着：以后再加备选，它照样能把每条都验一遍。）
 
 ## 原理（F2L：不用图，只看公式的结构）
 
@@ -113,3 +115,23 @@ FR 槽插入公式。这种错要靠镜像判据（a/b 不再互为镜像）来�
 | `signature.py` | 从导出的图里按比例取样，读出签名 |
 | `verify.py` | 主校验脚本（F2L 结构校验 + OLL/PLL 读图比对 + `--find` 搜索） |
 | `data/oll.js` `data/pll.js` | 第三方公式库，取自 [Logiqx/cubing-algs](https://github.com/Logiqx/cubing-algs)，仅用于「找不到朝向吻合的写法时」搜索替代 |
+
+## 教程步骤图（tutorial_geometry.js + tutorial_paint.py + tutorial_images.py）
+
+`tutorial/` 里那几张图是**从模拟器局面生成**的，别手改：
+
+```bash
+python3 tools/tutorial_images.py          # 出全部图（可跟图名只出某一张）
+```
+
+三段流水线：
+
+1. `tutorial_images.py` —— 定义教学局面（从复原态直接改某面的贴纸：不关心的格子
+   填 `X`，渲染时自然变成 gray，和 f2l/oll 那批图一个约定；要看白面就用
+   `CubeSim.apply(st,'x2')` 整体转过来）；
+2. `tutorial_geometry.js`（node）—— 局面 → U/F/R 三面状态 → cube.js 的多边形几何（JSON）。
+   面映射用的是给计算器拍照时和 DOM 逐格对拍过的那份变换（U 上、F 左前、R 右前）；
+3. `tutorial_paint.py` —— PIL 4 倍超采样画 256px、256 色调色板 PNG。
+
+> 为什么不直接让 cube.js 出 SVG 再栅格化：环境里 ImageMagick 的内置 SVG 渲染器
+> 画这种图会糊成一团，所以改成「出几何、自己画」。

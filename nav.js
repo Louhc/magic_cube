@@ -15,7 +15,10 @@
     ['index.html',  '首页'],
     ['editor.html', '编辑器'],
     ['calc.html',   '计算器'],
+    // 第 4 项：同一个导航项还管哪些页面（教程初级/进阶共用一个入口）
+    ['tutorial-basic.html', '教程', 1, ['tutorial-advanced.html']],
     ['practice.html', '练习'],
+    ['timer.html', '计时器'],
     ['f2l.html',    'F2L 公式', 1],
     ['oll.html',    'OLL 公式', 1],
     ['pll.html',    'PLL 公式', 1]
@@ -34,9 +37,18 @@
   var activeLink = null;
   PAGES.forEach(function (p) {
     var a = document.createElement('a');
-    a.href = p[0];
     a.textContent = p[1];
-    if (p[0] === here) {
+    // 一个入口管好几页时（教程的初级 / 进阶），跳到上次看的那一篇
+    var extra = [].concat(p[3] || []);
+    var target = p[0];
+    if (extra.length) {
+      try {
+        var last = localStorage.getItem('cube-last:' + p[0]);
+        if (last === p[0] || extra.indexOf(last) >= 0) target = last;
+      } catch (e) {}
+    }
+    a.href = target;
+    if (p[0] === here || extra.indexOf(here) >= 0) {
       a.className = 'on';
       a.setAttribute('aria-current', 'page');
       activeLink = a;
@@ -153,7 +165,11 @@
   });
 
   // 长表格页：右下角一个纯图标的「回到顶部」，滚过一屏才出现
-  var me = PAGES.filter(function (p) { return p[0] === here; })[0];
+  // 「长页」标志看的是入口那一行；一个入口管好几页时（教程初级/进阶），
+  // 每一页都得有按钮，所以 extras 也要算进来
+  var me = PAGES.filter(function (p) {
+    return p[0] === here || [].concat(p[3] || []).indexOf(here) >= 0;
+  })[0];
   if (me && me[2]) {
     var top = document.createElement('button');
     top.type = 'button';
@@ -186,6 +202,23 @@
           ' stroke-linecap="round" stroke-linejoin="round">' +
           '<path d="M20.2 14.7A8.6 8.6 0 1 1 9.3 3.8a6.9 6.9 0 0 0 10.9 10.9z"/></svg>'
   };
+  /* 换主题时，页面里那些「悬停变色」的小过渡会和变量本身的过渡打架：
+     变量在 240ms 里逐帧变，元素的 border-color/color 过渡就被每帧重启一次，
+     看着像抖了一下（主页那六张卡片的边框最明显）。
+     所以切换期间给 <html> 挂个 theme-anim，让元素自己的过渡让路（规则在 theme.css），
+     变量那条过渡照走 —— 页面照样是淡过去的。
+     用 MutationObserver 盯 data-theme：回调是微任务，在下一帧渲染之前跑，
+     所以这一类一定赶在「新颜色第一次参与样式计算」之前挂上。 */
+  (function watchThemeSwitch() {
+    var el = document.documentElement, timer = 0;
+    if (typeof MutationObserver !== 'function' || !el || !el.classList) return;
+    new MutationObserver(function () {
+      el.classList.add('theme-anim');
+      clearTimeout(timer);
+      timer = setTimeout(function () { el.classList.remove('theme-anim'); }, 260);
+    }).observe(el, { attributes: true, attributeFilter: ['data-theme'] });
+  })();
+
   function buildThemeSwitch() {
     var b = document.getElementById('themebtn');
     if (!b || (b.querySelector && b.querySelector('.tk'))) return;   // 没有 / 已填过
@@ -207,4 +240,87 @@
   } else {
     buildThemeSwitch();
   }
+})();
+
+/* ---------- 公式图片点开看大图 ----------
+   页面上那些公式图小的只有 30px（计算器的公式表），大的也就 100~200px，
+   想看清楚就得点开。做法：给图片加一个 data-zoom 属性（各页生成的标记里写），
+   这里用一个**事件委托**接住整页的点击 —— 图是页面渲染过程中才生成的，
+   一个个挂监听既啰嗦又容易漏。
+
+   为什么不做成「点哪儿都能放大」：首页那几张卡片里的图在 <a> 里，点一下是跳页；
+   编辑器里也有自己的图片交互。抢别人的点击不如让各页自己标 —— 标了才放大。
+
+   遮罩样式在 nav.css（.ltbox）；颜色走 theme.css 的 --overlay / --overlay-fg。
+   关掉：点遮罩任意处（图上也行）/ Esc / 右上角的 ×；关掉后焦点回到原来那张图，
+   键盘用户不会「丢在原地」。 */
+(function () {
+  'use strict';
+
+  var box = null, pic = null, closeBtn = null, opener = null;
+
+  function build() {
+    box = document.createElement('div');
+    box.className = 'ltbox';
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-modal', 'true');
+    box.setAttribute('aria-label', '查看图片（点任意处或按 Esc 关闭）');
+    pic = document.createElement('img');
+    pic.alt = '';
+    closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'ltclose';
+    closeBtn.setAttribute('aria-label', '关闭');
+    closeBtn.textContent = '\u00d7';                 // ×
+    box.appendChild(pic);
+    box.appendChild(closeBtn);
+    document.body.appendChild(box);
+    // 遮罩上点哪儿都关（图、×、空白都算）
+    box.addEventListener('click', close);
+  }
+
+  function open(src) {
+    if (!box) build();
+    // 主题相关的图（OLL 有昼夜两版）要显示当前这张：currentSrc 是浏览器真选中的那个，
+    // 懒加载还没轮到它的时候是空的，退回 src
+    pic.src = src.currentSrc || src.src;
+    pic.alt = src.alt || '';
+    opener = src;
+    box.classList.add('on');
+    document.documentElement.classList.add('lb-open');
+    if (closeBtn.focus) closeBtn.focus();
+  }
+
+  function close() {
+    if (!box || !box.classList || !box.classList.contains('on')) return;
+    box.classList.remove('on');
+    document.documentElement.classList.remove('lb-open');
+    // 焦点还给原来那张图：它是 <img>，得让它能被程序聚焦
+    if (opener && opener.focus) {
+      if (!opener.hasAttribute('tabindex')) opener.setAttribute('tabindex', '-1');
+      opener.focus();
+    }
+    opener = null;
+  }
+
+  /* 挂在**捕获**阶段：计算器的公式表是「整行都能点 = 把这条公式填进输入框」，
+     只在 document 的冒泡阶段接是来不及的 —— 那一行的处理已经先跑完了，
+     结果「只想看一眼图」会顺手把输入框改掉。捕获阶段拦下 + 不再往上传，
+     点图就只是看图。 */
+  document.addEventListener('click', function (e) {
+    var t = e.target;
+    if (!t || t.tagName !== 'IMG' || !t.hasAttribute || !t.hasAttribute('data-zoom')) return;
+    e.preventDefault();
+    if (e.stopPropagation) e.stopPropagation();
+    open(t);
+  }, true);
+
+  /* Esc 也走捕获：看图时按 Esc 只关图，不要再把页面自己的东西（比如计算器
+     那个展开着的公式表）一起收掉 */
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape' && e.key !== 'Esc') return;
+    if (!box || !box.classList.contains('on')) return;
+    if (e.stopPropagation) e.stopPropagation();
+    close();
+  }, true);
 })();

@@ -39,6 +39,13 @@
      --btn-bg / --btn-bg2    按钮底色的上下两端（浅渐变 = 有一点光泽）
      --btn-hi / --btn-shade / --btn-drop
                         按钮的顶边高光 / 底边暗边（按下时也当内阴影）/ 落地投影
+     --overlay / --overlay-fg
+                        点公式图看大图时那层全屏遮罩的底色（半透明）、遮罩上的字
+                        （关闭键）。两套主题共用一档：浅色下用蓝紫、夜晚用近黑
+     --primary / --primary2 / --primary-fg / --primary-drop
+                        主按钮（计算器的播放键）的实心底：上浅下深的渐变两端、
+                        压在它上面的图标色、比普通按钮更重的落地投影。
+                        一屏里只用在一个地方 —— 都当主按钮就等于没有主按钮
    ========================================================================== */
 
 /* 白天：浅蓝紫 —— #B1B2FF / #AAC4FF / #D2DAFF / #EEF1FF
@@ -67,6 +74,10 @@
      --btn-shade 既是底边的暗边、也是按下去时的内阴影，--btn-drop 是落地投影 */
   --btn-bg:#FFFFFF; --btn-bg2:#E4E9FF;
   --btn-hi:#ffffffd9; --btn-shade:#2a2f5e1f; --btn-drop:#2a2f5e29;
+  /* 主按钮：深紫实心底（比 --accent 再深一档），配白图标 */
+  --primary:#7075D8; --primary2:#4A4FAE; --primary-fg:#FFFFFF; --primary-drop:#2a2f5e4d;
+  /* 看图遮罩：浅色主题用蓝紫压暗，字用白 */
+  --overlay:#2a2f5ec7; --overlay-fg:#FFFFFF;
   --cubie:#16181c;
 }
 
@@ -88,6 +99,10 @@ html[data-theme="dark"]{
   --scroll:#4A505A; --toast-bg:#434952; --toast-fg:#EEEEEE; --toast-line:#4A505A;
   --btn-bg:#464D58; --btn-bg2:#3B414A;
   --btn-hi:#ffffff1a; --btn-shade:#00000059; --btn-drop:#00000059;
+  /* 主按钮：黄底深字（夜晚的主色就是黄） */
+  --primary:#FFD369; --primary2:#E8B23C; --primary-fg:#222831; --primary-drop:#00000080;
+  /* 看图遮罩：夜晚直接用近黑（黄字按钮那套在遮罩上不合适） */
+  --overlay:#000000d9; --overlay-fg:#EEEEEE;
   --cubie:#16181C;
 }
 
@@ -100,5 +115,93 @@ html[data-theme="dark"]{
     --text:#000; --muted:#555; --line:#bbb; --line-strong:#999;
     --chip:#f4f6f9; --badge:#fff; --head-band:#eef1f5;
     --head-red:#a33; --head-green:#156b3a; --accent:#7a4a58; --on-accent:#fff;
+  }
+}
+
+/* ==========================================================================
+   白天/夜晚切换：让整页颜色「淡」过去，而不是啪一下跳过去
+   --------------------------------------------------------------------------
+   颜色全在这一个文件里，换主题其实就是上面那几十个变量的值在变。默认情况下
+   自定义属性是「字符串替换」，浏览器没法在两种颜色之间插值 —— 所以先按 CSS 的
+   @property 把它们注册成「颜色型」（syntax:'<color>'），再在 :root 上挂一条
+   transition。这样切换时浏览器会逐帧算出中间色，页面（连按钮那种 --btn-bg 渐变底色、
+   阴影、描边）一起平滑过渡，不用给每个元素写 transition，也不会在首屏加载时补动画
+   （首次样式计算不触发 transition，而那之前 head 里的脚本已经把 data-theme 定好了）。
+
+   不支持 @property 的浏览器当没看见这些规则，直接切换 —— 和以前一模一样。
+
+   **画成 1px 线的那几个颜色故意不参与过渡**（--line / --line-strong /
+   --kbd-line / --toast-line）：它们是细线，不少还带圆角（主页那六张卡片就是
+   border:1px + border-radius:12px）。这种线在过渡里被逐帧重绘，遇上分数像素比
+   （Windows 缩放 125% / 150%）会反复重新对齐到设备像素 —— 看着就是「边框闪一下」。
+   让它们一步到位、其余颜色照旧淡过去，反而最干净。
+   时长压到 240ms：再长就能明显感觉到「页面在变色」，反而不像换主题。
+   ========================================================================== */
+@property --bg { syntax: '<color>'; inherits: true; initial-value: #D2DAFF; }
+@property --stage { syntax: '<color>'; inherits: true; initial-value: #D2DAFF; }
+@property --card { syntax: '<color>'; inherits: true; initial-value: #EEF1FF; }
+@property --panel { syntax: '<color>'; inherits: true; initial-value: #EEF1FF; }
+@property --line { syntax: '<color>'; inherits: true; initial-value: #AAC4FF; }
+@property --line-strong { syntax: '<color>'; inherits: true; initial-value: #B1B2FF; }
+@property --text { syntax: '<color>'; inherits: true; initial-value: #3A3F73; }
+@property --muted { syntax: '<color>'; inherits: true; initial-value: #5A60A0; }
+@property --accent { syntax: '<color>'; inherits: true; initial-value: #5A5FBF; }
+@property --on-accent { syntax: '<color>'; inherits: true; initial-value: #FFFFFF; }
+@property --accent-text { syntax: '<color>'; inherits: true; initial-value: #5A5FBF; }
+@property --accent-glow { syntax: '<color>'; inherits: true; initial-value: #5a5fbf40; }
+@property --field { syntax: '<color>'; inherits: true; initial-value: #FFFFFF; }
+@property --field-hover { syntax: '<color>'; inherits: true; initial-value: #D2DAFF; }
+@property --field-focus { syntax: '<color>'; inherits: true; initial-value: #FFFFFF; }
+@property --chip { syntax: '<color>'; inherits: true; initial-value: #D2DAFF; }
+@property --chip-hover { syntax: '<color>'; inherits: true; initial-value: #B1B2FF; }
+@property --chip-on-bg { syntax: '<color>'; inherits: true; initial-value: #C7D0FD; }
+@property --chip-on-fg { syntax: '<color>'; inherits: true; initial-value: #3A3F73; }
+@property --badge { syntax: '<color>'; inherits: true; initial-value: #ffffffb3; }
+@property --head-red { syntax: '<color>'; inherits: true; initial-value: #c0392b; }
+@property --head-green { syntax: '<color>'; inherits: true; initial-value: #1a7440; }
+@property --head-band { syntax: '<color>'; inherits: true; initial-value: #AAC4FF; }
+@property --muted2 { syntax: '<color>'; inherits: true; initial-value: #8A90C8; }
+@property --hint-bg { syntax: '<color>'; inherits: true; initial-value: #D2DAFF; }
+@property --kbd-bg { syntax: '<color>'; inherits: true; initial-value: #D2DAFF; }
+@property --kbd-line { syntax: '<color>'; inherits: true; initial-value: #AAC4FF; }
+@property --kbd-fg { syntax: '<color>'; inherits: true; initial-value: #3A3F73; }
+@property --scroll { syntax: '<color>'; inherits: true; initial-value: #AAC4FF; }
+@property --toast-bg { syntax: '<color>'; inherits: true; initial-value: #EEF1FF; }
+@property --toast-fg { syntax: '<color>'; inherits: true; initial-value: #3A3F73; }
+@property --toast-line { syntax: '<color>'; inherits: true; initial-value: #AAC4FF; }
+@property --btn-bg { syntax: '<color>'; inherits: true; initial-value: #FFFFFF; }
+@property --btn-bg2 { syntax: '<color>'; inherits: true; initial-value: #E4E9FF; }
+@property --btn-hi { syntax: '<color>'; inherits: true; initial-value: #ffffffd9; }
+@property --btn-shade { syntax: '<color>'; inherits: true; initial-value: #2a2f5e1f; }
+@property --btn-drop { syntax: '<color>'; inherits: true; initial-value: #2a2f5e29; }
+@property --primary { syntax: '<color>'; inherits: true; initial-value: #7075D8; }
+@property --primary2 { syntax: '<color>'; inherits: true; initial-value: #4A4FAE; }
+@property --primary-fg { syntax: '<color>'; inherits: true; initial-value: #FFFFFF; }
+@property --primary-drop { syntax: '<color>'; inherits: true; initial-value: #2a2f5e4d; }
+@property --overlay { syntax: '<color>'; inherits: true; initial-value: #2a2f5ec7; }
+@property --overlay-fg { syntax: '<color>'; inherits: true; initial-value: #FFFFFF; }
+@property --cubie { syntax: '<color>'; inherits: true; initial-value: #16181c; }
+
+/* 换主题的那 240ms 里，元素自己的过渡全让路，只留 :root 上那条变量过渡 ——
+   否则「悬停变色」之类的 transition 会因为变量每帧都在变而反复重启，
+   看着像抖一下（主页卡片的边框最明显）。主题开关里的滑块 .tk 除外，它就是要滑。 */
+html.theme-anim *:not(.tk),
+html.theme-anim *:not(.tk)::before,
+html.theme-anim *:not(.tk)::after{ transition: none !important; }
+
+@media (prefers-reduced-motion: no-preference){
+  :root{
+    transition:
+    --bg 240ms ease, --stage 240ms ease, --card 240ms ease, --panel 240ms ease,
+    --text 240ms ease, --muted 240ms ease, --accent 240ms ease, --on-accent 240ms ease,
+    --accent-text 240ms ease, --accent-glow 240ms ease, --field 240ms ease, --field-hover 240ms ease,
+    --field-focus 240ms ease, --chip 240ms ease, --chip-hover 240ms ease, --chip-on-bg 240ms ease,
+    --chip-on-fg 240ms ease, --badge 240ms ease, --head-red 240ms ease, --head-green 240ms ease,
+    --head-band 240ms ease, --muted2 240ms ease, --hint-bg 240ms ease, --kbd-bg 240ms ease,
+    --kbd-fg 240ms ease, --scroll 240ms ease, --toast-bg 240ms ease, --toast-fg 240ms ease,
+    --btn-bg 240ms ease, --btn-bg2 240ms ease, --btn-hi 240ms ease, --btn-shade 240ms ease,
+    --btn-drop 240ms ease, --primary 240ms ease, --primary2 240ms ease,
+    --primary-fg 240ms ease, --primary-drop 240ms ease, --overlay 240ms ease,
+    --overlay-fg 240ms ease, --cubie 240ms ease;
   }
 }

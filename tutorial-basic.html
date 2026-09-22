@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>三阶魔方教程 · 初级（层先法）</title>
+<link rel="icon" type="image/x-icon" href="cube-64x64.ico">
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="nav.css">
+<style>
+  /* 配色（两套主题的所有颜色变量）都在 theme.css 里，这里只管版式。 */
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--bg);color:var(--text);
+       font:14px/1.7 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+  main{max-width:820px;margin:0 auto;padding:10px 18px 70px}
+
+  header{position:relative;padding:14px 0 6px}
+  h1{margin:0;font-size:22px;letter-spacing:.02em}
+  header p{margin:6px 0 0;color:var(--muted);font-size:13px}
+  .printbtn{position:absolute;right:0;top:14px;width:30px;height:30px;padding:0;
+            border-radius:8px;background:var(--field);border:1px solid var(--line);
+            color:var(--muted);cursor:pointer;display:grid;place-items:center}
+  .printbtn:hover{color:var(--accent-text);border-color:var(--accent-text)}
+  .printbtn svg{width:15px;height:15px;display:block;fill:none;stroke:currentColor;
+                stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+  .themebtn{position:absolute;right:40px;top:14px}
+
+  /* 开头那张「认识魔方」的图要够大：面字母是绝对定位标上去的 */
+  .hero{position:relative;width:260px;margin:14px auto 0}
+  .hero img{width:100%;display:block;border-radius:10px}
+  .hero span{position:absolute;font:600 12px/1 ui-monospace,Menlo,Consolas,monospace;
+             color:var(--accent-text);background:var(--card);border:1px solid var(--line);
+             border-radius:5px;padding:2px 5px}
+  .hero .u{left:50%;top:-9px;transform:translateX(-50%)}
+  .hero .f{left:-6px;bottom:34%}
+  .hero .r{right:-6px;bottom:34%}
+
+  section{margin:26px 0 0;background:var(--card);border:1px solid var(--line);
+          border-radius:12px;padding:16px 18px}
+  section > h2{margin:0 0 10px;font-size:16px}
+  section > h2 .n{display:inline-grid;place-items:center;width:22px;height:22px;margin-right:8px;
+                  border-radius:7px;background:var(--accent);color:var(--on-accent);
+                  font-size:12.5px;vertical-align:1px}
+  h3{margin:16px 0 6px;font-size:14px}
+  p{margin:8px 0}
+  ol,ul{margin:8px 0;padding-left:22px}
+  li{margin:4px 0}
+  .goal{color:var(--muted)}
+  .goal b{color:var(--text)}
+  .tip{margin:12px 0 0;padding:9px 12px;border-left:3px solid var(--accent);
+       background:var(--chip);border-radius:0 8px 8px 0;font-size:13px;color:var(--muted)}
+  .tip b{color:var(--text)}
+  .duo{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin:12px 0 4px}
+  .duo figure{margin:0;text-align:center}
+  .duo img{width:170px;display:block;border-radius:8px}
+  .duo figcaption{margin-top:6px;color:var(--muted);font-size:12.5px}
+  .one{text-align:center;margin:12px 0 4px}
+  .one img{width:200px;border-radius:8px}
+
+  table{border-collapse:collapse;margin:10px 0;font-size:13px}
+  th,td{border:1px solid var(--line);padding:5px 10px;text-align:left}
+  th{background:var(--chip);font-weight:600}
+  code{font:13.5px/1.7 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+       cursor:pointer;border-radius:5px;padding:2px 6px;background:var(--chip)}
+  code:hover{color:var(--accent-text)}
+  code.copied{background:var(--accent);color:var(--on-accent)}
+  .alg{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0}
+  .alg .tag{color:var(--muted);font-size:12.5px}
+  a.tocalc{flex:none;display:inline-flex;align-items:center;justify-content:center;
+           width:22px;height:22px;border-radius:50%;color:var(--muted);
+           border:1px solid var(--line);text-decoration:none;opacity:.7}
+  a.tocalc:hover{color:var(--on-accent);background:var(--accent);border-color:var(--accent);opacity:1}
+  a.tocalc svg{width:13px;height:13px;display:block}
+  .next{margin:14px 0 0;display:flex;gap:10px;flex-wrap:wrap}
+  .next a{color:var(--accent-text)}
+
+  #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(12px);
+         background:#111c;color:#fff;padding:8px 16px;border-radius:8px;font-size:13px;
+         opacity:0;pointer-events:none;transition:.18s}
+  #toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  @media (max-width:640px){
+    .hero{width:210px}
+    .duo img{width:140px}
+  }
+
+  /* 左边：教程目录（初级 / 进阶）；右边：本页步骤 + 回到顶部。
+     用 fixed 挂在正文两侧；窄屏直接收起来，正文本身仍然完整可读。
+     另外导航条里那条「教程」也会展开成这两页（见 nav.js / nav.css）。 */
+  .side,.steps{position:fixed;width:152px;display:flex;flex-direction:column;gap:2px;z-index:3}
+  .side{top:calc(var(--nav-h, 63px) + 16px);left:max(14px, calc(50% - 616px))}
+  /* 右边这条贴着右下角，正好落在「回到顶部」按钮上方
+     （那个按钮固定 right:18px / bottom:18px、40x40） */
+  .steps{right:18px;bottom:calc(18px + 40px + 14px);align-items:flex-end}
+  .steps a{text-align:right}
+  .side a,.steps a{color:var(--muted);text-decoration:none;font-size:12.5px;line-height:1.5;
+                   padding:4px 9px;border-radius:7px;border-left:2px solid transparent}
+  .side a:hover,.steps a:hover{color:var(--accent-text);background:var(--chip)}
+  .side a.on,.steps a.on{color:var(--text);border-left-color:var(--accent);background:var(--chip)}
+  @media (max-width:1240px){ .side,.steps{display:none} }
+
+  @media print{
+    /* 打印：按纸上的阅读习惯重排一遍 ——
+       卡片框线在纸上容易被分页切断（看着像坏掉），改成一条细分隔线；
+       步骤号在屏幕上是色块，纸上默认不印背景，会变成白字白底，所以画成描边小方块；
+       字号、行距、图宽、表格线都按纸面调。 */
+    body{background:#fff;color:#000;font-size:10.5pt;line-height:1.65}
+    main{padding:0 12mm;max-width:none}
+    header{padding:0 0 4mm;break-after:avoid}
+    h1{font-size:19pt}
+    h2{font-size:13pt}
+    h3{font-size:11.5pt}
+    h2,h3{break-after:avoid}
+    section{margin:0;padding:4mm 0 0;border:0;border-top:1px solid #ccc;background:none;
+            border-radius:0;break-inside:auto;overflow:visible}
+    section:first-of-type{border-top:0}
+    section > h2 .n{display:inline-grid;width:auto;min-width:6mm;height:6mm;padding:0 1.5mm;
+                    background:none;color:#000;border:1px solid #666;border-radius:1.5mm;
+                    font-size:9pt;vertical-align:1px}
+    .goal{color:#333}
+    .goal b{color:#000}
+    .tip{border-left:2.5px solid #666;background:none;border-radius:0;
+         padding:.5mm 0 .5mm 4mm;color:#333}
+    .tip b{color:#000}
+    .one img{width:46mm}
+    figure img{width:42mm}
+    .duo img{width:40mm}
+    figcaption,.duo figcaption{color:#444}
+    table{margin:3mm 0;border:1.5px solid #333}
+    th,td{border:1px solid #333;padding:1.2mm 2.5mm}
+    th{background:none;border-bottom:2px solid #333}
+    code{font-size:11pt;font-weight:600;background:none;border:1px solid #999;
+         border-radius:1mm;padding:.2mm 1.5mm;margin:0;cursor:auto}
+    .alg{gap:3mm;margin:2mm 0}
+    .alg .tag{color:#333}
+    .side,.steps,a.tocalc,.themebtn,.printbtn{display:none}
+    .tip,.one,figure,.alg{break-inside:avoid}
+    #toast{display:none}
+  }
+</style>
+<script>try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.dataset.theme='dark'}catch(e){}</script>
+</head>
+<body>
+
+<script src="nav.js"></script>
+<main>
+<nav class="side" aria-label="教程目录">
+    <a class="on" href="tutorial-basic.html">初级 · 层先法</a>
+    <a class="" href="tutorial-advanced.html">进阶 · CFOP</a>
+  </nav>
+  <header>
+    <h1>三阶魔方教程 · 初级</h1>
+    <p>层先法：一层一层来，七步把魔方复原。不需要记很多公式，看懂每一步在干什么就行。</p>
+    <button class="themebtn" id="themebtn" type="button" title="切到夜晚"></button>
+    <button class="printbtn" id="printbtn" type="button" title="打印 / 存成 PDF" aria-label="打印"><svg
+      viewBox="0 0 24 24"><path d="M7 10.5V4h10v6.5"/><path
+      d="M7 18.5H5.2A2.2 2.2 0 0 1 3 16.3v-3.6a2.2 2.2 0 0 1 2.2-2.2h13.6A2.2 2.2 0 0 1 21 12.7v3.6a2.2 2.2 0 0 1-2.2 2.2H17"/><path
+      d="M7 14.5h10v6H7z"/></svg></button>
+  </header>
+
+  <section id="s0">
+    <h2>先认识魔方</h2>
+    <div class="hero">
+      <img src="tutorial/complete-256x258.png" alt="三阶魔方：顶面 U、左前面 F、右前面 R">
+      <span class="u">U</span><span class="f">F</span><span class="r">R</span>
+    </div>
+    <p>三阶魔方有 6 个中心块、12 个棱块、8 个角块。<b>中心块永远不动</b>——所以「白色面」
+    就是白色中心所在的那一面，转来转去它还是白色面。</p>
+    <p><b>颜色是对着的</b>：白对黄、红对橙、蓝对绿。本站的配色表就是这一套。</p>
+    <h3>公式记号</h3>
+    <p>字母表示「把哪一面顺时针转 90°」，都是<b>面对那一面看</b>的时候的顺时针：</p>
+    <table>
+      <tr><th>记号</th><th>意思</th></tr>
+      <tr><td><code>R</code> <code>L</code></td><td>右面 / 左面顺时针 90°</td></tr>
+      <tr><td><code>U</code> <code>D</code></td><td>上面 / 下面顺时针 90°</td></tr>
+      <tr><td><code>F</code> <code>B</code></td><td>前面 / 后面顺时针 90°</td></tr>
+      <tr><td><code>R'</code></td><td>带一撇 = 反过来（逆时针）90°</td></tr>
+      <tr><td><code>R2</code></td><td>转 180°（顺逆都一样）</td></tr>
+      <tr><td><code>x y z</code></td><td>整个魔方跟着转：x 跟 R 同向、y 跟 U 同向、z 跟 F 同向</td></tr>
+    </table>
+    <div class="tip">看不懂公式没关系：本页每条公式右边的 <b>↗</b> 会把这条公式送进
+    <a href="calc.html">计算器</a>，点「提交」就能看着魔方一步步转出来。</div>
+  </section>
+
+  <section id="s1">
+    <h2><span class="n">1</span>白色十字</h2>
+    <p class="goal"><b>目标</b>：底面拼出一个白色十字，而且每条白棱的<b>侧面颜色和同侧的中心块对齐</b>。</p>
+    <p>先不管别的块。把四条白棱都转到<b>黄色中心那一面</b>，摆成一朵「小花」：</p>
+    <div class="one"><img src="tutorial/cross-256x258.png" alt="小花：顶面中间是黄色中心，四条棱是白色"></div>
+    <p>然后一条一条处理：把某一瓣的<b>侧面颜色</b>转到和它同色的中心块对齐，再把这一面转 180°——
+    白棱就翻到底面去了。四条都做完，底面就是白十字。</p>
+    <div class="tip"><b>为什么先做小花</b>：直接拼白十字要一边看底面一边看侧面，很难；
+    先集中到顶面，一次只处理一条棱，眼睛轻松很多。</div>
+  </section>
+
+  <section id="s2">
+    <h2><span class="n">2</span>底层角块（第一层完成）</h2>
+    <p class="goal"><b>目标</b>：四个白色角块归位，<b>第一层侧面也整整齐齐</b>。</p>
+    <p>在顶层找一个白色角块，把它转到「它该去的位置」的<b>正上方</b>（看它另外两种颜色，
+    对应哪两个中心块，就转到那两个中心之间），然后重复做这条公式：</p>
+    <div class="alg"><span class="tag">右手公式</span>
+      <code>R U R' U'</code>
+      <a class="tocalc" href="calc.html#R%20U%20R'%20U'" target="_blank" rel="noopener"></a></div>
+    <p>做到白角块翻进底层、而且侧面颜色对上了为止（最多做几次）。四个角都这样处理。</p>
+    <div class="tip"><b>小坑</b>：如果白色朝上或朝着侧面，先随便做一次让它跑到顶层侧边，
+    再按上面的方法摆好重来。</div>
+    <div class="one"><img src="tutorial/bottom-256x258.png" alt="第一层完成：白色面朝下、侧面一圈颜色对齐"></div>
+  </section>
+
+  <section id="s3">
+    <h2><span class="n">3</span>中层棱块（第二层完成）</h2>
+    <p class="goal"><b>目标</b>：中层四条棱归位，前两层全部完成。</p>
+    <p>在顶层找一条<b>不带黄色的</b>棱块，把它的侧面颜色转到和同色中心对齐，看它该往左插还是往右插：</p>
+    <div class="alg"><span class="tag">往右插</span>
+      <code>U R U' R' U' F' U F</code>
+      <a class="tocalc" href="calc.html#U%20R%20U'%20R'%20U'%20F'%20U%20F" target="_blank" rel="noopener"></a></div>
+    <div class="alg"><span class="tag">往左插</span>
+      <code>U' L' U L U F U' F'</code>
+      <a class="tocalc" href="calc.html#U'%20L'%20U%20L%20U%20F%20U'%20F'" target="_blank" rel="noopener"></a></div>
+    <div class="tip"><b>小坑</b>：顶层找不到不带黄色的棱，说明它卡在中层但位置错了——
+    随便用上面一条公式把它顶出来，再重新插。</div>
+    <div class="one"><img src="tutorial/f2l-256x258.png" alt="前两层完成：只有顶面还没做"></div>
+  </section>
+
+  <section id="s4">
+    <h2><span class="n">4</span>顶层黄十字</h2>
+    <p class="goal"><b>目标</b>：顶面出现黄色十字（先别管角块）。</p>
+    <p>看顶面黄色贴纸的形状：<b>一个点</b> → <b>一条线</b> → <b>一个拐角</b> → 十字。
+    摆好方向做这条公式，重复到出十字：</p>
+    <div class="alg"><span class="tag">黄十字</span>
+      <code>F R U R' U' F'</code>
+      <a class="tocalc" href="calc.html#F%20R%20U%20R'%20U'%20F'" target="_blank" rel="noopener"></a></div>
+    <p>摆法：出现「线」时让线<b>横着</b>；出现「拐角」时把拐角放在<b>左上角</b>。</p>
+    <div class="one"><img src="tutorial/topcross-256x258.png" alt="顶层黄十字"></div>
+  </section>
+
+  <section id="s5">
+    <h2><span class="n">5</span>顶层黄色面</h2>
+    <p class="goal"><b>目标</b>：整个顶面都是黄色。</p>
+    <p>把魔方摆成「小鱼」：<b>顶面只差三个角块没翻上来</b>，黄色角块的位置决定用哪条公式。</p>
+    <div class="alg"><span class="tag">小鱼（黄色角在左上）</span>
+      <code>R U R' U R U2 R'</code>
+      <a class="tocalc" href="calc.html#R%20U%20R'%20U%20R%20U2%20R'" target="_blank" rel="noopener"></a></div>
+    <div class="alg"><span class="tag">它的镜像</span>
+      <code>R U2 R' U' R U' R'</code>
+      <a class="tocalc" href="calc.html#R%20U2%20R'%20U'%20R%20U'%20R'" target="_blank" rel="noopener"></a></div>
+    <div class="tip"><b>摆法口诀</b>：顶面缺两个黄、且有两个黄在<b>左边</b>时，让黄色朝着<b>后面的左上角</b>做第一条。</div>
+    <div class="one"><img src="tutorial/oll-256x258.png" alt="顶面全黄"></div>
+  </section>
+
+  <section id="s6">
+    <h2><span class="n">6</span>顶层角块归位</h2>
+    <p class="goal"><b>目标</b>：四个角块回到正确位置（<b>方向先不管</b>）。</p>
+    <p>找一个<b>位置已经对了</b>的角块（三个面颜色和所在位置的三面中心都对得上），把它放在
+    <b>右前方</b>；如果四个都不对，随便找一条做一次再看。然后做这条公式：</p>
+    <div class="alg"><span class="tag">角块三循环</span>
+      <code>x' R2 D2 (R' U' R) D2 (R' U R')</code>
+      <a class="tocalc" href="calc.html#x'%20R2%20D2%20(R'%20U'%20R)%20D2%20(R'%20U%20R')" target="_blank" rel="noopener"></a></div>
+  </section>
+
+  <section id="s7">
+    <h2><span class="n">7</span>顶层棱块归位（完成！）</h2>
+    <p class="goal"><b>目标</b>：顶层四条棱归位，魔方复原。</p>
+    <p>看顶层四条棱哪三条在打转：需要<b>顺时针</b>换位就用第一条，<b>逆时针</b>用第二条。</p>
+    <div class="alg"><span class="tag">顺时针</span>
+      <code>R U' R U R U R U' R' U' R2</code>
+      <a class="tocalc" href="calc.html#R%20U'%20R%20U%20R%20U%20R%20U'%20R'%20U'%20R2" target="_blank" rel="noopener"></a></div>
+    <div class="alg"><span class="tag">逆时针</span>
+      <code>R2 U R U R' U' R' U' R' U R'</code>
+      <a class="tocalc" href="calc.html#R2%20U%20R%20U%20R'%20U'%20R'%20U'%20R'%20U%20R'" target="_blank" rel="noopener"></a></div>
+    <p>如果四条棱全乱了（两条对换），随便做一次其中一条，就会变成上面两种情况之一。</p>
+  </section>
+
+  <section id="s8">
+    <h2>做完之后</h2>
+    <div class="one"><img src="tutorial/complete-256x258.png" alt="六面复原"></div>
+    <ul>
+      <li>去 <a href="practice.html">练习页</a> 随机出题，拿真魔方对着核；</li>
+      <li>公式记不住就用 <a href="calc.html">计算器</a> 一步步看，或者照
+        <a href="f2l.html">F2L</a> / <a href="oll.html">OLL</a> / <a href="pll.html">PLL</a>
+        三张速查表对号入座；</li>
+      <li>能稳定复原之后，下一步是提速：<a href="tutorial-advanced.html">三阶魔方教程 · 进阶（CFOP）</a>
+        —— 十字、F2L、OLL、PLL，以及手法和练习方法。</li>
+    </ul>
+    <p class="next">本站公式表里每条公式都能直接点 ↗ 送到计算器试跑。</p>
+  </section>
+  <nav class="steps" aria-label="本页步骤">
+    <a href="#s0">先认识魔方</a>
+    <a href="#s1">1 白色十字</a>
+    <a href="#s2">2 底层角块</a>
+    <a href="#s3">3 中层棱块</a>
+    <a href="#s4">4 顶层黄十字</a>
+    <a href="#s5">5 顶层黄色面</a>
+    <a href="#s6">6 顶层角块归位</a>
+    <a href="#s7">7 顶层棱块归位</a>
+  </nav>
+</main>
+
+<div id="toast"></div>
+<script>
+(function () {
+  'use strict';
+
+  /* ---------- 点公式复制（和公式页一套做法：去掉空格，粘进计时器就能用） ---------- */
+  var toastEl = document.getElementById('toast'), toastTimer = 0;
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('on');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.classList.remove('on'); }, 1400);
+  }
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+  document.addEventListener('click', function (e) {
+    var el = e.target.closest ? e.target.closest('code') : null;
+    if (!el) return;
+    var text = el.textContent.replace(/\s+/g, '');
+    function done() {
+      el.classList.add('copied');
+      setTimeout(function () { el.classList.remove('copied'); }, 600);
+    }
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(function () { done(); toast(text); }, function () {
+        fallbackCopy(text); done(); toast(text);
+      });
+    } else {
+      fallbackCopy(text); done(); toast(text);
+    }
+  });
+
+  /* ---------- 公式右边的 ↗：计算器图标（内联 SVG，跟着 currentColor 走） ---------- */
+  var CALC_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4.4" y="2.8" ' +
+    'width="15.2" height="18.4" rx="3.2" fill="none" stroke="currentColor" stroke-width="2.1"/>' +
+    '<path d="M8.1 7.4h7.8" fill="none" stroke="currentColor" stroke-width="2.1" ' +
+    'stroke-linecap="round"/><circle cx="9.4" cy="12.3" r="1.35" fill="currentColor"/>' +
+    '<circle cx="14.6" cy="12.3" r="1.35" fill="currentColor"/>' +
+    '<circle cx="9.4" cy="16.6" r="1.35" fill="currentColor"/>' +
+    '<circle cx="14.6" cy="16.6" r="1.35" fill="currentColor"/></svg>';
+  Array.prototype.forEach.call(document.querySelectorAll('a.tocalc'), function (a) {
+    a.innerHTML = CALC_ICON;
+    if (!a.getAttribute('aria-label')) a.setAttribute('aria-label', '在计算器里打开这条公式');
+  });
+
+  document.getElementById('printbtn').addEventListener('click', function () { window.print(); });
+
+  /* 右边目录标识「现在看到哪一步」：滚动时把最后一段已经划过去的高亮 */
+  (function spy() {
+    var links = Array.prototype.slice.call(document.querySelectorAll('.steps a[href^="#"]'));
+    if (!links.length) return;
+    var targets = links.map(function (a) { return document.getElementById(a.getAttribute('href').slice(1)); });
+    var raf = (window.requestAnimationFrame || function (f) { return setTimeout(f, 16); });
+    var ticking = false;
+    function sync() {
+      ticking = false;
+      var best = 0;
+      targets.forEach(function (el, i) {
+        if (el && el.getBoundingClientRect && el.getBoundingClientRect().top <= 72) best = i;
+      });
+      links.forEach(function (a, i) { a.classList.toggle('on', i === best); });
+    }
+    window.addEventListener('scroll', function () {
+      if (ticking) return;
+      ticking = true;
+      raf(sync);
+    });
+    sync();
+  })();
+
+
+
+  /* ---------- 夜晚模式 ---------- */
+  var root = document.documentElement, btn = document.getElementById('themebtn');
+  function applyTheme(t) {
+    root.dataset.theme = t;
+    btn.title = t === 'dark' ? '切到白天' : '切到夜晚';
+    try { localStorage.setItem('cube-theme', t); } catch (e) {}
+  }
+  // 下次从导航点「教程」要回到这一次看的那一篇（nav.js 读这个键）
+  try { localStorage.setItem('cube-last:tutorial-basic.html', 'tutorial-basic.html'); } catch (e) {}
+  var saved = null;
+  try { saved = localStorage.getItem('cube-theme'); } catch (e) {}
+  applyTheme(saved === 'dark' ? 'dark' : 'light');
+  btn.addEventListener('click', function () {
+    applyTheme(root.dataset.theme === 'dark' ? 'light' : 'dark');
+  });
+})();
+</script>
+</body>
+</html>

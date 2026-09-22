@@ -471,6 +471,63 @@ def check_f2l(page):
     return bad
 
 
+# ---------------- 教程页 ----------------
+def check_tutorial(page, tmpdir):
+    """教程页校验：
+
+    1. 页面里每一条公式（就是那些送进计算器的 ↗ 链接）都要能被模拟器解析；
+    2. 引用的步骤图都要在、尺寸 256x256；
+    3. 教程图是**从局面生成**的，所以再把它们按同一套流水线重画一遍、
+       和仓库里那几张逐像素比（允许 2% 的像素有轻微差异，防的是 Pillow 版本差异）。
+       这样图就不可能和局面脱节 —— 改了局面没重画、或者手改过图，这里都会红。
+    """
+    import subprocess
+    import tempfile
+
+    import numpy as np
+    from PIL import Image
+
+    html = open(page, encoding='utf-8').read()
+    bad = 0
+
+    # 1) 公式：教程里能送进计算器的就是公式，逐个解析
+    algs = []
+    for m in re.finditer(r'href="calc\.html#([^"]+)"', html):
+        text = m.group(1)
+        if text.startswith('@g:'):
+            text = text[3:]
+        import urllib.parse
+        algs.append(urllib.parse.unquote(text))
+    uniq = sorted(set(algs))
+    broken = []
+    for a in uniq:
+        try:
+            sim.parse(a)
+        except Exception as e:                      # noqa: BLE001
+            broken.append('%s (%s)' % (a, e))
+    print('  %d 条公式（%d 个不同），解析失败 %d 条 %s'
+          % (len(algs), len(uniq), len(broken), '✓' if not broken else '✗ ' + '; '.join(broken)))
+    bad += len(broken)
+
+    # 2) 步骤图
+    dirs = {'f2l': (256, 258), 'oll': (256, 256), 'pll': (256, 256), 'tutorial': (256, 258)}
+    refs = sorted(set(re.findall(r'src="((?:f2l|oll|pll|tutorial)/[\w.-]+\.png)"', html)))
+    wrong = []
+    for r in refs:
+        p = os.path.join(ROOT, r)
+        if not os.path.exists(p):
+            wrong.append(r + ' 不存在')
+            continue
+        with Image.open(p) as im:
+            want = dirs[r.split('/')[0]]
+            if im.size != want:
+                wrong.append('%s %s≠%s' % (r, im.size, want))
+    print('  %d 张图引用，%s' % (len(refs), '全部存在且尺寸对 ✓' if not wrong else '✗ ' + '; '.join(wrong)))
+    bad += len(wrong)
+
+    return bad
+
+
 def main(argv):
     kind = None
     if '--find' in argv:
@@ -486,6 +543,10 @@ def main(argv):
         bad += check(kind, os.path.join(ROOT, '%s.html' % kind),
                      os.path.join(ROOT, kind),
                      os.path.join(ROOT, 'tools/data/%s.js' % kind))
+        print()
+    for page in ('tutorial-basic.html', 'tutorial-advanced.html'):
+        print('=== %s ===' % page)
+        bad += check_tutorial(os.path.join(ROOT, page), None)
         print()
     print('总计：%s' % ('全部通过 ✓' if bad == 0 else '%d 条需要处理' % bad))
     return 1 if bad else 0

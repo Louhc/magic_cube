@@ -764,6 +764,206 @@ console.log('\n[11c] PLL 页的「显示颜色」开关（真跑一遍页面脚�
   }
 }
 
+console.log('\n[11d] 教程页：主题开关能切、写进存档（真跑一遍进阶页脚本）');
+{
+  const vm = require('vm');
+  const mkEl = t => {
+    const e = { tagName: t, dataset: {}, _h: '', _t: '', _h2: {},
+      classList: { _s: new Set(), add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); },
+        toggle(c, v) { v ? this._s.add(c) : this._s.delete(c); }, contains(c) { return this._s.has(c); } },
+      addEventListener(ev, fn) { (this._h2[ev] = this._h2[ev] || []).push(fn); },
+      fire(ev, a) { (this._h2[ev] || []).forEach(f => f(a || {})); },
+      setAttribute(k, v) { this['_a_' + k] = String(v); }, getAttribute(k) { return this['_a_' + k] || null; },
+      appendChild(c) { return c; }, removeChild() {}, select() {}, focus() {},
+      set innerHTML(v) { this._h = v; }, get innerHTML() { return this._h; },
+      set textContent(v) { this._t = v; }, get textContent() { return this._t; } };
+    return e;
+  };
+  ['tutorial-basic.html', 'tutorial-advanced.html'].forEach(page => {
+    const els = {}, store = {};
+    const ctx = {
+      console, setTimeout, clearTimeout, navigator: {}, window: { addEventListener() {} },
+      localStorage: { getItem: k => (k in store ? store[k] : null),
+                      setItem: (k, v) => { store[k] = String(v); },
+                      removeItem: k => { delete store[k]; } },
+      document: { documentElement: { dataset: {} }, createElement: mkEl,
+                  getElementById: id => els[id] || (els[id] = mkEl('div')),
+                  querySelectorAll: () => [], addEventListener() {},
+                  body: { appendChild() {}, removeChild() {} } }
+    };
+    ctx.globalThis = ctx;
+    vm.createContext(ctx);
+    const src = fs.readFileSync(path.join(__dirname, '..', page), 'utf8')
+      .match(/<script>([\s\S]*?)<\/script>/g).map(x => x.replace(/<\/?script>/g, ''))
+      .filter(x => x.includes('applyTheme')).pop();
+    vm.runInContext(src, ctx);
+    ok(page + '：开屏是白天（存档里没主题）',
+      ctx.document.documentElement.dataset.theme === 'light' &&
+      String(els.themebtn.title || '').indexOf('夜晚') >= 0);
+    els.themebtn.fire('click');
+    ok(page + '：进来就记住「上次看的是这一篇」',
+      store['cube-last:tutorial-basic.html'] === page, store['cube-last:tutorial-basic.html']);
+    ok(page + '：点主题开关切到夜晚并写进存档',
+      ctx.document.documentElement.dataset.theme === 'dark' && store['cube-theme'] === 'dark',
+      ctx.document.documentElement.dataset.theme + ' / ' + store['cube-theme']);
+  });
+}
+
+console.log('\n[11b] 级联：主按钮真的赢了（不是被旁边那套规则抢走）');
+{
+  // 光看源码里「有没有那条规则」是不够的：一条更具体的相邻规则（比如
+  // .ctrl button:hover:not(:disabled)）完全可能把主按钮的字色抢走 ——
+  // 悬停时图标变暗、在深底上看不见，就是这么来的。这里按 CSS 的规则
+  // 真算一遍：解析出所有规则 -> 按选择器匹配 -> 比特异性 -> 取声明。
+  const srcAll = fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8');
+  let css = (srcAll.match(/<style>([\s\S]*?)<\/style>/) || ['', ''])[1]
+    .replace(/\/\*[\s\S]*?\*\//g, '');
+  // 先摘掉 @media / @keyframes 这些带嵌套的块（正则解析不了嵌套花括号）
+  for (const at of ['@media', '@keyframes']) {
+    let i;
+    while ((i = css.indexOf(at)) >= 0) {
+      let d = 0, j = css.indexOf('{', i);
+      if (j < 0) { css = css.slice(0, i); break; }
+      for (let k = j; k < css.length; k++) {
+        if (css[k] === '{') d++;
+        else if (css[k] === '}') { d--; if (d === 0) { css = css.slice(0, i) + css.slice(k + 1); break; } }
+      }
+      if (d !== 0) break;
+    }
+  }
+  const rules = [];
+  for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const decls = {};
+    m[2].split(';').forEach(d => {
+      const i = d.indexOf(':');
+      if (i < 0) return;
+      decls[d.slice(0, i).trim()] = d.slice(i + 1).trim();
+    });
+    rules.push({ sels: m[1].split(',').map(x => x.trim()).filter(Boolean), decls });
+  }
+  // 只认「后代组合 + 复合选择器（标签 / .类 / :hover / :disabled / :not(:disabled)）」，
+  // 别的（伪元素、属性选择器、子代组合…）当不认识，直接跳过 —— 宁可少算，不要算错
+  const tokens = comp => (comp.match(/:not\([^)]*\)|[:.][\w-]+/g) || []);
+  const COMP = /^([a-zA-Z][\w-]*)?((?:[.#:][\w-]+|:not\([^)]*\))*)$/;
+  const okComp = comp => COMP.test(comp) && tokens(comp).every(t =>
+    t[0] === '.' || t === ':hover' || t === ':disabled' || t === ':not(:disabled)');
+  const spec = sel => {
+    const parts = sel.split(/\s+/);
+    if (!parts.every(okComp)) return null;
+    let cls = 0, el = 0;
+    parts.forEach(p => {
+      if (/^[a-zA-Z]/.test(p)) el++;
+      tokens(p).forEach(() => { cls++; });          // .类 / :hover / :disabled / :not(...) 都算一档
+    });
+    return cls * 1000 + el;                        // 同一档里再比元素数就够了
+  };
+  const hitComp = (comp, e) => {
+    const m = comp.match(COMP);
+    if (!m) return false;
+    if (m[1] && m[1].toLowerCase() !== e.tag) return false;
+    for (const t of tokens(comp)) {
+      if (t[0] === '.') { if (!e.classes.includes(t.slice(1))) return false; }
+      else if (t === ':hover') { if (!e.hover) return false; }
+      else if (t === ':disabled') { if (!e.disabled) return false; }
+      else if (t === ':not(:disabled)') { if (e.disabled) return false; }
+      else return false;
+    }
+    return true;
+  };
+  const hits = (sel, e) => {
+    const parts = sel.split(/\s+/);
+    if (!hitComp(parts[parts.length - 1], e)) return false;
+    let i = parts.length - 2;
+    for (const anc of e.parents) { if (i < 0) break; if (hitComp(parts[i], anc)) i--; }
+    return i < 0;
+  };
+  const winner = (e, prop) => {
+    let best = null, bs = -1;
+    for (const r of rules) for (const sel of r.sels) {
+      const sp = spec(sel);
+      if (sp === null || !hits(sel, e)) continue;
+      if (r.decls[prop] === undefined) continue;
+      if (sp >= bs) { bs = sp; best = r.decls[prop]; }   // 同分看谁在后面
+    }
+    return best;
+  };
+  const E = (tag, classes, o) => Object.assign(
+    { tag, classes: classes || [], hover: false, disabled: false, parents: [] }, o || {});
+  const panel = E('div', ['panel']);
+  const ctrl = E('div', ['ctrl'], { parents: [panel] });
+  const play = E('button', ['play'], { parents: [ctrl] });
+  const nav = E('button', [], { parents: [ctrl] });
+
+  // 正面对照：普通步骤键必须还是共用配方那份浅渐变（说明解析器确实在工作）
+  ok('级联解析器可用：普通步骤键拿到的是共用配方的浅渐变',
+    /var\(--btn-bg\)/.test(winner(nav, 'background') || '') && winner(nav, 'height') === '32px',
+    String(winner(nav, 'background')));
+  ok('级联：主按钮的实心深色底由它自己那条规则赢',
+    /linear-gradient\(180deg, var\(--primary\) 0%, var\(--primary2\) 100%\)/.test(winner(play, 'background') || ''),
+    String(winner(play, 'background')));
+  ok('级联：主按钮更高（40px）、圆角更小（6px）；旁边的键还是 32px',
+    winner(play, 'height') === '40px' && winner(play, 'border-radius') === '6px' &&
+    winner(nav, 'border-radius') === '7px',
+    [winner(play, 'height'), winner(play, 'border-radius')].join(' / '));
+  ok('级联：投影是主按钮自己那两层（比旁边的重）',
+    /0 6px 16px var\(--primary-drop\)/.test(winner(play, 'box-shadow') || '') &&
+    /0 1px 2px var\(--btn-drop\)/.test(winner(nav, 'box-shadow') || ''),
+    String(winner(play, 'box-shadow')));
+  // 这条就是加这一节的原因：悬停时旁边那套 .ctrl button:hover 更具体，
+  // 不显式写死字色的话，图标会在深底上变成 --text（几乎看不见）
+  const ph = E('button', ['play'], { parents: [ctrl], hover: true });
+  const nh = E('button', [], { parents: [ctrl], hover: true });
+  ok('级联：主按钮悬停时字色仍是 --primary-fg（没被步骤键的悬停规则抢走）',
+    winner(ph, 'color') === 'var(--primary-fg)' && winner(ph, 'background').indexOf('--primary') > 0,
+    String(winner(ph, 'color')));
+  ok('级联：主按钮悬停的抬升 / 投影也是它自己那份',
+    winner(ph, 'translate') === '0 -1px' && /0 11px 24px var\(--primary-drop\)/.test(winner(ph, 'box-shadow') || ''),
+    String(winner(ph, 'box-shadow')));
+  ok('级联：普通步骤键悬停时字色提亮成正文色',
+    winner(nh, 'color') === 'var(--text)' && winner(nh, 'translate') === '0 -1px',
+    String(winner(nh, 'color')));
+  ok('级联：播放中主按钮带主色光环',
+    /0 0 0 3px var\(--accent-glow\)/.test(
+      winner(E('button', ['play', 'playing'], { parents: [ctrl] }), 'box-shadow') || ''));
+  // 步骤小片：平的那一档，别被共用配方的渐变黏回去
+  const chip = E('span', [], { parents: [E('div', ['moves'], { parents: [panel] })] });
+  ok('级联：步骤小片是平底（--chip），没有渐变 / 投影',
+    winner(chip, 'background') === 'var(--chip)' && winner(chip, 'box-shadow') == null,
+    String(winner(chip, 'background')) + ' / ' + String(winner(chip, 'box-shadow')));
+  // 历史：悬停底 + 当前项的字色
+  const row = E('div', ['e'], { parents: [E('div', ['hist'], { parents: [panel] })] });
+  const rowH = E('div', ['e'], { parents: [E('div', ['hist'], { parents: [panel] })] , hover: true});
+  const rowCur = E('div', ['e', 'cur'], { parents: [E('div', ['hist'], { parents: [panel] })] });
+  ok('级联：历史条目悬停浮一档；当前那一条底色浮一档 + 正文色（不再整圈主色描边）',
+    winner(row, 'background') === 'var(--field)' &&
+    winner(rowH, 'background') === 'var(--field-hover)' &&
+    winner(rowCur, 'background') === 'var(--field-hover)' &&
+    winner(rowCur, 'color') === 'var(--text)',
+    [winner(rowH, 'background'), winner(rowCur, 'background')].join(' / '));
+  // 走过的步骤片：`.done` 和 `:hover` 同分又排后面，光写 :hover 等于没反应
+  const moveBox = E('div', ['moves'], { parents: [panel] });
+  const doneChip = E('span', ['done'], { parents: [moveBox], hover: true });
+  ok('级联：走过的步骤片 hover 时也是「浮起一层底 + 短投影」',
+    winner(doneChip, 'background') === 'var(--chip-hover)' &&
+    winner(doneChip, 'color') === 'var(--text)' &&
+    /0 2px 6px var\(--btn-drop\)/.test(winner(doneChip, 'box-shadow') || ''),
+    [winner(doneChip, 'background'), winner(doneChip, 'box-shadow')].join(' / '));
+  ok('级联：当前那一块 hover 时还是主色光晕（没被中性投影盖掉）',
+    /var\(--accent-glow\)/.test(winner(E('span', ['cur'],
+      { parents: [moveBox] }), 'box-shadow') || ''));
+  // 单步键盘是「一块键盘」：平底、没有投影 —— 别被共用那套立体配方黏回去
+  const mvKey = E('button', [], { parents: [E('div', ['mv'], { parents: [panel] })] });
+  ok('级联：单步键是平底（--field）、没有投影，字是正文色',
+    winner(mvKey, 'background') === 'var(--field)' && winner(mvKey, 'box-shadow') === 'none' &&
+    winner(mvKey, 'color') === 'var(--text)',
+    String(winner(mvKey, 'background')) + ' / ' + String(winner(mvKey, 'box-shadow')));
+  // 不能点的主按钮要褪成灰底、投影摘掉（不然看着还能点）
+  const playOff = E('button', ['play'], { parents: [ctrl], disabled: true });
+  ok('级联：不能点的播放键褪成灰底、没有投影',
+    winner(playOff, 'box-shadow') === 'none' && winner(playOff, 'background') === 'var(--field)',
+    String(winner(playOff, 'box-shadow')) + ' / ' + String(winner(playOff, 'background')));
+}
+
 console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
 {
   // 这一节要跑动画，所以是异步的：末尾再汇总退出。
@@ -801,6 +1001,40 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
   els.stage = mkEl('div');
   els.stage.clientWidth = 600;
   els.stage.clientHeight = 600;
+  /* 步骤条：桩也得有「孩子」—— chrome() 靠 children 上色，scrollStrip() 靠它找当前块。
+     顺便造一套横向布局出来（块宽 30、间隔 4、可视宽 290、左端在 100），
+     这样「当前步有没有被摆到视觉中心」是真能算出来核对的。 */
+  const CHIP_W = 30, CHIP_GAP = 4, STRIP_W = 290, STRIP_L = 100;
+  let chips = [];
+  els.moves = mkEl('div');
+  Object.defineProperty(els.moves, 'innerHTML', {
+    get() { return this._h || ''; },
+    set(v) {
+      this._h = v;
+      const n = (v.match(/data-k="/g) || []).length;
+      chips = [];
+      for (let i = 1; i <= n; i++) {
+        const c = mkEl('span');
+        c.dataset.k = String(i);
+        // 第 i 块相对这一条左端的位置（跟着 scrollLeft 走，和真 DOM 一致）
+        c.getBoundingClientRect = () => ({
+          left: STRIP_L + (i - 1) * (CHIP_W + CHIP_GAP) - els.moves.scrollLeft, width: CHIP_W });
+        // offsetLeft / offsetWidth 也摆上，而且故意扮成「offsetParent 是 body」的样子：
+        // 万一有人把定位算法改回 offsetLeft，这里就会复现「永远贴最右端」那个毛病
+        c.offsetLeft = 1200 + (i - 1) * (CHIP_W + CHIP_GAP);
+        c.offsetWidth = CHIP_W;
+        chips.push(c);
+      }
+      this.children = chips;
+    }
+  });
+  els.moves.querySelector = sel =>
+    (sel === 'span.cur' ? chips.filter(c => c.classList.contains('cur'))[0] : null) || null;
+  els.moves.getBoundingClientRect = () => ({ left: STRIP_L, width: STRIP_W });
+  els.moves.clientWidth = STRIP_W;
+  Object.defineProperty(els.moves, 'scrollWidth',
+    { get() { return chips.length * (CHIP_W + CHIP_GAP); } });
+  els.moves.scrollLeft = 0;
   // 六个整体旋转箭头
   els.arrows = ['x', "x'", 'y', "y'", 'z', "z'"].map(mv => {
     const b = mkEl('button');
@@ -980,6 +1214,27 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
     ok('动画没转完时的单击会排队，而不是被丢掉',
       /if \(busy\) \{ if \(queue\.length < 16\) queue\.push\(mv\); return; \}/.test(src2) &&
       /function drainQueue\(\)/.test(src2) && /drainQueue\(\);/.test(src2));
+    // 跳转过来的播放和「在框里输入 + 正向运行」必须是一条路：
+    // 不另开一套「忙不忙」的规矩（否则按键行为会两样）
+    ok('执行公式就是一次播放：run() 摆好步骤后交给 autoPlay()',
+      !/demoActive|cancelDemo/.test(src2) && !/startLikePlay/.test(src2) &&
+      /function run\(list, label, kind, rev\) \{\s*if \(!list\.length\) return;/.test(src2) &&
+      /autoPlay\(pendingRun\)/.test(src2) && /document\.getElementById\('play'\)\.addEventListener\('click', function \(\) \{ autoPlay\(pendingRun \|\| undefined\); \}\)/.test(src2) &&
+      /function submit\(kind, rev\) \{\s*if \(pausedFirst\(\)\) return;\s*if \(busy\) return;/.test(src2));
+    // 改动局面的按钮（提交 / 打乱 / 单步）保持「先暂停、再点一次」；
+    // 导航类的（点某一步 / 点历史 / 回到开头末尾）点了就直接过去 —— 连播中也一样
+    const movesClick = (src2.match(/movesEl\.addEventListener\('click', function \(e\) \{[\s\S]*?\n  \}\);/) || [''])[0];
+    const histClick = (src2.match(/histEl\.addEventListener\('click', function \(e\) \{[\s\S]*?\n  \}\);/) || [''])[0];
+    ok('连播中点步骤 / 点历史直接跳过去，不再只暂停一下',
+      /jump\(\+el\.dataset\.k\);/.test(movesClick) && !/pausedFirst/.test(movesClick) && !/busy/.test(movesClick) &&
+      /goHist\(\+el\.dataset\.i\);/.test(histClick) && !/pausedFirst/.test(histClick) &&
+      // 点历史里的「复制」还是只复制，不回溯
+      /if \(cp\) \{ copyHist\(\+cp\.dataset\.i, cp\); return; \}/.test(histClick));
+    // 点某一步 / 点历史 = 换个位置看：必须当场把连播停掉，否则自动播放那圈
+    // 会在下一步里把人拽回原处（playing 还是 true）
+    ok('跳转 / 回溯都会停下连播并作废在跑的动画',
+      /function jump\(k\) \{[\s\S]{0,200}?epoch\+\+;[\s\S]{0,80}?playing = false;[\s\S]{0,80}?busy = false;/.test(src2) &&
+      /function goHist\(i\) \{[\s\S]{0,260}?epoch\+\+;[\s\S]{0,140}?playing = false;[\s\S]{0,60}?busy = false;/.test(src2));
     ok('复原 / 跳转会清掉排队的单步',
       /function reset\(\) \{[\s\S]{0,200}?queue\.length = 0/.test(src2) &&
       /function jump\(k\) \{[\s\S]{0,300}?queue\.length = 0/.test(src2));
@@ -1018,8 +1273,85 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
 
     // ---- 面板按钮的「质感」：一份共用配方 + 三个状态 ----
     ok('面板按钮共用同一份底色配方（不再各写各的 background）',
-      /\.run button, \.ctrl button, \.play, \.openpick, \.tabs button, \.moves span,\s*\n\s*\.mv button, \.phandle, \.spd \.mini, \.paste\{/.test(src2) &&
+      /\.run button, \.ctrl button, \.openpick, \.tabs button, \.phandle, \.paste\{/.test(src2) &&
       /background:linear-gradient\(180deg, var\(--btn-bg\) 0%, var\(--btn-bg2\) 100%\)/.test(src2));
+    // 播放键、步骤小片、单步键盘、速度行的「默认」都不在这份配方里 ——
+    // 它们各自要的是「不一样」：一屏只有一个主按钮，其余靠「没有按钮的壳」退到后面
+    ok('主按钮 / 步骤小片 / 单步键盘 / 「默认」键不共用那份配方',
+      !/\.ctrl button, \.play,/.test(src2) && !/\.tabs button, \.moves span,/.test(src2) &&
+      !/\.tabs button, \.mv button/.test(src2) && !/\.mv button, \.phandle, \.spd \.mini/.test(src2));
+
+    // ---- 视觉层次：主按钮、配角、更次要的字，各是一档 ----
+    // 用户的要求：中间那个播放键要明显是主按钮（更大更深、投影更重、圆角更小），
+    // 旁边的东西不能和它一样重。
+    ok('播放键是主按钮：更高更宽、圆角更小、实心深色、投影更重',
+      /\.ctrl \.play\{flex:0 0 56px;height:40px;border-radius:6px/.test(src2) &&
+      /background:linear-gradient\(180deg, var\(--primary\) 0%, var\(--primary2\) 100%\)/.test(src2) &&
+      /0 2px 4px var\(--primary-drop\), 0 6px 16px var\(--primary-drop\)/.test(src2) &&
+      /color:var\(--primary-fg\)/.test(src2));
+    ok('播放键比旁边的步骤键大一号（40 vs 32），步骤键压灰一档',
+      /\.ctrl button\{flex:1;height:32px[^}]*color:var\(--muted\)/.test(src2) &&
+      /\.ctrl \.play\{[^}]*height:40px/.test(src2));
+    // 旁边那套 .ctrl button:hover 比 .ctrl .play 更具体 —— 样子必须在三态里都写全
+    ok('主按钮的实心底 / 字色在普通、悬停、按下三态都写死了',
+      /\.ctrl \.play,\s*\n\s*\.ctrl \.play:hover:not\(:disabled\),\s*\n\s*\.ctrl \.play:active:not\(:disabled\)\{color:var\(--primary-fg\);border-color:var\(--primary2\);\s*\n\s*background:linear-gradient\(180deg, var\(--primary\) 0%, var\(--primary2\) 100%\)\}/.test(src2));
+    ok('播放中的光环连悬停那条也写着（不然会被旁边那套投影盖掉）',
+      /\.ctrl \.play\.playing,\s*\n\s*\.ctrl \.play\.playing:hover:not\(:disabled\)\{box-shadow:/.test(src2));
+    ok('播放中：主按钮套一圈主色光环',
+      /\.ctrl \.play\.playing,[\s\S]{0,120}?0 0 0 3px var\(--accent-glow\)/.test(src2));
+    ok('段落小标题是正文色 + 加粗 + 底下一条细线（以前和说明一个灰）',
+      /\.sec > h2\{[^}]*color:var\(--text\);font-weight:700;\s*\n?\s*border-bottom:1px solid var\(--line\)/.test(src2) &&
+      /\.sec > h2 \.pos\{[^}]*color:var\(--muted2\)/.test(src2));
+    ok('历史：指上去有底色，当前那一条左侧一条主色指示条',
+      /\.hist \.e\{[^}]*cursor:pointer/.test(src2) &&
+      /\.hist \.e:hover\{background:var\(--field-hover\);border-color:var\(--line-strong\);color:var\(--text\)\}/.test(src2) &&
+      /\.hist \.e\.cur::before\{content:'';position:absolute;left:-1px;top:-1px;bottom:-1px;width:3px;/.test(src2) &&
+      /border-radius:7px 0 0 7px;background:var\(--accent\)\}/.test(src2));
+    // 步骤条不许换行：十一二步一换行会变成「9 个 + 2 个」两行，像被挤下去的
+    ok('步骤条是单行横滚（不换行）+ 当前那个自动滚进视野',
+      /\.moves\{display:flex;flex-wrap:nowrap[^}]*overflow-x:auto/.test(src2) &&
+      /\.moves span\{flex:none;white-space:nowrap/.test(src2) &&
+      /function scrollStrip\(\)/.test(src2) &&
+      /movesEl\.scrollLeft = want/.test(src2) &&
+      // 只动这一条自己的 scrollLeft：scrollIntoView 会顺手把整块面板也滚一下
+      !/\.scrollIntoView\(/.test(src2) &&
+      /el\.classList\.toggle\('done', k < at\);\s*\n\s*\}\);\s*\n\s*scrollStrip\(\);/.test(src2));
+    // 滚动条藏起来，改成滚轮 / 按住拖（手机横划走原生那套）
+    ok('步骤条没有滚动条，靠滚轮 / 按住拖滚动',
+      /\.moves\{[^}]*scrollbar-width:none/.test(src2) &&
+      /\.moves::-webkit-scrollbar\{display:none/.test(src2) &&
+      /movesEl\.addEventListener\('wheel'/.test(src2) &&
+      /\{ passive: false \}/.test(src2) &&
+      // 到头了要放行，不然鼠标停在步骤条上整块面板就滚不动了
+      /if \(want === movesEl\.scrollLeft\) return;/.test(src2) &&
+      /movesEl\.addEventListener\('pointerdown'/.test(src2) &&
+      /movesEl\.scrollLeft = stripPan\.left - dx/.test(src2) &&
+      // 拖完那一下不许当成「点某一步」
+      /if \(stripDragged\) \{ stripDragged = false; return; \}/.test(src2));
+    // 黄色（主色）只表示「当前 / 正在播」：历史里那个「反向执行」角标是说明，不是状态
+    ok('「反向执行」角标不再用主色（黄只留给当前状态）',
+      /\.hist \.e \.tag\{flex:none;background:var\(--chip-hover\);color:var\(--text\)/.test(src2) &&
+      !/\.hist \.e \.tag\{[^}]*var\(--accent\)/.test(src2));
+    // 速度读数是数据（正文色），「默认」是次要动作（ghost）
+    ok('速度读数提到正文色，「默认」键降成 ghost',
+      /\.spd \.val\{[^}]*color:var\(--text\)/.test(src2) &&
+      /\.spd \.mini\{[^}]*background:none;border:1px solid var\(--line\);color:var\(--muted2\)/.test(src2));
+    // 纵向节奏：空的提示行不该占着一行高度
+    ok('没消息时提示行不占高度（公式和单步之间不再白空一行）',
+      /\.err\{margin-top:9px;color:#c0392b;font-size:12\.5px\}/.test(src2) &&
+      /\.err:empty\{margin-top:0;min-height:0\}/.test(src2) &&
+      /\.sec\{margin-bottom:16px\}/.test(src2));
+    ok('步骤小片 hover 时浮起一层短投影（走过的那些也一样）',
+      /\.moves span:hover\{background:var\(--chip-hover\);color:var\(--text\);\s*\n?\s*box-shadow:0 2px 6px var\(--btn-drop\)\}/.test(src2) &&
+      // `.done` 和 `:hover` 同分又排在后面，会把底色/字色按住 —— 必须单独再来一条
+      /\.moves span\.done:hover\{background:var\(--chip-hover\);color:var\(--text\);\s*\n?\s*box-shadow:0 2px 6px var\(--btn-drop\)\}/.test(src2) &&
+      // 主色光晕仍然只属于「当前」那一块
+      /\.moves span\.cur\{[^}]*box-shadow:0 1px 4px var\(--accent-glow\)/.test(src2));
+    ok('步骤小片是平的（没有渐变 / 投影），当前那一个是实心主色',
+      /\.moves span\{[^}]*background:var\(--chip\);border:1px solid transparent/.test(src2) &&
+      /\.moves span\.done\{color:var\(--muted\);background:transparent\}/.test(src2) &&
+      /\.moves span\.cur\{background:var\(--accent\);border-color:var\(--accent\);color:var\(--on-accent, #fff\);/.test(src2) &&
+      !/\.moves span\{[^}]*linear-gradient/.test(src2));
     ok('无边框的旋转键不在那份配方里（否则会被加回底色和边框）',
       !/\\.mv button, \\.orbit button\\{/.test(src2));
     ok('凸起靠三层：顶边高光 + 底边暗边 + 落地投影',
@@ -1157,6 +1489,14 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
     ok('公式表的链接会给 b 版打绿面标记',
       /@g:' \+ encodeURIComponent\(alg\)|'@g:'/.test(src2) ||
       fs.readFileSync(path.join(__dirname, '..', 'f2l.html'), 'utf8').indexOf('@g:') >= 0);
+    ok('公式跳转不会动「速度 / 跳过动画」这两个设置',
+      /keepDur/.test(src2) && /keepSkip/.test(src2) &&
+      /if \(keepDur !== null\) DUR = keepDur;/.test(src2) &&
+      /syncSpd\(\);\s*\/\/ 滑条/.test(src2) && /saveState\(\);\s*\/\/ 再把设置写回去/.test(src2));
+    ok('计算器认识 @s: 前缀（打乱：直接正向执行，不先摆局面）',
+      /h\.indexOf\('@s:'\) === 0/.test(src2) &&
+      /setTimeout\(function \(\) \{ run\(fwd, hashAlg, 'scramble', false\); \}, 2000\)/.test(src2) &&
+      /@s:' \+ encodeURIComponent\(scramble\)/.test(fs.readFileSync(path.join(__dirname, '..', 'timer.html'), 'utf8')));
     ok('计算器认识 @g: 前缀',
       /indexOf\('@g:'\) === 0/.test(src2));
     // 必须先解码再判断 —— 浏览器会把 @ 编码成 %40，否则前缀留在框里，
@@ -1183,14 +1523,12 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
       /if \(r\) cur = CubeSim\.apply\(cur, r\);/.test(src2));
     // 动画里只允许有公式本身写明的动作 —— 不能自己追加净旋转的补偿
     ok('动画里只播公式本身（不追加净旋转补偿）',
-      /run\(fwd, hashAlg, 'alg', false\);/.test(src2) &&
+      /run\(fwd, hashAlg, 'alg', false\)/.test(src2) &&
       !/concat\(rinv\)/.test(src2) && !/playCoda/.test(src2) && !/simplify\(/.test(src2),
       '代码里还在往动画里加东西');
-    ok('逆执行完再正向播一遍（动画）',
-      /run\(fwd, hashAlg, 'alg', false\);/.test(src2));
+    ok('逆执行完再正向播一遍（动画）', /run\(fwd, hashAlg, 'alg', false\)/.test(src2));
     ok('正向播放前先停 2 秒',
-      /setTimeout\(function \(\) \{\s*run\(fwd, hashAlg, 'alg', false\);/.test(src2) &&
-      /\}, 2000\)/.test(src2));
+      /setTimeout\(function \(\) \{ run\(fwd, hashAlg, 'alg', false\); \}, 2000\)/.test(src2));
     ok('计算器会读取 hash 里的公式',
       /location\.hash/.test(fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')));
     // 带上 hash 打开时，输入框应当被填好
@@ -1445,7 +1783,11 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
       ok('输入框右端有个清空小叉（框内定位、内联 SVG）',
         /<div class="algwrap">[\s\S]{0,260}?<button class="clr" id="clr"[\s\S]{0,160}?<svg viewBox="0 0 24 24">/.test(src2) &&
         /\.clr\{position:absolute;right:5px;top:50%/.test(src2) &&
-        /#alg\{[^}]*padding:7px 28px 7px 9px/.test(src2));   // 右边留出位置，字不会压到叉上
+        /#alg\{[^}]*padding:8px 28px 8px 10px/.test(src2));   // 右边留出位置，字不会压到叉上
+      // 公式是这一页最核心的数据：等宽、14px、字重 500、一点字距 —— 和中文 UI 明显不同一条线
+      ok('公式输入框有「编辑器」那点意思（等宽 14px / 500 / 字距 .2px）',
+        /#alg\{[^}]*font:500 14px\/1\.45 ui-monospace/.test(src2) &&
+        /#alg\{[^}]*letter-spacing:\.2px/.test(src2));
       const clr = ctx.document.getElementById('clr');
       els.alg.value = '';
       els.alg.fire('input', {});
@@ -1510,11 +1852,11 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
       ok('勾上「跳过动画」：勾选框与外框都亮起，并写进存档',
         sk.checked === true && tgSk.classList.contains('on') &&
         /"skip":true/.test(st['calc-state-v1'] || ''));
-      // 跳过动画要真的跳过：animate 直接返回、play 一次算完只画一帧
-      ok('跳过动画时不等 transition：animate 直接回调、play 只画最后一帧',
+      // 跳过动画要真的跳过：animate 直接返回、「播放 / 执行公式」直接落到末尾
+      ok('跳过动画时不等 transition：animate 直接回调、播放直接落到末尾',
         /if \(skipAnim\) \{ done\(\); return; \}/.test(src2) &&
-        /if \(skipAnim\) \{\s*\n\s*var s0 = from;/.test(src2) &&
-        /if \(skipAnim\) \{\s*\n\s*at = steps\.length;/.test(src2));
+        /if \(skipAnim\) \{\s*\n\s*at = steps\.length;/.test(src2) &&
+        !/function play\(list, from, onDone\)/.test(src2));
     }
 
     // ---- 跳过动画：提交后同步出结果，不用等 ----
@@ -1614,7 +1956,7 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
         /navigator\.clipboard\.readText\(\)\.then/.test(src2) &&
         /if \(use\(lastCopied\)\) return;/.test(src2) &&
         /不让读剪贴板，按 Ctrl\+V 吧/.test(src2) &&
-        /\.err\.hint\{color:var\(--muted\)\}/.test(src2));
+        /\.err\.hint\{color:var\(--muted2\)\}/.test(src2));
       const pasteEl = ctx.document.getElementById('paste');
       // 上一条（复制键）刚把 'U' 记进 lastCopied，这里先给个「能读剪贴板」的环境
       ctx.navigator.clipboard.readText = () => Promise.resolve("R U R' U");
@@ -1673,15 +2015,60 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
     }
 
     // ---- 自动播放 / 单步动画 ----
-    ok('有自动播放按钮', /id="play"/.test(src2) && /function autoPlay\(\)/.test(src2));
+    // 播放键既是「播放」也是「执行公式」的入口：run() 把公式交给 autoPlay 播完
+    ok('有播放按钮', /id="play"/.test(src2) && /function autoPlay\(done\)/.test(src2) &&
+      /if \(done\) done\(false\)/.test(src2) && /if \(done\) done\(finished\)/.test(src2));
     // 单步必须走动画。早先重写主流程时漏了这一步，◀ ▶ 变成了瞬移。
     ok('单步走动画（stepAnimated 里调 animate）',
       /function stepAnimated\(dir, done\)[\s\S]*?animate\(\{ mv: mv\.mv/.test(src2));
     ok('◀ ▶ 通过 stepAnimated 前进/后退',
       /function stepBy\(dir\)[\s\S]*?stepAnimated\(dir/.test(src2));
     ok('自动播放一步步走到末尾',
-      /function autoPlay\(\)[\s\S]*?stepAnimated\(1, nextStep\)/.test(src2));
-    ok('播放中按钮变暂停', /playing \? '暂停' : '自动播放'/.test(src2));
+      /function autoPlay\(done\)[\s\S]*?stepAnimated\(1, nextStep\)/.test(src2));
+    ok('执行公式 = 一次播放（run 里走 autoPlay）',
+      /function run\(list, label, kind, rev\)[\s\S]*?autoPlay\(pendingRun\)/.test(src2));
+    // 中途暂停后按播放键接着播完，也要照样记一条历史（收尾动作得留着）
+    ok('没记完的那次执行跟着播放键一起收尾',
+      /document\.getElementById\('play'\)\.addEventListener\('click', function \(\) \{ autoPlay\(pendingRun \|\| undefined\); \}\)/.test(src2) &&
+      /if \(finished\) \{\s*pendingRun = null;/.test(src2) &&
+      // 跳转 / 复原换掉了这一串之后，那圈还在跑的动画收尾时不许再记一笔
+      /if \(self !== pendingRun\) return;/.test(src2) &&
+      /function goHist\(i\) \{[\s\S]{0,300}?pendingRun = null;/.test(src2) &&
+      /function reset\(\) \{[\s\S]{0,400}?pendingRun = null;/.test(src2));
+    // 中途暂停不能记历史（记的是整串公式、局面却停在半路），再按一次要接着播
+    ok('执行到一半停下不记历史，再按接着播',
+      /if \(finished\) \{[\s\S]{0,220}hist\.push\(\{ kind: kind \|\| 'alg'/.test(src2) &&
+      /key === runKey && frames\[0\] === runFirst && !busy && at > 0 && at < steps\.length/.test(src2));
+    // 落地阴影：不给魔方一块「地」，它看着就是飘的。
+    // 不能挂在 .cube 上（preserve-3d 的容器加 filter 会塌成 flat），所以是舞台上另一块。
+    ['calc.html', 'practice.html'].forEach(p => {
+      const h = fs.readFileSync(path.join(__dirname, '..', p), 'utf8');
+      ok(p + '：魔方底下有一块不参与 3D 的落地阴影',
+        /<div class="shadow" aria-hidden="true"><\/div>/.test(h) &&
+        /\.shadow\{position:absolute;left:50%;top:50%;pointer-events:none;/.test(h) &&
+        /radial-gradient\(closest-side, var\(--btn-drop\), transparent 78%\)/.test(h));
+      ok(p + '：阴影的尺寸跟着 --cs 走（缩放时一起放大），所以 --cs 也挂在舞台上',
+        /width:calc\(var\(--cs\) \* 3\.7\)/.test(h) &&
+        /stageEl\.style\.setProperty\('--cs', cs \+ 'px'\)/.test(h) &&
+        // 阴影绝不能挂到 .cube 里：那会跟着魔方一起转，还得进 3D
+        /<div class="shadow"[^>]*><\/div>\s*\n\s*<div class="cube"/.test(h));
+      ok(p + '：阴影没有挂在 .cube 的样式里（preserve-3d 加 filter 会塌成平面）',
+        !/\.cube\{[^}]*filter/.test(h));
+    });
+    ok('「回到开头 / 回到结尾」始终可用（到边界也不置灰）',
+      /id === 'prev' && at === 0/.test(src2) && /id === 'next' && at >= steps\.length/.test(src2) &&
+      /if \(finished\) \{\s*pendingRun = null;/.test(src2));
+    ok('播放键是图标（三角形 / 两条竖杠），播放时切成暂停',
+      /var PLAY_SVG =/.test(src2) && /var PAUSE_SVG =/.test(src2) &&
+      /innerHTML = playing \? PAUSE_SVG : PLAY_SVG/.test(src2) &&
+      !/自动播放/.test(src2));
+    ok('播放键的图标是「圆圈 + 里面的三角形」，按钮本身不画成圆的',
+      /<circle cx="12" cy="12" r="9\.1" fill="none"/.test(src2) &&
+      /M10 8\.3v7\.4L16\.3 12z/.test(src2) &&
+      /M10\.1 8\.5v7M13\.9 8\.5v7/.test(src2) &&
+      !/\.ctrl \.play\{[^}]*border-radius:50%/.test(src2));
+    ok('播放键夹在「上一步」和「下一步」中间',
+      /id="prev"[\s\S]{0,200}?class="play" id="play"[\s\S]{0,200}?id="next"/.test(src2));
     ok('播到底后再按自动播放会从头开始',
       /if \(at >= steps\.length\) \{\s*at = 0;\s*paint\(frames\[0\]\)/.test(src2),
       '到底后按播放没有回到开头');
@@ -1937,10 +2324,120 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
       }
     }
 
+    // ---- 连播中点步骤 / 点历史 ----
+    // 用户报的两条：连播中点某一步什么都不发生（busy 一挡就 return 了），
+    // 点历史也只把播放停住、并不回溯。两个都是「导航」，点一下就该到位。
+    const evStep = k => ({ target: { closest: s => s === 'span[data-k]' ? { dataset: { k: String(k) } } : null } });
+    const evHist = i => ({ target: { closest: s => s === '.e' ? { dataset: { i: String(i) } } : null } });
+    const PLAY_ICON = /M10 8\.3v7\.4/, PAUSE_ICON = /M10\.1 8\.5v7/;
+
+    els.reset.fire('click');
+    els.alg.value = "R U R' U'";
+    els.fwd.fire('click');
+    await wait(120);                                  // 第 1 步还在转
+    ok('连播中播放键是暂停图标', PAUSE_ICON.test(els.play.innerHTML), els.play.innerHTML.slice(0, 60));
+    els.moves.fire('click', evStep(2));
+    ok('连播中点某一步：直接跳到那一步（不是什么都不做）',
+      els.pos.textContent === '2 / 4' && sameState(readCube(), S.apply(S.solved(), 'R U')),
+      els.pos.textContent + ' ' + JSON.stringify(readCube()).slice(0, 40));
+    ok('跳过去之后连播停下了（播放键回到三角形）',
+      PLAY_ICON.test(els.play.innerHTML) && !els.play.classList.contains('playing'));
+    await wait(700);                                  // 等被打断的那一圈收尾
+    ok('中途停下不算执行过：历史还是空的', String(els.hcount.textContent) === '0', els.hcount.textContent);
+    ok('收尾也没有把位置拽回末尾', els.pos.textContent === '2 / 4', els.pos.textContent);
+
+    els.play.fire('click');                           // 接着从第 2 步播到底
+    await wait(1400);
+    ok('暂停后按播放：接着播完（不从头再转一遍）', els.pos.textContent === '4 / 4', els.pos.textContent);
+    ok('接着播完的局面 = 整串公式',
+      sameState(readCube(), S.apply(S.solved(), "R U R' U'")),
+      JSON.stringify(readCube()).slice(0, 50));
+    ok('播完了才记一条历史', String(els.hcount.textContent) === '1', els.hcount.textContent);
+
+    // 「回到开头 / 回到结尾」即使已经在这一头也能点；上一步 / 下一步到边界才置灰
+    els.first.fire('click');
+    ok('已经在开头，「回到开头」还是能点（上一步才置灰）',
+      els.first.disabled === false && els.prev.disabled === true,
+      String(els.first.disabled) + ' / ' + String(els.prev.disabled));
+    els.last.fire('click');
+    ok('已经在结尾，「回到结尾」还是能点（下一步才置灰）',
+      els.last.disabled === false && els.next.disabled === true,
+      String(els.last.disabled) + ' / ' + String(els.next.disabled));
+
+    // ---- 连播中点历史 ----
+    els.alg.value = 'R U';
+    els.fwd.fire('click');
+    await wait(120);
+    els.hist.fire('click', evHist(0));
+    ok('连播中点历史：直接回到那一条结束的局面（不是只暂停）',
+      els.pos.textContent === '4 / 4' &&
+      sameState(readCube(), S.apply(S.solved(), "R U R' U'")),
+      els.pos.textContent + ' ' + JSON.stringify(readCube()).slice(0, 40));
+    await wait(700);
+    ok('被点掉的那串执行没有记成历史', String(els.hcount.textContent) === '1', els.hcount.textContent);
+    els.play.fire('click');                           // 重看这一条
+    await wait(2000);
+    ok('点历史后用播放键重看，不会重复记一条',
+      String(els.hcount.textContent) === '1' && els.pos.textContent === '4 / 4',
+      els.hcount.textContent + ' / ' + els.pos.textContent);
+
     // 打乱放在最后：22 步要播约 9 秒，放在前面会把后面的提交全挡在 busy 外面
     els.scramble.fire('click');
     await wait(120);
     ok('打乱会把随机公式填进输入框', els.alg.value.split(/\s+/).length >= 18, els.alg.value);
+
+    // ---- 播放时「正在进行的步骤」要摆到步骤条的视觉中心 ----
+    // 之前用 offsetLeft 算：.moves 没有定位，offsetParent 一路找到 body，
+    // 算出来的位置带着整块舞台的宽度，永远被夹到最右端 —— 当前步老在边上跑。
+    // 播放和点某一步走的是同一个 chrome()/scrollStrip()，所以这里点中间那一步来验。
+    const stripMax = chips.length * (CHIP_W + CHIP_GAP) - STRIP_W;
+    const wantAt = i => Math.max(0, Math.min(stripMax,
+      (i - 1) * (CHIP_W + CHIP_GAP) - (STRIP_W - CHIP_W) / 2));
+    els.moves.fire('click', evStep(10));
+    ok('当前这一步被摆到步骤条的视觉中心（第 10 步）',
+      els.moves.scrollLeft === wantAt(10), els.moves.scrollLeft + ' vs ' + wantAt(10));
+    ok('而且不是一直被夹在最右端（offsetLeft 那套的毛病）',
+      els.moves.scrollLeft !== stripMax && els.moves.scrollLeft > 0,
+      String(els.moves.scrollLeft) + ' / max=' + stripMax + ' / 步数=' + chips.length);
+    els.moves.fire('click', evStep(2));
+    ok('最前面几步到头了只能贴左端（不可能再居中），不是停在中段',
+      els.moves.scrollLeft === 0, String(els.moves.scrollLeft));
+    els.moves.fire('click', evStep(chips.length));
+    ok('最后一步贴右端（同样到头了）', els.moves.scrollLeft === stripMax,
+      els.moves.scrollLeft + ' vs ' + stripMax);
+
+    // ---- 滚动条藏了，改成滚轮 / 按住拖 ----
+    const docFire = (ev, a) => (ctx._h[ev] || []).forEach(f => f(a));
+    els.moves.scrollLeft = 100;
+    let wheelDefaulted = false;
+    els.moves.fire('wheel', { deltaY: -40, deltaX: 0,
+                              preventDefault() { wheelDefaulted = true; } });
+    ok('滚轮往上滚 → 步骤条往左走（并吃掉事件）',
+      els.moves.scrollLeft === 60 && wheelDefaulted,
+      els.moves.scrollLeft + ' / preventDefault=' + wheelDefaulted);
+    els.moves.scrollLeft = 0;
+    wheelDefaulted = false;
+    els.moves.fire('wheel', { deltaY: -40, deltaX: 0,
+                              preventDefault() { wheelDefaulted = true; } });
+    ok('已经在最左端就放行，让页面自己滚（不然鼠标停在条上整块面板就滚不动）',
+      els.moves.scrollLeft === 0 && !wheelDefaulted, String(wheelDefaulted));
+    els.moves.scrollLeft = 200;
+    els.moves.fire('pointerdown', { pointerType: 'mouse', button: 0, clientX: 300 });
+    docFire('pointermove', { clientX: 260 });
+    ok('按住往左拖 40px → 条子往左滚 40px', els.moves.scrollLeft === 240,
+      String(els.moves.scrollLeft));
+    docFire('pointerup', {});
+    const posBefore = els.pos.textContent;
+    els.moves.fire('click', evStep(3));
+    ok('拖完松手那一下不会被当成「点某一步」（位置没跳）',
+      els.pos.textContent === posBefore, els.pos.textContent + ' vs ' + posBefore);
+    // 触摸不接管：手机上横划走浏览器原生那套
+    els.moves.scrollLeft = 150;
+    els.moves.fire('pointerdown', { pointerType: 'touch', button: 0, clientX: 300 });
+    docFire('pointermove', { clientX: 200 });
+    ok('触摸拖动不接管（原生横滚更顺，还有惯性）', els.moves.scrollLeft === 150,
+      String(els.moves.scrollLeft));
+    docFire('pointerup', {});
 
     console.log('\n结果: ' + pass + ' 通过, ' + fail + ' 失败');
     process.exit(fail ? 1 : 0);

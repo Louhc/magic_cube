@@ -37,6 +37,16 @@
   .themebtn{position:absolute;right:16px;top:14px;z-index:5}
 
 
+  /* 魔方底下的落地阴影：不给它一块「地」，立体魔方看着就是飘着的。
+     不能挂在 .cube 上：那是个 preserve-3d 的容器，给它加 filter/box-shadow 会把它
+     压成 flat（3D 立刻塌掉），而且阴影也不该跟着魔方一起转。
+     所以是舞台上另放一块不参与 3D 的椭圆：位置和尺寸都按 --cs 算（和魔方同步缩放），
+     颜色取 --btn-drop（两套主题各自的「落地投影」色），边缘化开得很大 = 非常柔和。 */
+  .shadow{position:absolute;left:50%;top:50%;pointer-events:none;
+          width:calc(var(--cs) * 3.7);height:calc(var(--cs) * 0.82);
+          margin:calc(var(--cs) * 1.5) 0 0 calc(var(--cs) * -1.85);
+          border-radius:50%;
+          background:radial-gradient(closest-side, var(--btn-drop), transparent 78%)}
   .cube{position:relative;width:0;height:0;transform-style:preserve-3d}
   .layer{position:absolute;left:0;top:0;width:0;height:0;transform-style:preserve-3d}
   .cubie{position:absolute;left:0;top:0;width:var(--cs);height:var(--cs);
@@ -59,8 +69,10 @@
   .panel::-webkit-scrollbar{width:10px}
   .panel::-webkit-scrollbar-thumb{background:var(--scroll);border-radius:6px;border:2px solid var(--panel)}
   .sec{margin-bottom:20px}
-  .sec > h2{margin:0 0 9px;font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;
-            color:var(--muted);font-weight:600}
+  /* 小标题是这一列的骨架：正文色 + 加粗 + 底下一道细线（和计算器那一列同一套） */
+  .sec > h2{margin:0 0 9px;padding-bottom:6px;font-size:12px;letter-spacing:.1em;
+            text-transform:uppercase;color:var(--text);font-weight:700;
+            border-bottom:1px solid var(--line)}
 
   .scope{display:flex;gap:6px}
   .scope button{flex:1;height:32px;border-radius:8px;cursor:pointer;font:inherit;font-size:12.5px;
@@ -108,6 +120,8 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
 <div class="app">
   <main class="stage" id="stage">
     <button class="themebtn" id="themebtn" type="button" title="切到夜晚"></button>
+    <!-- 魔方的落地阴影：不参与 3D，尺寸跟着 --cs 走 -->
+    <div class="shadow" aria-hidden="true"></div>
     <div class="cube" id="cube"></div>
     <!-- 放大缩小：点按钮，或者直接把指针放在舞台上滚轮 -->
     <div class="zoom">
@@ -136,7 +150,7 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     <section class="sec">
       <h2>题目</h2>
       <div class="qid" id="qid">—</div>
-      <div class="qthumb"><img id="qimg" alt="要解决的图形"><span>要解决的图形</span></div>
+      <div class="qthumb"><img id="qimg" alt="要解决的图形" data-zoom><span>要解决的图形</span></div>
       <div class="qhint">拿拼好的魔方做这个情况的公式<br>做完应当得到左边的立体魔方</div>
       <div class="act">
         <button id="next" type="button">换一题</button>
@@ -243,6 +257,7 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     var cs = CS * zoom;
     cubeEl.style.setProperty('--cs', cs + 'px');
     cubeEl.style.setProperty('--half', (cs / 2) + 'px');
+    stageEl.style.setProperty('--cs', cs + 'px');   // 舞台上的落地阴影也按这个尺寸
   }
   function syncZoom() {
     document.getElementById('zin').disabled = zoom >= ZMAX - 0.001;

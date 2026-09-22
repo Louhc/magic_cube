@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>魔方计时器</title>
+<link rel="icon" type="image/x-icon" href="cube-64x64.ico">
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="nav.css">
+<style>
+  /* 配色（两套主题的所有颜色变量）都在 theme.css 里，这里只管版式。 */
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--bg);color:var(--text);
+       font:14px/1.6 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+  main{max-width:900px;margin:0 auto;padding:10px 18px 70px}
+
+  header{position:relative;padding:14px 0 6px}
+  h1{margin:0;font-size:22px;letter-spacing:.02em}
+  header p{margin:6px 0 0;color:var(--muted);font-size:13px}
+  .themebtn{position:absolute;right:40px;top:14px}
+  .printbtn{display:none}
+
+  /* 打乱 */
+  .scr{margin:16px 0 0;padding:14px 16px;background:var(--card);border:1px solid var(--line);
+       border-radius:12px;display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}
+  .scr .txt{flex:1;min-width:240px;font:15px/1.7 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+            word-break:break-word}
+  .scr .txt.bad{color:var(--muted);font-family:inherit}
+
+  /* 计时区：整块都能按（按住预备、松开开始、再按停止） */
+  .pad{margin:16px 0 0;padding:26px 16px 22px;border-radius:14px;background:var(--card);
+       border:1px solid var(--line);text-align:center;cursor:pointer;user-select:none;
+       touch-action:manipulation;transition:background .12s,border-color .12s,color .12s}
+  .pad.ready{background:var(--chip-on-bg);border-color:var(--accent)}
+  .pad.run{background:var(--chip);border-color:var(--line-strong)}
+  .time{font:700 60px/1.15 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+        font-variant-numeric:tabular-nums;letter-spacing:.01em}
+  .pad.ready .time{color:var(--head-green)}
+  .hint{margin-top:8px;color:var(--muted);font-size:13px}
+
+  /* 成绩 */
+  .sum{margin:18px 0 0;display:flex;gap:10px;flex-wrap:wrap}
+  .sum .b{flex:1;min-width:110px;padding:10px 12px;border-radius:10px;background:var(--card);
+          border:1px solid var(--line)}
+  .sum .k{color:var(--muted);font-size:12.5px}
+  .sum .v{font:600 20px/1.3 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+          font-variant-numeric:tabular-nums}
+  .bar{margin:14px 0 0;display:flex;align-items:center;gap:12px;color:var(--muted);font-size:13px}
+  .bar button{padding:5px 12px;border-radius:8px;cursor:pointer;font:inherit;
+              background:var(--field);border:1px solid var(--line);color:var(--text)}
+  .bar button:hover{color:var(--accent-text);border-color:var(--accent-text)}
+  .list{margin:12px 0 0}
+  .row{display:flex;align-items:baseline;gap:12px;padding:7px 4px;border-bottom:1px solid var(--line);
+       font-size:13.5px}
+  .row .n{flex:none;width:34px;color:var(--muted);font-size:12.5px}
+  .row .t{flex:none;width:78px;font:600 15px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+          font-variant-numeric:tabular-nums}
+  .row .s{flex:1;min-width:0;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .row.best .t{color:var(--accent-text)}
+  /* 每行右边：复制打乱 / 在计算器里打开 / 删掉这条 */
+  .scr .ico,.row .ico{flex:none;display:inline-flex;align-items:center;justify-content:center;
+            width:24px;height:24px;padding:0;border-radius:7px;cursor:pointer;
+            background:none;border:1px solid transparent;color:var(--muted);text-decoration:none}
+  .scr .ico:hover,.row .ico:hover{color:var(--accent-text);border-color:var(--line);background:var(--field)}
+  .row .ico.del:hover{color:var(--head-red);border-color:var(--head-red)}
+  .scr .ico svg,.row .ico svg{width:14px;height:14px;display:block;fill:none;stroke:currentColor;
+                stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+  .empty{color:var(--muted);font-size:13px;padding:10px 4px}
+
+  @media (max-width:640px){
+    .time{font-size:44px}
+    .pad{padding:20px 12px 18px}
+    .row .s{display:none}
+  }
+  @media print{ .themebtn,.pad,.bar{display:none} }
+</style>
+<script>try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.dataset.theme='dark'}catch(e){}</script>
+</head>
+<body>
+
+<script src="nav.js"></script>
+<script src="timer.js"></script>
+<main>
+  <header>
+    <h1>魔方计时器</h1>
+    <p>空格（或按住这块区域）：<b>按住 → 松开开始 → 再按一下停</b>。成绩只存在本机浏览器里。</p>
+    <button class="themebtn" id="themebtn" type="button" title="切到夜晚"></button>
+  </header>
+
+  <div class="scr">
+    <div class="txt" id="scr"></div>
+    <button class="bar" id="newscr" type="button" style="border:1px solid var(--line);
+      background:var(--field);color:var(--text);border-radius:8px;padding:5px 12px;cursor:pointer">
+      换一个</button>
+    <!-- 还没开始计时也能用：复制这条打乱 / 送进计算器 -->
+    <button class="ico" id="scr-copy" type="button" title="复制这条打乱" aria-label="复制这条打乱"></button>
+    <a class="ico" id="scr-calc" href="calc.html#" target="_blank" rel="noopener"
+       title="在计算器里打开这条打乱" aria-label="在计算器里打开这条打乱"></a>
+  </div>
+
+  <div class="pad" id="pad">
+    <div class="time" id="time">0.00</div>
+    <div class="hint" id="hint">按住空格或这块区域，变绿后松开就开始</div>
+  </div>
+
+  <div class="sum">
+    <div class="b"><div class="k">本次</div><div class="v" id="s-last">—</div></div>
+    <div class="b"><div class="k">最快</div><div class="v" id="s-best">—</div></div>
+    <div class="b"><div class="k">ao5</div><div class="v" id="s-ao5">—</div></div>
+    <div class="b"><div class="k">ao12</div><div class="v" id="s-ao12">—</div></div>
+  </div>
+
+  <div class="bar">
+    <span id="count">还没有成绩</span>
+    <button id="save" type="button">保存成绩</button>
+    <button id="clear" type="button">清空</button>
+  </div>
+  <div class="list" id="list"></div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+
+  var KEY = 'cube-timer-v1';
+  var MAX = 300;                       // 只留最近 300 次，别把 localStorage 撑爆
+
+  var scrEl = document.getElementById('scr');
+  var padEl = document.getElementById('pad');
+  var timeEl = document.getElementById('time');
+  var hintEl = document.getElementById('hint');
+  var listEl = document.getElementById('list');
+  var countEl = document.getElementById('count');
+  var els = { last: 's-last', best: 's-best', ao5: 's-ao5', ao12: 's-ao12' };
+
+  var ICON = {
+    copy: '<svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2.4"/>' +
+          '<path d="M15 6.5V5.4A2.4 2.4 0 0 0 12.6 3H5.4A2.4 2.4 0 0 0 3 5.4v7.2A2.4 2.4 0 0 0 5.4 15h1.1"/></svg>',
+    calc: '<svg viewBox="0 0 24 24"><rect x="4.4" y="2.8" width="15.2" height="18.4" rx="3.2"/>' +
+          '<path d="M8.1 7.4h7.8"/><circle cx="9.4" cy="12.3" r="1.35"/><circle cx="14.6" cy="12.3" r="1.35"/>' +
+          '<circle cx="9.4" cy="16.6" r="1.35"/><circle cx="14.6" cy="16.6" r="1.35"/></svg>',
+    del: '<svg viewBox="0 0 24 24"><path d="M5 5l14 14M19 5L5 19"/></svg>'
+  };
+
+  var solves = [];                     // [{ms, scramble, at}]，新的在后面
+  var scramble = '';
+  var phase = 'idle';                  // idle | ready | run
+  var t0 = 0, raf = 0, timer = 0;
+
+  try {
+    var raw = JSON.parse(localStorage.getItem(KEY) || 'null');
+    if (Object.prototype.toString.call(raw) === '[object Array]') {
+      // 老格式：只有成绩列表
+      solves = raw.filter(function (s) { return s && typeof s.ms === 'number'; });
+    } else if (raw && typeof raw === 'object') {
+      solves = (raw.solves || []).filter(function (s) { return s && typeof s.ms === 'number'; });
+      scramble = typeof raw.scramble === 'string' ? raw.scramble : '';
+    }
+  } catch (e) {}
+  function save() {
+    try {
+      localStorage.setItem(KEY, JSON.stringify({
+        solves: solves.slice(-MAX),
+        scramble: scramble          // 当前这条也要存：切走再回来不该换题
+      }));
+    } catch (e) {}
+  }
+
+  /* ---------- 打乱 ---------- */
+  var scrCopy = document.getElementById('scr-copy'), scrCalc = document.getElementById('scr-calc');
+  scrCopy.innerHTML = ICON.copy;
+  scrCalc.innerHTML = ICON.calc;
+  function newScramble() {
+    scramble = Timer.scramble(20);
+    scrEl.textContent = scramble;
+    scrEl.classList.remove('bad');
+    // 没开始计时也能把这条送进计算器（换打乱时链接跟着换）
+    scrCalc.setAttribute('href', 'calc.html#@s:' + encodeURIComponent(scramble));
+    save();          // 换了打乱立刻存：否则切页回来又变回上一条
+  }
+  // 存档里有当前打乱就接着用（切页、刷新都不换题），没有才新生成一条
+  if (scramble) {
+    scrEl.textContent = scramble;
+    scrCalc.setAttribute('href', 'calc.html#@s:' + encodeURIComponent(scramble));
+  } else {
+    newScramble();
+  }
+  scrCopy.addEventListener('click', function () {
+    flash('已复制：' + scramble);
+    copyText(scramble, function () {});
+  });
+
+  /* ---------- 计时 ---------- */
+  function paintTime(ms) { timeEl.textContent = Timer.fmt(ms); }
+  function setPhase(p) {
+    phase = p;
+    padEl.classList.toggle('ready', p === 'ready');
+    padEl.classList.toggle('run', p === 'run');
+    hintEl.textContent = p === 'idle' ? '按住空格或这块区域，变绿后松开就开始'
+      : p === 'ready' ? '松开就开始'
+      : '按一下停';
+  }
+  function start() {
+    if (phase === 'run') return;                      // 已经在跑了就别重开
+    t0 = (window.performance && performance.now) ? performance.now() : Date.now();
+    setPhase('run');
+    tick();
+  }
+  function tick() {
+    var now = (window.performance && performance.now) ? performance.now() : Date.now();
+    paintTime(now - t0);
+    raf = (window.requestAnimationFrame || function (f) { return setTimeout(f, 30); })(tick);
+  }
+  // 停掉逐帧刷新（清空时也要用：计时中点清空，不能只改状态、把计时丢在后台继续跑）
+  function stopTicking() {
+    if (raf) { (window.cancelAnimationFrame || clearTimeout)(raf); raf = 0; }
+  }
+  function stop() {
+    var now = (window.performance && performance.now) ? performance.now() : Date.now();
+    stopTicking();
+    var ms = Math.round(now - t0);
+    paintTime(ms);
+    solves.push({ ms: ms, scramble: scramble, at: Date.now() });
+    save();
+    render();
+    setPhase('idle');
+    newScramble();                     // 下一次的题
+  }
+
+  /* 一次「按」= keydown/pointerdown，一次「放」= keyup/pointerup。规则：
+       idle  + 按 -> ready（预备）
+       ready + 放 -> 开始计时
+       run   + 按 -> 停
+     两个标记是为了不让一次动作被处理两遍、也不让「停」那一下的松手又开跑：
+       pressed —— 这一轮「按」已经处理过（空格和指针事件可能同一瞬间都来）
+       skipUp  —— 刚才是「按下去停的」，紧跟着的松手什么都不做 */
+  var pressed = false, skipUp = false;
+  function down() {
+    if (pressed) return;
+    pressed = true;
+    if (phase === 'run') { stop(); skipUp = true; return; }
+    setPhase('ready');
+  }
+  function up() {
+    if (!pressed && !skipUp) return;
+    pressed = false;
+    if (skipUp) { skipUp = false; return; }
+    if (phase === 'ready') start();
+  }
+  padEl.addEventListener('pointerdown', function (e) { e.preventDefault(); down(); });
+  padEl.addEventListener('pointerup', function (e) { e.preventDefault(); up(); });
+  padEl.addEventListener('pointercancel', function () { if (phase === 'ready') setPhase('idle'); });
+  document.addEventListener('keydown', function (e) {
+    if (e.code !== 'Space' && e.key !== ' ') return;
+    e.preventDefault();
+    if (e.repeat) return;
+    down();
+  });
+  document.addEventListener('keyup', function (e) {
+    if (e.code !== 'Space' && e.key !== ' ') return;
+    e.preventDefault();
+    up();
+  });
+
+  /* ---------- 成绩列表 ---------- */
+  function render() {
+    var st = Timer.stats(solves);
+    var lastMs = st.count ? solves[solves.length - 1].ms : null;
+    document.getElementById(els.last).textContent = Timer.fmt(lastMs);
+    document.getElementById(els.best).textContent = Timer.fmt(st.best);
+    document.getElementById(els.ao5).textContent = Timer.fmt(st.ao5);
+    document.getElementById(els.ao12).textContent = Timer.fmt(st.ao12);
+    countEl.textContent = st.count ? ('共 ' + st.count + ' 次') : '还没有成绩';
+    var html = '';
+    for (var i = solves.length - 1; i >= 0; i--) {
+      var s = solves[i];
+      var scr = String(s.scramble || '').replace(/[<>&"]/g, '');
+      html += '<div class="row' + (s.ms === st.best ? ' best' : '') + '">' +
+              '<span class="n">' + (i + 1) + '</span>' +
+              '<span class="t">' + Timer.fmt(s.ms) + '</span>' +
+              '<span class="s">' + scr + '</span>' +
+              '<button class="ico" type="button" data-copy="' + i + '" title="复制这条打乱"' +
+              ' aria-label="复制这条打乱">' + ICON.copy + '</button>' +
+              (scr ? '<a class="ico" href="calc.html#@s:' + encodeURIComponent(scr) + '"' +
+                     ' target="_blank" rel="noopener" title="在计算器里打开这条打乱"' +
+                     ' aria-label="在计算器里打开这条打乱">' + ICON.calc + '</a>' : '') +
+              '<button class="ico del" type="button" data-del="' + i + '" title="删掉这条"' +
+              ' aria-label="删掉这条">' + ICON.del + '</button>' +
+              '</div>';
+    }
+    listEl.innerHTML = html || '<div class="empty">按下空格，开始第一次。</div>';
+  }
+  render();
+
+  /* 列表里的三个小图标：复制打乱、跳计算器（就是个 <a>）、删掉这条。
+     删除只动成绩列表，不碰计时状态 —— 计时中删记录也不会影响正在跑的这一次。 */
+  function flash(msg) {
+    if (phase === 'run') return;                 // 计时中不打扰那块区域
+    hintEl.textContent = msg;
+    clearTimeout(flash.t);
+    flash.t = setTimeout(function () {
+      hintEl.textContent = phase === 'idle' ? '按住空格或这块区域，变绿后松开就开始' : '';
+    }, 1400);
+  }
+  function copyText(text, done) {
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(done, function () { fallback(text); done(); });
+    } else { fallback(text); done(); }
+    function fallback(t) {
+      var ta = document.createElement('textarea');
+      ta.value = t;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch (e) {}
+      document.body.removeChild(ta);
+    }
+  }
+  listEl.addEventListener('click', function (e) {
+    var el = e.target && e.target.closest ? e.target.closest('[data-del],[data-copy]') : null;
+    if (!el) return;
+    var del = el.getAttribute('data-del'), cp = el.getAttribute('data-copy');
+    if (del !== null && del !== undefined) {
+      solves.splice(+del, 1);
+      save();
+      render();
+      flash('删掉了一条');
+    } else if (cp !== null && cp !== undefined) {
+      var s = solves[+cp];
+      if (!s) return;
+      // 先给反馈（复制是异步的），复制失败会走 execCommand 退路，提示一样准
+      flash('已复制：' + (s.scramble || ''));
+      copyText(s.scramble || '', function () {});
+    }
+  });
+
+  /* 保存成绩：导出成 CSV 下载（和计算器拍照一个做法：Blob + <a download>） */
+  document.getElementById('save').addEventListener('click', function () {
+    if (!solves.length) { flash('还没有成绩'); return; }
+    var t = new Date(), p = function (n) { return (n < 10 ? '0' : '') + n; };
+    var name = 'cube-timer-' + t.getFullYear() + p(t.getMonth() + 1) + p(t.getDate()) + '-' +
+               p(t.getHours()) + p(t.getMinutes()) + p(t.getSeconds()) + '.csv';
+    var blob = new Blob([Timer.csv(solves)], { type: 'text/csv;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    if (a.remove) a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+    flash('已保存 ' + name + '（' + solves.length + ' 条）');
+  });
+
+  document.getElementById('newscr').addEventListener('click', newScramble);
+  document.getElementById('clear').addEventListener('click', function () {
+    // 正在计时时点清空：先把计时停掉、这一次不算成绩，再清列表
+    stopTicking();
+    pressed = skipUp = false;
+    solves = [];
+    save();
+    paintTime(0);
+    render();
+    setPhase('idle');
+    newScramble();
+  });
+
+  /* ---------- 夜晚模式 ---------- */
+  var root = document.documentElement, btn = document.getElementById('themebtn');
+  function applyTheme(t) {
+    root.dataset.theme = t;
+    btn.title = t === 'dark' ? '切到白天' : '切到夜晚';
+    try { localStorage.setItem('cube-theme', t); } catch (e) {}
+  }
+  var saved = null;
+  try { saved = localStorage.getItem('cube-theme'); } catch (e) {}
+  applyTheme(saved === 'dark' ? 'dark' : 'light');
+  btn.addEventListener('click', function () {
+    applyTheme(root.dataset.theme === 'dark' ? 'light' : 'dark');
+  });
+})();
+</script>
+</body>
+</html>

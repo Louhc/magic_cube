@@ -80,21 +80,7 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   td.f code{vertical-align:middle}
   td.f a.tocalc{vertical-align:middle}
 
-  /* 有备用写法时，图片可点开。展开后每条备选配一张"对应朝向"的图
-     （就是原图顺时针转 m*90 度 —— 已用模拟器验证过，等价于把局面做 U^m）。 */
-  tr.has-alts td.pic .box{cursor:pointer}
-  tr.has-alts td.pic img{transition:box-shadow .14s}
-  tr.has-alts td.pic .box:hover img{box-shadow:0 0 0 2px var(--line-strong)}
-  tr.open td.pic .box img{box-shadow:0 0 0 2px var(--accent)}
-  tr.has-alts td.pic .box::after{content:'be';position:absolute;right:3px;top:1px;
-        font-size:10px;color:var(--muted);line-height:1;transition:transform .14s}
-  tr.open td.pic .box::after{transform:rotate(180deg);color:var(--accent-text)}
-  .alts{display:none;margin-top:8px}
-  tr.open .alts{display:block}
-  .alts .r{display:flex;align-items:center;gap:9px;margin:5px 0}
-  .alts .th{flex:none;width:42px;height:42px}
-  .alts .th img{width:42px;height:42px;display:block}
-  .alts .f1{flex:1;min-width:0}
+  /* 图片点一下看大图：光标（放大镜）和悬停那圈边由 nav.css 的 img[data-zoom] 负责 */
 
   #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(12px);
          background:#111c;color:#fff;padding:8px 16px;border-radius:8px;font-size:13px;
@@ -109,10 +95,21 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   }
   @media print{
     body{background:#fff;color:#000}
-    header{padding:0 0 8px}
+    /* 打印分页：卡片别拦着分页 —— break-inside:avoid + overflow:hidden 会让整张表
+       变成「不可拆分的一块」，这一页装不下就整节推到下一页，标题也跟着单独占一页。
+       现在让表格跨页接着排，只禁止「一行被劈成两半」；标题不落在页尾当孤儿。 */
+    main{padding:0}
+    header{padding:0 0 6px;break-after:avoid}
+    section{break-inside:auto;overflow:visible;border-radius:0;border-color:#999;margin:10px 0 0}
+    section > h2{break-after:avoid;border-radius:0}
+    tr{break-inside:avoid}
+    /* 打印：纸上比屏幕费眼 —— 表格框线加粗、公式文字调大 */
+    table{border:2px solid #333}
+    th,td{border:1px solid #333}
+    th{border-bottom-width:2px}
+    code{font-size:15px;font-weight:600}
     .themebtn,.printbtn{display:none}
     a.tocalc{display:none}
-    section{break-inside:avoid;border-color:#999}
     code:hover{background:none}
     #toast{display:none}
   }
@@ -240,27 +237,16 @@ function toCalc(alg, id) {
   return '<a class="tocalc" href="calc.html#' + frag + '" title="' + tip +
          '" aria-label="' + tip + '">' + CALC_ICON + '</a>';
 }
-function row(n, alg, alts) {
+function row(n, alg) {
   // 一条公式里可能有换行 —— 表示同一格内的多条写法，逐行渲染
   // 用 fromCharCode(10) 取换行，避免生成器里转义被多吃一层
   var body = alg ? alg.split(String.fromCharCode(10)).map(function (line) {
       return '<code>' + esc(line) + '</code>' + toCalc(line, n);
     }).join('<br>')
     : '<span class="todo">—</span>';
-  if (alts && alts.length) {
-    body += '<div class="alts">';
-    alts.forEach(function (a) {
-      // a[1] 是相对本图要转的 AUF 步数；图顺时针转 m*90 度即"对应的朝向"
-      body += '<div class="r"><span class="th"><img src="' + IMG(n) + '" data-oll="' + esc(n) +
-              '" alt="" loading="lazy"' +
-              (a[1] ? ' style="transform:rotate(' + (a[1] * 90) + 'deg)"' : '') +
-              '></span><span class="f1"><code>' + esc(a[0]) + '</code>' + toCalc(a[0], n) +
-              '</span></div>';
-    });
-    body += '</div>';
-  }
-  return '<tr' + (alts && alts.length ? ' class="has-alts" data-id="' + esc(n) + '"' : '') + '>' +
-         '<td class="pic"><span class="box"><img src="' + IMG(n) + '" data-oll="' + esc(n) +
+  // data-zoom：这张图点一下看大图（放大镜那套在共用的 nav.js / nav.css 里）
+  return '<tr>' +
+         '<td class="pic"><span class="box"><img src="' + IMG(n) + '" data-zoom data-oll="' + esc(n) +
          '" alt="' + n +
          '" loading="lazy"><span class="no">' + n + '</span></span></td>' +
          '<td class="f">' + body + '</td></tr>';
@@ -270,7 +256,7 @@ SECTIONS.forEach(function (sec) {
   html += '<section><h2>' + esc(sec.title) +
           '<span class="cnt">' + sec.cnt + '</span></h2><table>' +
           '<colgroup><col class="pic"><col></colgroup><tbody>';
-  sec.rows.forEach(function (r) { html += row(r[0], r[1], r[2]); });
+  sec.rows.forEach(function (r) { html += row(r[0], r[1]); });
   html += '</tbody></table></section>';
 });
 document.getElementById('app').innerHTML = html;
@@ -309,12 +295,7 @@ function fallbackCopy(text) {
   ta.remove();
 }
 document.getElementById('app').addEventListener('click', function (e) {
-  // 点图片 -> 展开/收起这一行的其他写法
-  var pic = e.target.closest ? e.target.closest('tr.has-alts > td.pic') : null;
-  if (pic) {
-    pic.parentNode.classList.toggle('open');
-    return;
-  }
+  // 点公式 -> 复制。图片的点击不在这里管：nav.js 统一处理「看大图」
   var el = e.target.closest ? e.target.closest('code') : null;
   if (!el) return;
   var compact = el.textContent.replace(/\s+/g, '');

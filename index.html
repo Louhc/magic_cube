@@ -28,7 +28,7 @@
   /* GitHub 纸带：经典的黑白配色 + octocat，45° 斜贴在右上角。
      位置放在导航条【下面】——不再压住导航栏。
      它会和右上角的昼夜按钮抢地方，屏幕不够宽就整条收起来（见媒体查询）。 */
-  .ghribbon{position:absolute;top:var(--nav-h, 42px);right:0;width:150px;height:150px;
+  .ghribbon{position:absolute;top:var(--nav-h, 63px);right:0;width:150px;height:150px;
             overflow:hidden;pointer-events:none;z-index:30}
   .ghribbon a{position:absolute;top:36px;right:-48px;width:200px;padding:8px 0;
               display:block;transform:rotate(45deg);pointer-events:auto;
@@ -58,6 +58,10 @@
   .card h2 .n{color:var(--accent-text);font-weight:600;font-size:13px;margin-left:8px;
               vertical-align:2px;letter-spacing:0}
   .card p{margin:0;color:var(--muted);font-size:12.5px;line-height:1.6}
+  /* 教程卡片不整张跳一个页面：标题右边给「初级 / 进阶」两个入口 */
+  .card h2 a{color:var(--accent-text);font-size:13.5px;font-weight:600;text-decoration:none;
+             border-bottom:1px solid transparent}
+  .card h2 a:hover{border-bottom-color:var(--accent-text)}
 
   @media (max-width:720px){
     .cards{grid-template-columns:1fr}
@@ -97,10 +101,22 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
         <h2>计算器</h2>
       </span>
     </a>
+    <div class="card">
+      <span class="thumb"><img src="tutorial/cross-256x258.png" alt="三阶魔方教程"></span>
+      <span>
+        <h2>教程 <a href="tutorial-basic.html">初级</a> · <a href="tutorial-advanced.html">进阶</a></h2>
+      </span>
+    </div>
     <a class="card" href="practice.html">
       <span class="thumb"><img src="pll/pll-T-256x256.png" alt="魔方练习"></span>
       <span>
         <h2>练习</h2>
+      </span>
+    </a>
+    <a class="card" href="timer.html">
+      <span class="thumb"><img src="tutorial/complete-256x258.png" alt="魔方计时器"></span>
+      <span>
+        <h2>计时器</h2>
       </span>
     </a>
     <a class="card" href="f2l.html">

@@ -94,8 +94,20 @@
     body{background:#fff;color:#000}
     .themebtn,.printbtn{display:none}
     a.tocalc{display:none}
-    header{padding:0 0 8px}
-    section{break-inside:avoid;border-color:#999}
+    /* 打印分页：卡片别拦着分页 —— break-inside:avoid + overflow:hidden 会让整张表
+       变成「不可拆分的一块」，这一页装不下就整节推到下一页，标题也跟着单独占一页。
+       现在让表格跨页接着排，只禁止「一行被劈成两半」；标题不落在页尾当孤儿。 */
+    main{padding:0}
+    header{padding:0 0 6px;break-after:avoid}
+    section{break-inside:auto;overflow:visible;border-radius:0;border-color:#999;margin:10px 0 0}
+    section > h2{break-after:avoid;border-radius:0}
+    tr{break-inside:avoid}
+    /* 打印：纸上比屏幕费眼 —— 表格框线加粗、公式文字调大 */
+    table{border:2px solid #333}
+    th,td{border:1px solid #333}
+    th{border-bottom-width:2px}
+    code{font-size:15px;font-weight:600}
+    thead{display:table-header-group}   /* 换页后红/绿 F 表头再来一遍 */
     code:hover{background:none}
     #toast{display:none}
   }
@@ -236,7 +248,7 @@ function pic(name, alt) {
   if (!name) return '<td class="empty"></td>';
   // 角标去掉前导 0（01a -> 1a）；文件名不能动，磁盘上就叫 01a
   var label = name.replace(/^0+/, '');
-  return '<td class="pic"><span class="box"><img src="' + IMG(name) + '" alt="' +
+  return '<td class="pic"><span class="box"><img src="' + IMG(name) + '" data-zoom alt="' +
          esc(alt) + '" loading="lazy"><span class="no">' + esc(label) +
          '</span></span></td>';
 }
