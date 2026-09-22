@@ -308,9 +308,19 @@ console.log('\n[14] 导航高亮框：会滑动的 .pill');
     seq = 0;
     const body = el('body');
     const store = Object.assign({}, opts.store || {});
+    // 首页那个 [data-logo] 占位：真页面上它在 <header> 里，nav.js 在 <body> 开头
+    // 就跑了，那时还没解析到它 —— 所以 DOM 解析完之前桩里也返回空，
+    // 这样「等 DOMContentLoaded 再填一次」漏写了就会红。
+    const logoSlot = el('span');
+    const lastSlot = el('a');
+    lastSlot.setAttribute('data-last', 'tutorial-basic.html');
+    let parsed = false;
     const doc = {
       body, documentElement: el('html'), createElement: el,
-      getElementById: () => null, querySelectorAll: () => [],
+      getElementById: () => null,
+      querySelectorAll: sel => (!parsed ? []
+        : sel === '[data-logo]' ? [logoSlot]
+        : sel === '[data-last]' ? [lastSlot] : []),
       readyState: 'loading',          // 让 nav.js 走 DOMContentLoaded 那条路
       addEventListener(t, fn) { (this._e = this._e || {});
                               (this._e[t] = this._e[t] || []).push(fn); }
@@ -341,11 +351,12 @@ console.log('\n[14] 导航高亮框：会滑动的 .pill');
     const links = navEl.children[1];            // [0] 是 brand
     return {
       ctx, body, links, store, pill: links.children[0], pending, observers,
+      logo: logoSlot, last: lastSlot, navEl,
       linkAt: i => links.children[i + 1],       // [0] 是 .pill
       // 导航项会变多，测试里一律按文字找，别写下标
       linkTo: t => links.children.find(c => String(c.textContent).indexOf(t) >= 0),
       active: links.children.find(c => c.className === 'on'),
-      domReady: () => (doc._e.DOMContentLoaded || []).forEach(fn => fn()),
+      domReady: () => { parsed = true; (doc._e.DOMContentLoaded || []).forEach(fn => fn()); },
       click: e => (doc._e.click || []).forEach(fn => fn(e))
     };
   }
@@ -838,7 +849,8 @@ console.log('\n[17] 白天 / 夜晚开关（滑动式，七页共用一份标记
     /sun: '<svg/.test(nav) && /moon: '<svg/.test(nav) &&
     !/[\u2600\u263e]/.test(nav));
   ok('等 DOM 好了再注入（#themebtn 在 nav.js 后面才解析到）',
-    /document\.addEventListener\('DOMContentLoaded', buildThemeSwitch\)/.test(nav));
+    /ready\(buildThemeSwitch\)/.test(nav) &&
+    /function ready\(fn\)\s*\{[\s\S]*?DOMContentLoaded/.test(nav));
   ok('开关带 role=switch，并同步 aria-checked',
     /setAttribute\('role', 'switch'\)/.test(nav) && /aria-checked/.test(nav));
 
@@ -870,23 +882,133 @@ console.log('\n[17] 白天 / 夜晚开关（滑动式，七页共用一份标记
   });
 }
 
-console.log('\n[18] 站名');
+console.log('\n[18] 站名与站标');
 {
-  // 站名散在两个地方：首页 <title>/<h1>，以及 nav.js 里的导航条品牌名。
+  // 站名散在三个地方：首页 <title>/<h1>，以及 nav.js 里的 SITE（站标的 aria-label）。
   // 改名时很容易只改一处，所以在这里对一下。
+  const SITE = '六面魔方工具箱';
   const idx = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
   const nav = fs.readFileSync(path.join(ROOT, 'nav.js'), 'utf8');
-  const brand = (nav.match(/brand\.textContent = '([^']+)'/) || [])[1];
-  // h1 里两个字是分开上色的，所以要把标签剥掉再比
-  const h1 = ((idx.match(/<h1>([\s\S]*?)<\/h1>/) || [])[1] || '')
-    .replace(/<[^>]*>/g, '').trim();
-  ok('首页标题就是站名（' + h1 + '）', !!h1 && h1 === '六面', h1);
-  ok('导航条品牌名和首页标题一致（都是「' + brand + '」）',
-    brand === h1 && brand === '六面', '品牌名=' + brand + ' 标题=' + h1);
+  const site = (nav.match(/var SITE = '([^']+)'/) || [])[1];
+  // 首页大标题 = 站标（矢量，aria-label「六面」）+ 副标题「魔方工具箱」，合起来才是站名。
+  // 副标题两侧的破折号是 CSS 画的，不在 HTML 里。
+  const h1 = (idx.match(/<h1>([\s\S]*?)<\/h1>/) || [])[1] || '';
+  const markLabel = (h1.match(/aria-label="([^"]+)"/) || [])[1];
+  const sub = ((h1.match(/<span class="sub">([^<]*)<\/span>/) || [])[1] || '').trim();
+  ok('首页大标题 = 站标「' + markLabel + '」+ 副标题「' + sub + '」，合起来是站名',
+    !!markLabel && markLabel + sub === SITE, markLabel + ' + ' + sub);
+  ok('导航条里的站名和首页一致（都是「' + site + '」）', site === SITE, site);
   ok('首页 <title> 也是站名',
-    new RegExp('<title>' + (brand || '') + '</title>').test(idx), brand);
-  ok('站名里不再有旧名「工具箱」',
-    !/工具箱/.test(idx) && !/工具箱/.test(nav));
+    new RegExp('<title>' + SITE + '</title>').test(idx), SITE);
+  // 站标那两个字还是分开上色（六主色 / 面正文色），首页和导航条同一套
+  ok('首页站标的两字分色在（.g-a 主色 / .g-b 正文色）',
+    /h1 \.mark \.g-a\{fill:var\(--accent-text\)\}/.test(idx) &&
+    /h1 \.mark \.g-b\{fill:var\(--text\)\}/.test(idx));
+  ok('副标题两侧的破折号是 CSS 画的，没写进 HTML（免得读屏把「—」读成站名）',
+    /<span class="sub">魔方工具箱<\/span>/.test(h1) &&
+    /h1 \.sub::before,h1 \.sub::after\{content:'—'/.test(idx));
+  ok('首页那个站标由 nav.js 统一填（页面里只写 data-logo，不存第二份路径）',
+    /<span class="mark" data-logo/.test(h1) &&
+    /querySelectorAll\('\[data-logo\]'\)/.test(nav));
+
+  // 导航条里只放图形：brand 是个 <a>，挂 aria-label，里面内联 SVG
+  ok('导航条站标是链接到首页的图形（只图形、无文字）',
+    /var brand = document\.createElement\('a'\)/.test(nav) &&
+    /brand\.href = 'index\.html'/.test(nav) &&
+    /brand\.setAttribute\('aria-label', SITE\)/.test(nav) &&
+    /brand\.innerHTML = logoHTML/.test(nav) &&
+    /var logoHTML = '<svg viewBox="0 0 1209 502"/.test(nav) &&
+    !/brand\.textContent/.test(nav));
+  // 两条 d 必须和 logo.svg 一模一样：改了图没同步内联的那份，这里会红
+  const svg = fs.readFileSync(path.join(ROOT, 'logo.svg'), 'utf8');
+  const dOf = (s, cls) => (s.match(new RegExp('class="' + cls + '"[^>]*\\sd="([^"]+)"')) || [])[1];
+  const navD = cls => (nav.match(new RegExp("var LOGO_" + cls + " = '([^']+)'")) || [])[1];
+  ['A', 'B'].forEach((cls, i) => {
+    const want = dOf(svg, i ? 'g-b' : 'g-a');
+    ok('导航条内联的 LOGO_' + cls + ' 与 logo.svg 一致（' + (want || '').slice(0, 12) + '…）',
+      !!want && navD(cls) === want, String(navD(cls)).slice(0, 24));
+  });
+  const css = fs.readFileSync(path.join(ROOT, 'nav.css'), 'utf8');
+  ok('nav.css 给站标定了高度与两色（走主题变量）',
+    /\.topnav a\.brand svg\{[^}]*height:22px/.test(css) &&
+    /\.topnav a\.brand \.g-a\{fill:var\(--accent-text/.test(css) &&
+    /\.topnav a\.brand \.g-b\{fill:var\(--text/.test(css));
+  ok('窄屏把站标收起来（选择器要盖得住那条 a.brand）',
+    /\.topnav a\.brand\{display:none\}/.test(css));
+
+  // 其他页面的标签页都带站名前缀（首页本身就是站名，不加）
+  PAGES.filter(p => p !== 'index.html').forEach(p => {
+    const t = (fs.readFileSync(path.join(ROOT, p), 'utf8')
+      .match(/<title>([^<]*)<\/title>/) || [])[1];
+    ok(p + ' 的标签页带站名前缀（' + t + '）', !!t && t.indexOf('六面 · ') === 0, t);
+  });
+}
+
+console.log('\n[18b] 首页站标是 nav.js 在 DOM 解析完之后补上的');
+{
+  // 踩过的坑：nav.js 挂在 <body> 开头，跑的时候 <header> 还没解析到，
+  // querySelectorAll('[data-logo]') 是空的 —— 结果首页只剩下面那行
+  // 「— 魔方工具箱 —」，上面那个标没了。桩里 DOM 解析完之前也返回空，
+  // 所以「等 DOMContentLoaded 再填一次」漏掉了这里就会红。
+  const r = run('index.html');
+  r.domReady();
+  const html = String(r.logo.innerHTML || '');
+  ok('解析完之后占位里填上了站标（svg + 两块 path）',
+    html.indexOf('<svg viewBox="0 0 1209 502"') === 0 &&
+    html.indexOf('class="g-a"') > 0 && html.indexOf('class="g-b"') > 0,
+    html.slice(0, 40));
+  ok('填进去的和导航条里那份是同一个字符串（不存在第二份路径）',
+    html === String(r.navEl.children[0].innerHTML), '两处不一致');
+}
+
+console.log('\n[18c] 首页那张教程卡片：整张可点，效果和点导航条一样');
+{
+  // 卡片里铺了一个透明链接 <a class="stretch" data-last="tutorial-basic.html">，
+  // href 由 nav.js 按「上次看的那一篇」定 —— 和导航条上那个入口同一条规则
+  const idx = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  const card = (idx.match(/<div class="card">[\s\S]*?<\/div>/) || [''])[0];
+  ok('教程卡片里铺了一个盖满卡片的链接（data-last 指向教程入口）',
+    /<a class="stretch" href="tutorial-basic\.html" data-last="tutorial-basic\.html"/.test(card),
+    card.slice(0, 60));
+  ok('卡片是定位父级、铺满的那个链接 absolute inset:0',
+    /\.card\{[^}]*position:relative/.test(idx) &&
+    /\.card \.stretch\{position:absolute;inset:0/.test(idx));
+  ok('标题里的「初级 / 进阶」压在铺满的链接上面（否则点不到）',
+    /\.card h2 a\{position:relative;z-index:1/.test(idx));
+
+  {
+    const r = run('index.html',
+      { store: { 'cube-last:tutorial-basic.html': 'tutorial-advanced.html' } });
+    r.domReady();
+    ok('上次看的是进阶 -> 卡片链接就指到进阶',
+      r.last.getAttribute('href') === 'tutorial-advanced.html',
+      String(r.last.getAttribute('href')));
+  }
+  {
+    const r = run('index.html');
+    r.domReady();
+    ok('没看过 -> 默认初级', r.last.getAttribute('href') === 'tutorial-basic.html',
+      String(r.last.getAttribute('href')));
+  }
+  // 点卡片 = 点导航条那个入口：蓝框滑到「教程」、内容淡出、淡完再跳
+  {
+    const r = run('index.html', { defer: true, store: { 'cube-last:tutorial-basic.html': 'tutorial-advanced.html' } });
+    r.domReady();
+    const a = el('a');
+    a.setAttribute('href', 'tutorial-advanced.html');      // nav.js 已经改写过的那条
+    const c = fire(a);
+    r.click(c.e);
+    const tut = r.linkTo('教程');
+    ok('点卡片：拦下来，内容先淡出（和点导航条一样）',
+      c.got() && r.body.classList.contains('nav-fade'));
+    ok('点卡片：蓝框滑到「教程」那一项（即使 href 是进阶，也认得出是同一个入口）',
+      r.pill.style.transform ===
+        'translate(' + tut.offsetLeft + 'px,' + tut.offsetTop + 'px)',
+      r.pill.style.transform);
+    r.pending.forEach(fn => fn());
+    ok('点卡片：淡完才跳页', r.ctx.location.href === 'tutorial-advanced.html',
+      r.ctx.location.href);
+  }
 }
 
 

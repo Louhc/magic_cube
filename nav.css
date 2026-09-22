@@ -14,7 +14,15 @@
   font:14px/1 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
   position:relative; z-index:10;
 }
-.topnav .brand{font-weight:600;white-space:nowrap}
+/* 站标：导航条里只放图形（「六面」两个字标，矢量源 logo.svg，由 nav.js 内联进来）。
+   SVG 的颜色走 CSS 变量，所以跟着主题一起变；两色沿用首页大标题那套 ——
+   六 = 主色、面 = 正文色。高度按 63px 的导航条留白定。 */
+.topnav a.brand{display:inline-flex;align-items:center;padding:0;color:inherit;flex:none;
+                transition:opacity .15s}
+.topnav a.brand svg{display:block;height:22px;width:auto}
+.topnav a.brand .g-a{fill:var(--accent-text, var(--accent, #5A5FBF))}
+.topnav a.brand .g-b{fill:var(--text, #222)}
+.topnav a.brand:hover{opacity:.78}
 .topnav .links{margin-left:auto;display:flex;gap:3px;flex-wrap:wrap;justify-content:flex-end}
 .topnav a{
   color:var(--muted, #8A7D7D); text-decoration:none;
@@ -36,7 +44,8 @@ body > .app{height:calc(100% - var(--nav-h))}
 
 @media (max-width:620px){
   .topnav{gap:8px; padding:0 10px; font-size:13.5px}
-  .topnav .brand{display:none}
+  /* 选择器要和上面那条 .topnav a.brand 一样长才盖得住（窄屏把站标收起来，给链接让地方） */
+  .topnav a.brand{display:none}
   .topnav a{padding:6px 8px}
 }
 

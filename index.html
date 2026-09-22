@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>六面</title>
+<title>六面魔方工具箱</title>
 <link rel="icon" type="image/x-icon" href="cube-64x64.ico">
 <link rel="stylesheet" href="theme.css">
 <link rel="stylesheet" href="nav.css">
@@ -14,13 +14,21 @@
   body{margin:0;background:var(--bg);color:var(--text);
        font:14px/1.5 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
   header{position:relative;max-width:900px;margin:0 auto;padding:34px 20px 4px;text-align:center}
-  /* 站名：大字 + 拉开字距 + 两字分色（"六"用 accent，"面"用正文色）。
-     用 flex + gap 而不是 letter-spacing —— 后者会在最后一个字后面也留一份间距，
-     居中的标题会整体偏左。 */
-  h1{margin:0;display:flex;justify-content:center;align-items:baseline;
-     gap:.16em;font-size:40px;line-height:1.15;font-weight:700}
-  h1 .a{color:var(--accent-text)}
-  h1 .b{color:var(--text)}
+  /* 站名：上面是站标（矢量字标，「六」主色 /「面」正文色 —— 和导航条同一份图，
+     由 nav.js 填进 [data-logo]），下面一行「— 魔方工具箱 —」。两行居中。
+     破折号用 ::before/::after 画：写进 HTML 的话，读屏和测试都会把它当成站名的一部分。
+     拉开字距会在最后一个字后面也多留一份，所以给 .sub 配一条负的 margin-right
+     把那份补回来（不然整行看着往左偏）。 */
+  h1{margin:0;display:flex;flex-direction:column;align-items:center;gap:22px;
+     line-height:1.15;font-weight:700}
+  h1 .mark{display:block;width:260px;aspect-ratio:1209/502}
+  h1 .mark svg{display:block;width:100%;height:auto}
+  h1 .mark .g-a{fill:var(--accent-text)}
+  h1 .mark .g-b{fill:var(--text)}
+  h1 .sub{display:inline-block;white-space:nowrap;font-size:19px;font-weight:600;
+          letter-spacing:.34em;margin-right:-.34em;color:var(--muted)}
+  h1 .sub::before,h1 .sub::after{content:'—';margin:0 .5em;font-weight:400;
+                                 letter-spacing:0;color:var(--muted2, #999)}
   header p{margin:8px 0 0;color:var(--muted);font-size:13px}
   /* 只管位置 —— 开关本身的样式（尺寸/底色/滑块）在 nav.css 里，七页共用 */
   .themebtn{position:absolute;right:20px;top:34px}
@@ -49,8 +57,11 @@
   /* 卡片只留标题和缩略图，不再有说明文字 */
   .card{display:flex;align-items:center;gap:16px;text-decoration:none;color:inherit;
         background:var(--card);border:1px solid var(--line);border-radius:12px;
-        padding:18px;min-height:140px;transition:border-color .14s, transform .14s}
-  .card:hover{border-color:var(--line-strong);transform:translateY(-2px)}
+        padding:18px;min-height:140px;position:relative;
+        transition:border-color .14s, transform .14s}
+  .card:hover,.card:focus-within{border-color:var(--line-strong);transform:translateY(-2px)}
+  /* 教程卡片整张可点：一个铺满卡片的透明链接（里面 初级 / 进阶 两个链接压在它上面） */
+  .card .stretch{position:absolute;inset:0;border-radius:inherit}
   .card .thumb{flex:none;width:104px;height:104px;display:flex;align-items:center;justify-content:center}
   .card .thumb img{max-width:100%;max-height:100%;border-radius:8px}
   /* 没有说明文字了，标题放大一些，卡片才不会显得空 */
@@ -58,14 +69,17 @@
   .card h2 .n{color:var(--accent-text);font-weight:600;font-size:13px;margin-left:8px;
               vertical-align:2px;letter-spacing:0}
   .card p{margin:0;color:var(--muted);font-size:12.5px;line-height:1.6}
-  /* 教程卡片不整张跳一个页面：标题右边给「初级 / 进阶」两个入口 */
-  .card h2 a{color:var(--accent-text);font-size:13.5px;font-weight:600;text-decoration:none;
-             border-bottom:1px solid transparent}
+  /* 教程卡片不整张跳一个页面：标题右边给「初级 / 进阶」两个入口。
+     它们要压在铺满卡片那个透明链接上面，否则点不到。 */
+  .card h2 a{position:relative;z-index:1;color:var(--accent-text);font-size:13.5px;
+             font-weight:600;text-decoration:none;border-bottom:1px solid transparent}
   .card h2 a:hover{border-bottom-color:var(--accent-text)}
 
   @media (max-width:720px){
     .cards{grid-template-columns:1fr}
-    h1{font-size:30px}
+    h1{gap:16px}
+    h1 .mark{width:200px}
+    h1 .sub{font-size:16px}
   }
   /* 纸带最左探到距视口右边 90px；右上角的昼夜按钮在窄屏会缩到 54px 处，
      两者会撞上 —— 屏宽不够（约 <980px）就干脆不显示纸带。 */
@@ -80,7 +94,10 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
 
 <script src="nav.js"></script>
 <header>
-  <h1><span class="a">六</span><span class="b">面</span></h1>
+  <h1>
+    <span class="mark" data-logo role="img" aria-label="六面"></span>
+    <span class="sub">魔方工具箱</span>
+  </h1>
   <button class="themebtn" id="themebtn" type="button" title="切到夜晚"></button>
 </header>
 
@@ -102,6 +119,11 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
       </span>
     </a>
     <div class="card">
+      <!-- 整张卡片可点：铺一个透明链接盖满卡片，href 由 nav.js 按「上次看的那一篇」
+           填成初级或进阶（和导航条上那个「教程」入口同一条规则）。
+           标题右边那两个字仍是各自的链接，盖在铺满的链接上面。 -->
+      <a class="stretch" href="tutorial-basic.html" data-last="tutorial-basic.html"
+         aria-label="教程"></a>
       <span class="thumb"><img src="tutorial/cross-256x258.png" alt="三阶魔方教程"></span>
       <span>
         <h2>教程 <a href="tutorial-basic.html">初级</a> · <a href="tutorial-advanced.html">进阶</a></h2>

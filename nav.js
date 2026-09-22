@@ -28,9 +28,47 @@
   var here = location.pathname.split('/').pop().toLowerCase();
   if (!here) here = 'index.html';
 
-  var brand = document.createElement('span');
+  // 文档还在解析就先等 DOMContentLoaded，否则直接跑。
+  // nav.js 挂在 <body> 开头，页面自己的东西（header 里的站标、首页那些卡片）
+  // 这时候还没解析到 —— 要碰它们的活儿都得走这里。
+  function ready(fn) {
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn);
+    else fn();
+  }
+
+  /* 一个入口管好几页时（教程：初级 / 进阶），跳到上次看的那一篇。
+     导航条上那个入口和首页那张教程卡片共用这一条规则，别各写一份。 */
+  function lastOf(page) {
+    var entry = null;
+    for (var i = 0; i < PAGES.length; i++) if (PAGES[i][0] === page) entry = PAGES[i];
+    if (!entry) return page;
+    var extra = [].concat(entry[3] || []);
+    if (!extra.length) return page;
+    try {
+      var last = localStorage.getItem('cube-last:' + entry[0]);
+      if (last === entry[0] || extra.indexOf(last) >= 0) return last;
+    } catch (e) {}
+    return page;
+  }
+
+  /* ---------- 站标 ----------
+     导航条里只放图形（「六面」两字的字标），不放文字。矢量源是 logo.svg，
+     下面两条 d 和那边必须一模一样 —— test/links.js 会把两边抠出来逐字比，
+     改了图没同步会红。分成两条 path 是为了分开上色（六用主色、面用正文色，
+     首页那个大标题也是同一份图）；颜色走 CSS 变量（见 nav.css / index.html），
+     所以昼夜两套主题自动跟着变，不用第二份图。旁边没有文字，所以挂 aria-label。 */
+  var SITE = '六面魔方工具箱';
+  var LOGO_A = 'M243 0 327 0 338 6 338 8 341 10 344 16 344 87 346 93 351 97 557 97 564 99 576 107 583 120 584 153 582 161 578 168 572 174 570 174 567 177 556 180 30 180 18 177 8 170 1 156 1 122 5 112 12 104 28 97 217 97 223 93 225 88 225 17 229 9 234 4 243 0ZM144 219 234 219 242 223 246 228 248 234 247 245 125 489 116 497 102 502 17 501 11 498 2 488 0 481 2 467 4 466 14 444 16 443 33 408 35 407 50 376 52 375 61 355 63 354 72 334 74 333 82 315 84 314 92 296 94 295 101 279 103 278 127 230 136 222 144 219ZM346 219 436 219 445 223 452 230 466 260 468 261 484 295 486 296 507 340 509 341 561 446 563 447 574 469 574 486 567 496 554 502 472 502 458 496 450 488 439 466 439 463 427 441 427 438 417 420 417 417 403 391 403 388 386 356 386 353 333 248 331 242 332 231 339 222 346 219Z';
+  var LOGO_B = 'M647 9 1186 9 1198 14 1203 19 1208 28 1209 61 1204 73 1198 79 1190 83 962 84 955 88 952 97 944 112 944 117 948 120 1154 120 1167 124 1181 136 1182 140 1185 143 1188 155 1188 469 1185 480 1180 486 1180 488 1171 496 1156 502 663 502 648 496 639 487 634 475 634 154 637 144 641 137 650 128 661 122 669 120 816 120 822 117 829 103 829 100 833 94 834 88 830 84 643 83 634 78 627 69 625 63 625 30 628 22 634 15 647 9ZM751 193 743 196 738 204 738 424 744 434 751 437 1058 437 1064 435 1068 431 1070 427 1070 202 1066 196 1060 193 876 193 872 195 868 201 868 226 870 231 874 234 993 234 1006 238 1014 245 1018 254 1018 390 1014 398 1009 403 998 408 814 408 806 405 804 402 801 401 801 399 798 397 795 391 794 386 794 199 792 198 792 196 786 193 751 193ZM876 289 873 290 869 295 870 356 874 359 880 360 924 360 940 358 943 354 943 294 937 289 876 289Z';
+  var logoHTML = '<svg viewBox="0 0 1209 502" aria-hidden="true" focusable="false">' +
+    '<path class="g-a" d="' + LOGO_A + '"/>' +
+    '<path class="g-b" d="' + LOGO_B + '"/></svg>';
+
+  var brand = document.createElement('a');
   brand.className = 'brand';
-  brand.textContent = '六面';
+  brand.href = 'index.html';
+  brand.setAttribute('aria-label', SITE);
+  brand.innerHTML = logoHTML;
 
   var links = document.createElement('span');
   links.className = 'links';
@@ -40,15 +78,11 @@
     a.textContent = p[1];
     // 一个入口管好几页时（教程的初级 / 进阶），跳到上次看的那一篇
     var extra = [].concat(p[3] || []);
-    var target = p[0];
-    if (extra.length) {
-      try {
-        var last = localStorage.getItem('cube-last:' + p[0]);
-        if (last === p[0] || extra.indexOf(last) >= 0) target = last;
-      } catch (e) {}
-    }
-    a.href = target;
-    if (p[0] === here || extra.indexOf(here) >= 0) {
+    a.href = lastOf(p[0]);
+    // 「这个入口管哪几页」记在链接上：点卡片 / 点 ↗ 跳过去时，
+    // 蓝框要能找到对应的那一项（见下面点链接那段）
+    a._pages = [p[0]].concat(extra);
+    if (a._pages.indexOf(here) >= 0) {
       a.className = 'on';
       a.setAttribute('aria-current', 'page');
       activeLink = a;
@@ -67,6 +101,30 @@
   nav.appendChild(links);
 
   document.body.insertBefore(nav, document.body.firstChild);
+
+  /* 页面里想要同一个站标的地方（首页那个大标题）只写 <span data-logo></span>，
+     由这里统一填进去 —— 一个字标不在几个文件里各存一份，改图只改上面那两条 d。
+
+     首页那张教程卡片整张可点：卡片里埋一个铺满的 <a class="stretch" data-last="…">，
+     这里按「上次看的那一篇」把 href 定下来（和导航条上那个入口同一条规则）——
+     点下去的效果（蓝框滑过去 + 内容淡出）由下面拦截站内链接那段统一负责。
+
+     两件事都得等 DOM 解析完：这个脚本在 <body> 开头，跑的时候它们还没解析到
+     （首页的站标曾经就是这么丢的：页面上只剩下面那行「— 魔方工具箱 —」）。 */
+  function fillLogos() {
+    Array.prototype.forEach.call(document.querySelectorAll('[data-logo]'), function (el) {
+      el.innerHTML = logoHTML;
+    });
+  }
+  function resolveLastLinks() {
+    Array.prototype.forEach.call(document.querySelectorAll('[data-last]'), function (el) {
+      el.setAttribute('href', lastOf(el.getAttribute('data-last')));
+    });
+  }
+  ready(function () {
+    fillLogos();
+    resolveLastLinks();
+  });
 
   /* ---------- 当前页的蓝框 ----------
      链接自己不再画背景，背景统一由 .links 里这个绝对定位的圆角方块提供。
@@ -119,11 +177,7 @@
       void document.body.offsetHeight;    // 先把「隐着」结算掉，淡入的过渡才会跑
       document.body.classList.remove('nav-fade');
     };
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', show);
-    } else {
-      show();
-    }
+    ready(show);
   })();
 
   // —— 出场：点站内页面链接，先把动画演完再跳页
@@ -147,7 +201,10 @@
     for (var i = 0; i < links.children.length; i++) {
       var li = links.children[i];
       if (!li.tagName || String(li.tagName).toUpperCase() !== 'A') continue;
-      if ((li.getAttribute('href') || '').toLowerCase() === page) { hit = li; break; }
+      // 链接自己记着「这个入口管哪几页」：点「教程 · 进阶」时蓝框也要滑到
+      // 「教程」那一项（那一项的 href 是上次看的那一篇，直接比 href 比不到）
+      var owns = li._pages || [(li.getAttribute('href') || '').toLowerCase()];
+      if (owns.indexOf(page) >= 0) { hit = li; break; }
     }
 
     e.preventDefault();
@@ -235,11 +292,7 @@
     // 各页自己的点击处理注册得更早、会先跑，所以这里读到的是刚切完的状态
     b.addEventListener('click', sync);
   }
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', buildThemeSwitch);
-  } else {
-    buildThemeSwitch();
-  }
+  ready(buildThemeSwitch);
 })();
 
 /* ---------- 公式图片点开看大图 ----------
