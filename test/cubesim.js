@@ -112,7 +112,9 @@ console.log('\n[5] 真跑一遍 calc.html 的脚本（DOM 桩）');
   const mkEl = (t, init) => {
     const e = { tagName: t, children: [], style: {}, dataset: {},
       classList: { add() {}, remove() {}, toggle() {} }, addEventListener() {},
-      appendChild(c) { this.children.push(c); return c; },
+      // 真 DOM 的 appendChild 会写上 parentNode —— 桩不写的话，
+      // 「这个元素还在不在树里」这类判断全会误判（高亮色块会被反复重建）
+      appendChild(c) { this.children.push(c); c.parentNode = this; return c; },
       querySelectorAll() { return []; }, querySelector() { return null; },
       setPointerCapture() {}, closest() { return null; }, offsetWidth: 1,
       value: init || '',
@@ -764,6 +766,127 @@ console.log('\n[11c] PLL 页的「显示颜色」开关（真跑一遍页面脚�
   }
 }
 
+console.log('\n[11e] 「跳计算器」链接的朝向标记：只有 F2L 的 b 版才带 @g:');
+{
+  // 一个真 bug：三个公式页各自抄了一份 toCalc，里面都用 /b$/ 判「是不是 F2L 的 b 版」。
+  // F2L 的 b 版确实是 01b/02b，可 PLL 用字母编号 —— Ab / Gb / Jb / Nb / Rb / Ub
+  // 末尾也是 b，于是这六条被当成「绿面朝前」，跳到计算器会先转个 y，
+  // 摆出来的图和本站的图对不上。现在判据是显式写死的（F2L 写「数字 + b」，
+  // OLL / PLL 直接 false），这一节就把三个页面真渲染一遍，逐条查链接。
+  const vm = require('vm');
+  const render = (page) => {
+    const els = {};
+    const mkEl = (t) => {
+      const e = { tagName: t, children: [], dataset: {}, _h: '', _t: '', checked: true,
+        style: { setProperty() {} },
+        classList: { _s: new Set(), add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); },
+          toggle(c, v) { v ? this._s.add(c) : this._s.delete(c); }, contains(c) { return this._s.has(c); } },
+        _h2: {}, addEventListener(ev, fn) { (this._h2[ev] = this._h2[ev] || []).push(fn); },
+        fire(ev, a) { (this._h2[ev] || []).forEach(f => f(a || {})); },
+        appendChild(c) { this.children.push(c); return c; },
+        querySelectorAll() { return []; }, querySelector() { return null; },
+        set innerHTML(v) { this._h = v; }, get innerHTML() { return this._h; },
+        set textContent(v) { this._t = v; }, get textContent() { return this._t; } };
+      return e;
+    };
+    const ctx = { console, navigator: {}, window: { addEventListener() {} },
+      setTimeout, clearTimeout,
+      localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
+      location: { hash: '' },
+      document: { documentElement: { dataset: {} },
+                  getElementById: id => els[id] || (els[id] = mkEl('div')),
+                  querySelectorAll: () => [], createElement: mkEl,
+                  body: { appendChild() {} }, addEventListener() {} } };
+    ctx.globalThis = ctx;
+    vm.createContext(ctx);
+    const src = fs.readFileSync(path.join(__dirname, '..', page), 'utf8')
+      .match(/<script>([\s\S]*?)<\/script>/g).map(x => x.replace(/<\/?script>/g, ''))
+      .filter(x => x.includes('SECTIONS')).pop();
+    vm.runInContext(src, ctx);
+    return els.app.innerHTML;
+  };
+  const f2l = render('f2l.html'), oll = render('oll.html'), pll = render('pll.html');
+
+  const links = (html) => [...html.matchAll(/href="(calc\.html#[^"]*)"/g)].map(m => m[1]);
+  // 正面对照：F2L 的 b 版确实带 @g:，a 版不带 —— 说明这个标记本身是对的
+  ok('F2L：b 版的 ↗ 带 @g:，a 版不带（标记本身没问题）',
+    links(f2l).some(h => h.indexOf('@g:') >= 0) &&
+    links(f2l).some(h => h.indexOf('@g:') < 0),
+    links(f2l).length + ' 条链接');
+  // OLL / PLL：一条 @g: 都不许有
+  [['OLL', oll], ['PLL', pll]].forEach(([name, html]) => {
+    const ls = links(html);
+    ok(name + '：' + ls.length + ' 条链接里一个 @g: 都没有（@g: 只属于 F2L 的 b 版）',
+      ls.length >= 20 && ls.every(h => h.indexOf('@g:') < 0),
+      ls.filter(h => h.indexOf('@g:') >= 0).slice(0, 3).join(' '));
+  });
+  // 点名那条：Nb 末尾的 b 是「第二个变体」，不是 F2L 的 b 版
+  const nb = (pll.match(/Nb[\s\S]{0,800}?href="(calc\.html#[^"]*)"/) || [])[1] || '';
+  ok('PLL-Nb 的 ↗ 不带 @g:（它和 F2L 的 b 版没关系）',
+    !!nb && nb.indexOf('@g:') < 0, nb.slice(0, 70));
+  // 源码这一层也钉住：判据必须是显式的，不许再回到 /b$/ 那种后缀猜法
+  const f2lSrc = fs.readFileSync(path.join(__dirname, '..', 'f2l.html'), 'utf8');
+  ok('三个页面的判据都写死了（F2L 用「数字 + b」，OLL / PLL 直接 false）',
+    /var green = \/\^\\d\+b\$\//.test(f2lSrc) &&
+    /var green = false;/.test(fs.readFileSync(path.join(__dirname, '..', 'oll.html'), 'utf8')) &&
+    /var green = false;/.test(fs.readFileSync(path.join(__dirname, '..', 'pll.html'), 'utf8')) &&
+    // 谁也不许再用「以 b 结尾」来猜
+    !/var green = \/b\$\//.test(f2lSrc + oll + pll));
+}
+
+console.log('\n[11f] 跳转过来的朝向：只有 @g:（F2L 的 b 版）才补那 90°');
+{
+  // 另一半合同：链接带不带 @g: 由上一条测；计算器收到 @g: 要「先 y、视角补 90°」。
+  // 两半合起来才是「点 ↗ 摆出来的局面和表里的图一致」——所以这半边也得有人盯着。
+  const vm = require('vm');
+  const calcSrc = fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')
+    .match(/<script>([\s\S]*?)<\/script>/g).map(x => x.replace(/<\/?script>/g, ''))
+    .filter(x => x.includes('M3'))[0];
+  const boot = (hash) => {
+    const els = {};
+    const mkEl = (t, init) => {
+      const e = { tagName: t, children: [], dataset: {}, style: {}, _h: '', _t: '',
+        classList: { _s: new Set(), add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); },
+          toggle(c, v) { v ? this._s.add(c) : this._s.delete(c); }, contains(c) { return this._s.has(c); } },
+        addEventListener() {}, appendChild(c) { this.children.push(c); return c; },
+        querySelectorAll() { return []; }, querySelector() { return null; },
+        setPointerCapture() {}, closest() { return null; }, offsetWidth: 1, value: init || '',
+        focus() { this._focused = true; },
+        set innerHTML(v) { this._h = v; }, get innerHTML() { return this._h; },
+        set textContent(v) { this._t = v; }, get textContent() { return this._t === undefined ? '' : this._t; },
+        set disabled(v) {} };
+      return e;
+    };
+    const ctx = { console, navigator: {}, window: { addEventListener() {} },
+      setTimeout, clearTimeout, CubeSim: S,
+      performance: { getEntriesByType: () => [] },
+      localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
+      location: { hash },
+      document: { getElementById: id => els[id] || (els[id] = mkEl('div')),
+                  querySelectorAll: () => [], documentElement: mkEl('html'),
+                  createElement: mkEl, body: { appendChild() {} }, addEventListener() {} } };
+    ctx.globalThis = ctx;
+    vm.createContext(ctx);
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'alglist.js'), 'utf8'), ctx);
+    vm.runInContext(calcSrc, ctx);
+    return els;
+  };
+  const plain = boot('#R U');            // 普通公式（OLL / PLL 都是这种）
+  const green = boot('#@g:R U');         // F2L 的 b 版：绿面朝前（注意 # 也要带，
+                                         // 页面会先 slice(1) 掉它再认前缀）
+  const rotY = e => Number((String(e.cube.style.transform).match(/rotateY\(([-\d.]+)deg\)/) || [])[1]);
+  ok('普通公式：视角不额外补转（OLL / PLL 走的就是这条）',
+    Math.abs(rotY(plain)) < 1e-9 && Math.abs(rotY(plain) - (-32)) > 1e-9 || rotY(plain) === -32,
+    String(plain.cube.style.transform));
+  ok('@g: 公式：视角正好补 90°，魔方本身也真的先转了个 y',
+    Math.abs((rotY(green) - rotY(plain)) - 90) < 1e-9 &&
+    green.cube.innerHTML !== plain.cube.innerHTML,
+    rotY(plain) + ' -> ' + rotY(green));
+  ok('两种情况输入框里都只有公式本身（前缀不会漏进去）',
+    plain.alg.value === 'R U' && green.alg.value === 'R U',
+    plain.alg.value + ' / ' + green.alg.value);
+}
+
 console.log('\n[11d] 教程页：主题开关能切、写进存档（真跑一遍进阶页脚本）');
 {
   const vm = require('vm');
@@ -781,6 +904,17 @@ console.log('\n[11d] 教程页：主题开关能切、写进存档（真跑一�
   };
   ['tutorial-basic.html', 'tutorial-advanced.html'].forEach(page => {
     const els = {}, store = {};
+    // 教程页里那四张「顶层棱形状」是脚本画进 svg[data-top] 的，桩里得先有这几个节点
+    const tops = ['line', 'corner', 'dot', 'cross'].map(k => {
+      const svg = mkEl('svg');
+      svg.setAttribute('data-top', k);
+      return svg;
+    });
+    // data-oll / data-shape 的图：src 是脚本按主题拼的，桩里给几个假节点好检查拼出来的名字
+    const ollImgs = ['21', '27'].map(k => { const i = mkEl('img'); i.setAttribute('data-oll', k); return i; });
+    const shapeImgs = ['dot', 'line', 'corner', 'cross'].map(k => {
+      const i = mkEl('img'); i.setAttribute('data-shape', k); return i;
+    });
     const ctx = {
       console, setTimeout, clearTimeout, navigator: {}, window: { addEventListener() {} },
       localStorage: { getItem: k => (k in store ? store[k] : null),
@@ -788,7 +922,10 @@ console.log('\n[11d] 教程页：主题开关能切、写进存档（真跑一�
                       removeItem: k => { delete store[k]; } },
       document: { documentElement: { dataset: {} }, createElement: mkEl,
                   getElementById: id => els[id] || (els[id] = mkEl('div')),
-                  querySelectorAll: () => [], addEventListener() {},
+                  querySelectorAll: sel => (sel === 'svg[data-top]' ? tops
+                                            : sel === 'img[data-oll]' ? ollImgs
+                                            : sel === 'img[data-shape]' ? shapeImgs : []),
+                  addEventListener() {},
                   body: { appendChild() {}, removeChild() {} } }
     };
     ctx.globalThis = ctx;
@@ -800,12 +937,125 @@ console.log('\n[11d] 教程页：主题开关能切、写进存档（真跑一�
     ok(page + '：开屏是白天（存档里没主题）',
       ctx.document.documentElement.dataset.theme === 'light' &&
       String(els.themebtn.title || '').indexOf('夜晚') >= 0);
+    if (page === 'tutorial-basic.html') {
+      ok('教程：形状图开屏拼的是白天那版（含 OLL 表同一套做法）',
+        shapeImgs.every(i => i.src === 'tutorial/shape-' + i.getAttribute('data-shape') + '-day-256x256.png') &&
+        ollImgs.every(i => i.src === 'oll/oll-' + i.getAttribute('data-oll') + '-day-256x256.png'),
+        shapeImgs.map(i => i.src).join(' '));
+    }
     els.themebtn.fire('click');
     ok(page + '：进来就记住「上次看的是这一篇」',
       store['cube-last:tutorial-basic.html'] === page, store['cube-last:tutorial-basic.html']);
     ok(page + '：点主题开关切到夜晚并写进存档',
       ctx.document.documentElement.dataset.theme === 'dark' && store['cube-theme'] === 'dark',
       ctx.document.documentElement.dataset.theme + ' / ' + store['cube-theme']);
+    if (page === 'tutorial-basic.html') {
+      ok('教程：切到夜晚后形状图整批换成 -night（OLL 那几张也一起换）',
+        shapeImgs.every(i => i.src === 'tutorial/shape-' + i.getAttribute('data-shape') + '-night-256x256.png') &&
+        ollImgs.every(i => i.src === 'oll/oll-' + i.getAttribute('data-oll') + '-night-256x256.png'),
+        shapeImgs.map(i => i.src).join(' '));
+    }
+    if (page === 'tutorial-basic.html') {
+      const h = fs.readFileSync(path.join(__dirname, '..', page), 'utf8');
+      // 表格列数：除「公式记号」那张两列表，其余情况表都是两列 ——
+      // 曾经多出来一个空列（放 ↗ 的），用户一眼就看出来了
+      const emptyCells = (h.match(/<td><\/td>/g) || []).length;
+      ok('教程：表格正文没有多出来的空单元格（表头空着的那两格是 F2L 那种双列表本来就有的）',
+        emptyCells === 0, String(emptyCells));
+      // 第 3 步右边那条是「绿色为 F 面」的写法：跳计算器要跟 F2L 的 b 版一样带 @g: 前缀
+      ok('教程：第 3 步第二条公式带 @g: 前缀（计算器会先 y、再 y\' 回来）',
+        /href="calc\.html#@g:U'%20L'%20U%20L%20U%20F%20U'%20F'"/.test(h));
+      // 第 4 步的四张形状图（用户自己出的：单点 / 一字 / 拐角 / 十字）
+      // 它们是分昼夜两版的，页面上只写 data-shape，src 由脚本按主题拼
+      ['dot', 'line', 'corner', 'cross'].forEach(k => {
+        ok('教程：形状图 data-shape="' + k + '" 用上了',
+          h.includes('data-shape="' + k + '"'));
+      });
+      ok('教程：形状图不再写死 src（否则换主题就漏一张）',
+        !/src="tutorial\/top(3|1|2)?-256x256\.png"/.test(h));
+      // 打印一律白底：按主题现拼的图得在 @media print 里换回白天那版，
+      // 少列一个（比如以后加了某个 OLL 编号）就是「印出来那张是黄顶的白底图」
+      const printBlock = (h.match(/@media print\{([\s\S]*?)\n  \}/) || ['', ''])[1];
+      const dynIds = [...h.matchAll(/data-(shape|oll)="([\w-]+)"/g)].map(m => m[1] + '=' + m[2]);
+      const missing = [...new Set(dynIds)].filter(id => {
+        const [k, v] = id.split('=');
+        const dir = k === 'shape' ? 'tutorial/shape-' + v : 'oll/oll-' + v;
+        return !printBlock.includes('content:url(' + dir + '-day-256x256.png)');
+      });
+      ok('教程：打印时把昼夜两版的图换回白天那版（每种都列到了）',
+        missing.length === 0, missing.join(' '));
+      // 第 3 步那两张插入图、第 7 步那两张 U 型图
+      ok('教程：第 3 步两张插入图都在',
+        h.includes('src="tutorial/middle1-256x258.png"') && h.includes('src="tutorial/middle2-256x258.png"'));
+      ok('教程：第 7 步 Ua / Ub 用 PLL 页面那两张图',
+        h.includes('src="pll/pll-Ua-256x256.png"') && h.includes('src="pll/pll-Ub-256x256.png"'));
+      // 图下面挂说明、编号压在图左上角、点图能看大图
+      ok('教程：编号角标在图上（.no 在 .box 里），说明写在图下面（.cap）',
+        /<span class="box"><img[^>]*data-zoom><span class="no">/.test(h) &&
+        /<\/span><span class="cap">/.test(h));
+      ok('教程：表格里的图都能点开看大图（data-zoom）',
+        (h.match(/<img[^>]*data-zoom/g) || []).length >= 20,
+        String((h.match(/<img[^>]*data-zoom/g) || []).length));
+      // 记号表退回静态那一版（不再是脚本生成的箭头图）
+      ok('教程：公式记号表是静态的（没有内联 SVG 箭头）',
+        /<code>x y z<\/code>/.test(h) && !/data-top|<svg class="topview"/.test(h));
+      // 编号角标不能只是「有 class="no"」——样式漏掉的话它就是一段裸文字，
+      // 排在图片下面，跟 OLL / PLL / F2L 页那种压在左上角的角标完全两回事。
+      // 这里把四页的规则抠出来按「去空白」比对，防止哪天又各改各的。
+      const badgeOf = f => {
+        const m = f.replace(/\s+/g, ' ').match(/td\.pic \.no\{([^}]*)\}/);
+        return m ? m[1].replace(/\s+/g, '') : null;
+      };
+      const badge = badgeOf(h);
+      ok('教程：编号角标有样式（半透明底 + 绝对定位，不是裸文字）',
+        !!badge && /position:absolute/.test(badge) && /background:var\(--badge\)/.test(badge),
+        String(badge));
+      ['oll.html', 'pll.html', 'f2l.html'].forEach(p => {
+        const other = badgeOf(fs.readFileSync(path.join(__dirname, '..', p), 'utf8'));
+        ok('教程：编号角标样式与 ' + p + ' 一致', !!badge && other === badge,
+          badge + ' vs ' + other);
+      });
+      const one = h.replace(/\s+/g, ' ');
+      ok('教程：角标挂在 .box 上（.box 得是定位父级）',
+        /td\.pic \.box\{position:relative/.test(one));
+      ok('教程：图下说明另起一行（.cap 是块级）',
+        /\.cases \.cap\{display:block/.test(one));
+
+      // 第 4 步那四种形状：用户要求「缩小 + 排同一行」。
+      // 之前它们没有样式，四张 256px 的图竖着排，一屏都放不下。
+      const shapes = (h.match(/<div class="shapes">([\s\S]*?)<\/div>/) || ['', ''])[1];
+      ok('教程：第 4 步四种形状包在同一个 .shapes 里',
+        (shapes.match(/<figure>/g) || []).length === 4 &&
+        ['dot', 'line', 'corner', 'cross'].every(k => shapes.includes('data-shape="' + k + '"')),
+        String((shapes.match(/<figure>/g) || []).length));
+      ok('教程：.shapes 是 flex 且不换行（四个并排一行）',
+        /\.shapes\{display:flex/.test(one) && /flex-wrap:nowrap/.test(one));
+      const sw = (one.match(/\.shapes img\{width:(\d+)px;height:(\d+)px/) || []);
+      ok('教程：形状图缩小了（88px，远小于原图 256px）',
+        sw[1] === '88' && sw[2] === '88', sw[0]);
+
+      // 第 4 步表里配的就是上面那两张形状图（拐角型 / 一字型），不挂 OLL 编号 ——
+      // 用户点名要的：图要和自己画的形状图一致，别自作聪明加个 44 / 45 角标
+      const t4 = (h.match(/<section id="s4">[\s\S]*?<\/table>/) || [''])[0];
+      ok('教程：第 4 步表用形状图（拐角型 / 一字型，同一份昼夜两版的图）',
+        /class="box"><img data-shape="corner"/.test(t4) &&
+        /class="box"><img data-shape="line"/.test(t4));
+      ok('教程：第 4 步表里不带公式编号（.no / data-oll 都没有）',
+        !/class="no"/.test(t4) && !/data-oll/.test(t4));
+
+      // 第 7 步第二张表（两次小鱼）用用户新画的两张带箭头的图 + 用户给的两条公式。
+      // 局面类型算过了：top5 是 Ua、top4 是 Ub（颜色和箭头两个角度都对得上），
+      // 公式也验过：R'...y' L... 正好解开 top5，L...y R'... 正好解开 top4。
+      // 所以 Ua 那一行配 top5、Ub 那一行配 top4 —— 别按文件名顺序硬套。
+      const rows7 = (h.match(/<thead><tr><th>情况<\/th><th>用两次小鱼公式<\/th>[\s\S]*?<\/table>/) || [''])[0];
+      ok('教程：第 7 步第二张表的 Ua 行 = top5 图 + 用户给的 26 y\' 27',
+        /top5-256x256\.png"[\s\S]*?<span class="no">Ua<\/span>[\s\S]*?<code>R' U' R U' R' U2 R y' L U L' U L U2 L'<\/code>/.test(rows7));
+      ok('教程：第 7 步第二张表的 Ub 行 = top4 图 + 用户给的 27 y 26',
+        /top4-256x256\.png"[\s\S]*?<span class="no">Ub<\/span>[\s\S]*?<code>L U L' U L U2 L' y R' U' R U' R' U2 R<\/code>/.test(rows7));
+      ok('教程：第 7 步第一张表仍然用 PLL 页面那四张图（Ua/Ub/H/Z）',
+        ['Ua', 'Ub', 'H', 'Z'].every(id =>
+          h.includes('src="pll/pll-' + id + '-256x256.png"')));
+    }
   });
 }
 
@@ -948,9 +1198,11 @@ console.log('\n[11b] 级联：主按钮真的赢了（不是被旁边那套规�
     winner(doneChip, 'color') === 'var(--text)' &&
     /0 2px 6px var\(--btn-drop\)/.test(winner(doneChip, 'box-shadow') || ''),
     [winner(doneChip, 'background'), winner(doneChip, 'box-shadow')].join(' / '));
-  ok('级联：当前那一块 hover 时还是主色光晕（没被中性投影盖掉）',
-    /var\(--accent-glow\)/.test(winner(E('span', ['cur'],
-      { parents: [moveBox] }), 'box-shadow') || ''));
+  // 当前那一片自己不画底/光晕：交给会滑动的那条色块（.moves .pill）
+  ok('级联：当前那一片自己不画底（底和光晕交给会滑动的色块）',
+    winner(E('span', ['cur'], { parents: [moveBox] }), 'background') === 'transparent' &&
+    /var\(--accent-glow\)/.test(winner(E('span', ['pill'], { parents: [moveBox] }),
+      'box-shadow') || ''));
   // 单步键盘是「一块键盘」：平底、没有投影 —— 别被共用那套立体配方黏回去
   const mvKey = E('button', [], { parents: [E('div', ['mv'], { parents: [panel] })] });
   ok('级联：单步键是平底（--field）、没有投影，字是正文色',
@@ -978,7 +1230,9 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
       _handlers: {},
       addEventListener(ev, fn) { (this._handlers[ev] = this._handlers[ev] || []).push(fn); },
       fire(ev, arg) { (this._handlers[ev] || []).forEach(f => f(arg || {})); },
-      appendChild(c) { this.children.push(c); return c; },
+      // 真 DOM 的 appendChild 会写上 parentNode —— 桩不写的话，
+      // 「这个元素还在不在树里」这类判断全会误判（高亮色块会被反复重建）
+      appendChild(c) { this.children.push(c); c.parentNode = this; return c; },
       querySelectorAll() { return []; }, querySelector() { return null; },
       setPointerCapture() {}, closest() { return null; }, offsetWidth: 1,
       // 拍照链路要用到：canvas 的 2d 上下文 + toBlob、<a download> 的 click
@@ -989,7 +1243,13 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
       focus() { this._focused = true; },
       setAttribute(k, v) { this['_a_' + k] = String(v); },
       value: init || '',
-      set innerHTML(v) { this._h = v; }, get innerHTML() { return this._h || ''; },
+      // 真 DOM 换 innerHTML 时旧的子节点会掉线（parentNode 变 null）——
+      // 桩不照做的话，「这个元素还在树里吗」的判断会误判（高亮色块就不会重建）
+      set innerHTML(v) {
+        (this.children || []).forEach(c => { c.parentNode = null; });
+        this._h = v;
+      },
+      get innerHTML() { return this._h || ''; },
       set textContent(v) { this._t = v; }, get textContent() { return this._t === undefined ? '' : this._t; },
       set disabled(v) { this._d = v; }, get disabled() { return this._d; } };
     return e;
@@ -1010,6 +1270,8 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
   Object.defineProperty(els.moves, 'innerHTML', {
     get() { return this._h || ''; },
     set(v) {
+      // 旧子节点要掉线（真 DOM 行为）：不然高亮色块会被误判成「还在树里」而不再重建
+      (this.children || []).forEach(c => { c.parentNode = null; });
       this._h = v;
       const n = (v.match(/data-k="/g) || []).length;
       chips = [];
@@ -1018,7 +1280,8 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
         c.dataset.k = String(i);
         // 第 i 块相对这一条左端的位置（跟着 scrollLeft 走，和真 DOM 一致）
         c.getBoundingClientRect = () => ({
-          left: STRIP_L + (i - 1) * (CHIP_W + CHIP_GAP) - els.moves.scrollLeft, width: CHIP_W });
+          left: STRIP_L + (i - 1) * (CHIP_W + CHIP_GAP) - els.moves.scrollLeft,
+          top: 3, width: CHIP_W, height: 22 });
         // offsetLeft / offsetWidth 也摆上，而且故意扮成「offsetParent 是 body」的样子：
         // 万一有人把定位算法改回 offsetLeft，这里就会复现「永远贴最右端」那个毛病
         c.offsetLeft = 1200 + (i - 1) * (CHIP_W + CHIP_GAP);
@@ -1030,8 +1293,10 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
   });
   els.moves.querySelector = sel =>
     (sel === 'span.cur' ? chips.filter(c => c.classList.contains('cur'))[0] : null) || null;
-  els.moves.getBoundingClientRect = () => ({ left: STRIP_L, width: STRIP_W });
+  els.moves.getBoundingClientRect = () => ({ left: STRIP_L, top: 0, width: STRIP_W, height: 26 });
   els.moves.clientWidth = STRIP_W;
+  // 平滑滚动：把 behavior 记下来 —— 测试要确认「是滑过去，不是一跳」
+  els.moves.scrollTo = function (o) { this._smooth = o.behavior; this.scrollLeft = o.left; };
   Object.defineProperty(els.moves, 'scrollWidth',
     { get() { return chips.length * (CHIP_W + CHIP_GAP); } });
   els.moves.scrollLeft = 0;
@@ -1219,8 +1484,14 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
     ok('执行公式就是一次播放：run() 摆好步骤后交给 autoPlay()',
       !/demoActive|cancelDemo/.test(src2) && !/startLikePlay/.test(src2) &&
       /function run\(list, label, kind, rev\) \{\s*if \(!list\.length\) return;/.test(src2) &&
-      /autoPlay\(pendingRun\)/.test(src2) && /document\.getElementById\('play'\)\.addEventListener\('click', function \(\) \{ autoPlay\(pendingRun \|\| undefined\); \}\)/.test(src2) &&
+      /autoPlay\(afterRun\(\)\)/.test(src2) &&
+      /document\.getElementById\('play'\)\.addEventListener\('click', function \(\) \{ autoPlay\(\); \}\)/.test(src2) &&
       /function submit\(kind, rev\) \{\s*if \(pausedFirst\(\)\) return;\s*if \(busy\) return;/.test(src2));
+    // 顺序反过来：先把这一条记进历史（并把累积局面推到末尾），再开始播动画
+    ok('先记账再播动画（hist.push 排在 autoPlay 之前，按了就有反馈）',
+      /showSteps\(list, cur\);\s*\n\s*at = 0;\s*\n\s*\/\/ 先记账[\s\S]{0,200}?hist\.push\(\{ kind: kind \|\| 'alg'[\s\S]{0,200}?cur = frames\[frames\.length - 1\];[\s\S]{0,120}?autoPlay\(afterRun\(\)\);/.test(src2) &&
+      // 播放键不再需要「收尾」（没有 pendingRun 这套东西了）
+      !/pendingRun|finishRun/.test(src2));
     // 改动局面的按钮（提交 / 打乱 / 单步）保持「先暂停、再点一次」；
     // 导航类的（点某一步 / 点历史 / 回到开头末尾）点了就直接过去 —— 连播中也一样
     const movesClick = (src2.match(/movesEl\.addEventListener\('click', function \(e\) \{[\s\S]*?\n  \}\);/) || [''])[0];
@@ -1309,13 +1580,16 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
       /border-radius:7px 0 0 7px;background:var\(--accent\)\}/.test(src2));
     // 步骤条不许换行：十一二步一换行会变成「9 个 + 2 个」两行，像被挤下去的
     ok('步骤条是单行横滚（不换行）+ 当前那个自动滚进视野',
-      /\.moves\{display:flex;flex-wrap:nowrap[^}]*overflow-x:auto/.test(src2) &&
+      /\.moves\{position:relative;display:flex;flex-wrap:nowrap[^}]*overflow-x:auto/.test(src2) &&
       /\.moves span\{flex:none;white-space:nowrap/.test(src2) &&
       /function scrollStrip\(\)/.test(src2) &&
       /movesEl\.scrollLeft = want/.test(src2) &&
       // 只动这一条自己的 scrollLeft：scrollIntoView 会顺手把整块面板也滚一下
       !/\.scrollIntoView\(/.test(src2) &&
-      /el\.classList\.toggle\('done', k < at\);\s*\n\s*\}\);\s*\n\s*scrollStrip\(\);/.test(src2));
+      /el\.classList\.toggle\('done', k < at\);\s*\n\s*\}\);\s*\n\s*placePill\(\);\s*\n\s*scrollStrip\(\);/.test(src2) &&
+      // 滑过去而不是一跳：能平滑就平滑，系统要求「减少动态效果」才瞬移
+      /movesEl\.scrollTo && !noMotion\(\)/.test(src2) &&
+      /scrollTo\(\{ left: want, behavior: 'smooth' \}\)/.test(src2));
     // 滚动条藏起来，改成滚轮 / 按住拖（手机横划走原生那套）
     ok('步骤条没有滚动条，靠滚轮 / 按住拖滚动',
       /\.moves\{[^}]*scrollbar-width:none/.test(src2) &&
@@ -1344,13 +1618,24 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
     ok('步骤小片 hover 时浮起一层短投影（走过的那些也一样）',
       /\.moves span:hover\{background:var\(--chip-hover\);color:var\(--text\);\s*\n?\s*box-shadow:0 2px 6px var\(--btn-drop\)\}/.test(src2) &&
       // `.done` 和 `:hover` 同分又排在后面，会把底色/字色按住 —— 必须单独再来一条
-      /\.moves span\.done:hover\{background:var\(--chip-hover\);color:var\(--text\);\s*\n?\s*box-shadow:0 2px 6px var\(--btn-drop\)\}/.test(src2) &&
-      // 主色光晕仍然只属于「当前」那一块
-      /\.moves span\.cur\{[^}]*box-shadow:0 1px 4px var\(--accent-glow\)/.test(src2));
-    ok('步骤小片是平的（没有渐变 / 投影），当前那一个是实心主色',
+      /\.moves span\.done:hover\{background:var\(--chip-hover\);color:var\(--text\);\s*\n?\s*box-shadow:0 2px 6px var\(--btn-drop\)\}/.test(src2));
+    // 「当前这一步」的高亮：一条会滑过去的色块（和顶部导航那条 .pill 一个思路）。
+    // 层次是：小片自己的底（在流里）< 色块（absolute）< 小片里的字（那层 <b> 抬到 z-index:2），
+    // 所以它滑过去的路上既不挡字母、也不会被别的小片遮住。
+    ok('当前步骤的高亮是一条会滑的色块（不是这块灭、那块亮）',
+      /\.moves \.pill\{position:absolute;[^}]*transition:left \.18s/.test(src2) &&
+      /\.moves \.pill\.instant\{transition:none\}/.test(src2) &&
+      /pointer-events:none/.test(src2) &&
+      /\.moves span b\{position:relative;z-index:2;font-weight:inherit\}/.test(src2) &&
+      /\.moves \.pill\{[^}]*z-index:1/.test(src2) &&
+      /<b>' \+ mvLabel\(x\) \+ '<\/b>/.test(src2) &&
+      /function placePill\(\)/.test(src2) && /function pillEl\(\)/.test(src2) &&
+      // 换了一串步骤时直接落位，别从上一处飞过来
+      /var pillInstant = true;/.test(src2) && /if \(pillInstant\)/.test(src2));
+    ok('步骤小片是平的（没有渐变 / 投影），当前那一片的底交给色块',
       /\.moves span\{[^}]*background:var\(--chip\);border:1px solid transparent/.test(src2) &&
       /\.moves span\.done\{color:var\(--muted\);background:transparent\}/.test(src2) &&
-      /\.moves span\.cur\{background:var\(--accent\);border-color:var\(--accent\);color:var\(--on-accent, #fff\);/.test(src2) &&
+      /\.moves span\.cur\{background:transparent;border-color:transparent;color:var\(--on-accent, #fff\)\}/.test(src2) &&
       !/\.moves span\{[^}]*linear-gradient/.test(src2));
     ok('无边框的旋转键不在那份配方里（否则会被加回底色和边框）',
       !/\\.mv button, \\.orbit button\\{/.test(src2));
@@ -2026,19 +2311,14 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
     ok('自动播放一步步走到末尾',
       /function autoPlay\(done\)[\s\S]*?stepAnimated\(1, nextStep\)/.test(src2));
     ok('执行公式 = 一次播放（run 里走 autoPlay）',
-      /function run\(list, label, kind, rev\)[\s\S]*?autoPlay\(pendingRun\)/.test(src2));
-    // 中途暂停后按播放键接着播完，也要照样记一条历史（收尾动作得留着）
-    ok('没记完的那次执行跟着播放键一起收尾',
-      /document\.getElementById\('play'\)\.addEventListener\('click', function \(\) \{ autoPlay\(pendingRun \|\| undefined\); \}\)/.test(src2) &&
-      /if \(finished\) \{\s*pendingRun = null;/.test(src2) &&
-      // 跳转 / 复原换掉了这一串之后，那圈还在跑的动画收尾时不许再记一笔
-      /if \(self !== pendingRun\) return;/.test(src2) &&
-      /function goHist\(i\) \{[\s\S]{0,300}?pendingRun = null;/.test(src2) &&
-      /function reset\(\) \{[\s\S]{0,400}?pendingRun = null;/.test(src2));
-    // 中途暂停不能记历史（记的是整串公式、局面却停在半路），再按一次要接着播
-    ok('执行到一半停下不记历史，再按接着播',
-      /if \(finished\) \{[\s\S]{0,220}hist\.push\(\{ kind: kind \|\| 'alg'/.test(src2) &&
-      /key === runKey && frames\[0\] === runFirst && !busy && at > 0 && at < steps\.length/.test(src2));
+      /function run\(list, label, kind, rev\)[\s\S]*?autoPlay\(afterRun\(\)\)/.test(src2));
+    // 记账在按下那一下做完：历史 + 高亮 + 累积局面，然后才是动画
+    ok('按下去就记账：历史 / 高亮 / cur 都先落位，再演动画',
+      /histAt = hist\.length - 1;\s*\n\s*renderHist\(\);\s*\n\s*cur = frames\[frames\.length - 1\];/.test(src2));
+    // 中途暂停后再按一次是「接着播」，不能再记一条（那一串按下去时已经记过了）
+    ok('接着播不再重复记一条',
+      /if \(key === runKey && frames\[0\] === runFirst && !busy && at > 0 && at < steps\.length\) \{\s*\n\s*playing = false;\s*\n\s*autoPlay\(afterRun\(\)\);\s*\n\s*return;/.test(src2) &&
+      !/pendingRun|finishRun/.test(src2));
     // 落地阴影：不给魔方一块「地」，它看着就是飘的。
     // 不能挂在 .cube 上（preserve-3d 的容器加 filter 会塌成 flat），所以是舞台上另一块。
     ['calc.html', 'practice.html'].forEach(p => {
@@ -2056,8 +2336,10 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
         !/\.cube\{[^}]*filter/.test(h));
     });
     ok('「回到开头 / 回到结尾」始终可用（到边界也不置灰）',
-      /id === 'prev' && at === 0/.test(src2) && /id === 'next' && at >= steps\.length/.test(src2) &&
-      /if \(finished\) \{\s*pendingRun = null;/.test(src2));
+      /id === 'prev' && at === 0/.test(src2) && /id === 'next' && at >= steps\.length/.test(src2));
+    ok('播放键的图标放大了一点（25px，按钮是 56×40）',
+      /\.ctrl \.play svg\{width:25px;height:25px/.test(src2) &&
+      /\.ctrl \.play\{[^}]*height:40px/.test(src2));
     ok('播放键是图标（三角形 / 两条竖杠），播放时切成暂停',
       /var PLAY_SVG =/.test(src2) && /var PAUSE_SVG =/.test(src2) &&
       /innerHTML = playing \? PAUSE_SVG : PLAY_SVG/.test(src2) &&
@@ -2090,9 +2372,22 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
       /if \(my !== epoch\)/.test(src2));
     ok('单步在连播中会先停下再走',
       /function stepBy\(dir\)[\s\S]*?if \(playing\) \{ playing = false; \}/.test(src2));
-    ok('其他动作入口会先暂停播放',
-      (src2.match(/pausedFirst\(\)/g) || []).length >= 6,
-      '只有 ' + (src2.match(/pausedFirst\(\)/g) || []).length + ' 处');
+    // 会改动局面的入口保持「先暂停、再点一次」；两个例外不走这条：
+    // 公式面板（开合 / 换表 / 填公式，不碰魔方）和复原（按一下就回去）
+    ok('改动局面的入口（提交 / 打乱 / 单步）还是先暂停',
+      /function submit\(kind, rev\) \{\s*if \(pausedFirst\(\)\) return;/.test(src2) &&
+      /function scramble\(\) \{\s*if \(pausedFirst\(\)\) return;/.test(src2) &&
+      /function doMove\(mv, kind\) \{[\s\S]{0,200}?if \(pausedFirst\(\)\) return;/.test(src2));
+    ok('公式面板和复原不再「先暂停」',
+      // 公式开合 / 换表 / 选一条：都只是面板的事
+      /openBtn\.addEventListener\('click', function \(\) \{\s*\n\s*setPicker\(/.test(src2) &&
+      !/openBtn[\s\S]{0,200}?pausedFirst/.test(src2) &&
+      !/querySelectorAll\('\.tabs button'\)[\s\S]{0,260}?pausedFirst/.test(src2) &&
+      !/pickEl\.addEventListener\('click'[\s\S]{0,400}?pausedFirst/.test(src2) &&
+      // 复原：按一下就复原（播放中也一样）
+      /function reset\(\) \{\s*\n\s*epoch\+\+;[\s\S]{0,200}?playing = false;\s*\n\s*busy = false;/.test(src2) &&
+      !/function reset\(\) \{[\s\S]{0,200}?pausedFirst/.test(src2) &&
+      !/function reset\(\) \{[\s\S]{0,200}?if \(busy\) return;/.test(src2));
     // 只有「跳到开头/末尾」和点某一步是瞬移
     ok('jump 保持瞬移（不带动画）',
       /function jump\(k\)[\s\S]*?paint\(frames\[at\]\)/.test(src2) &&
@@ -2336,6 +2631,10 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
     els.fwd.fire('click');
     await wait(120);                                  // 第 1 步还在转
     ok('连播中播放键是暂停图标', PAUSE_ICON.test(els.play.innerHTML), els.play.innerHTML.slice(0, 60));
+    // 先记账再播：动画才演了个头，历史里那条已经在了、而且就是「当前」那一条
+    ok('按下那一刻历史已经记好并高亮成当前（不用等动画演完）',
+      String(els.hcount.textContent) === '1' && /class="e cur"/.test(els.hist.innerHTML),
+      els.hcount.textContent + ' / ' + els.hist.innerHTML.slice(0, 80));
     els.moves.fire('click', evStep(2));
     ok('连播中点某一步：直接跳到那一步（不是什么都不做）',
       els.pos.textContent === '2 / 4' && sameState(readCube(), S.apply(S.solved(), 'R U')),
@@ -2343,7 +2642,8 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
     ok('跳过去之后连播停下了（播放键回到三角形）',
       PLAY_ICON.test(els.play.innerHTML) && !els.play.classList.contains('playing'));
     await wait(700);                                  // 等被打断的那一圈收尾
-    ok('中途停下不算执行过：历史还是空的', String(els.hcount.textContent) === '0', els.hcount.textContent);
+    ok('按下就记账：动画还在演，历史里已经有这一条了',
+      String(els.hcount.textContent) === '1', els.hcount.textContent);
     ok('收尾也没有把位置拽回末尾', els.pos.textContent === '2 / 4', els.pos.textContent);
 
     els.play.fire('click');                           // 接着从第 2 步播到底
@@ -2352,7 +2652,7 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
     ok('接着播完的局面 = 整串公式',
       sameState(readCube(), S.apply(S.solved(), "R U R' U'")),
       JSON.stringify(readCube()).slice(0, 50));
-    ok('播完了才记一条历史', String(els.hcount.textContent) === '1', els.hcount.textContent);
+    ok('接着播完不会再多记一条', String(els.hcount.textContent) === '1', els.hcount.textContent);
 
     // 「回到开头 / 回到结尾」即使已经在这一头也能点；上一步 / 下一步到边界才置灰
     els.first.fire('click');
@@ -2374,11 +2674,12 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
       sameState(readCube(), S.apply(S.solved(), "R U R' U'")),
       els.pos.textContent + ' ' + JSON.stringify(readCube()).slice(0, 40));
     await wait(700);
-    ok('被点掉的那串执行没有记成历史', String(els.hcount.textContent) === '1', els.hcount.textContent);
+    ok('连播中点了历史：那一条照样在（按下时就记过了）',
+      String(els.hcount.textContent) === '2', els.hcount.textContent);
     els.play.fire('click');                           // 重看这一条
     await wait(2000);
     ok('点历史后用播放键重看，不会重复记一条',
-      String(els.hcount.textContent) === '1' && els.pos.textContent === '4 / 4',
+      String(els.hcount.textContent) === '2' && els.pos.textContent === '4 / 4',
       els.hcount.textContent + ' / ' + els.pos.textContent);
 
     // 打乱放在最后：22 步要播约 9 秒，放在前面会把后面的提交全挡在 busy 外面
@@ -2391,11 +2692,31 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
     // 算出来的位置带着整块舞台的宽度，永远被夹到最右端 —— 当前步老在边上跑。
     // 播放和点某一步走的是同一个 chrome()/scrollStrip()，所以这里点中间那一步来验。
     const stripMax = chips.length * (CHIP_W + CHIP_GAP) - STRIP_W;
+    console.log('   [debug] chips=' + chips.length + ' max=' + stripMax + ' scrollLeft=' + els.moves.scrollLeft + ' clientW=' + els.moves.clientWidth + ' scrollW=' + els.moves.scrollWidth);
     const wantAt = i => Math.max(0, Math.min(stripMax,
       (i - 1) * (CHIP_W + CHIP_GAP) - (STRIP_W - CHIP_W) / 2));
+    // 桩里的 classList 和 className 是两套（页面代码用的是 className = 'pill'）；
+    // 找不到时给个空壳，让断言干净地失败，而不是抛异常把整节崩掉
+    const pillOf = () => els.moves.children.filter(c => c.className === 'pill')[0] ||
+      { style: {}, classList: { contains: () => false } };
+    els.moves._smooth = null;
     els.moves.fire('click', evStep(10));
     ok('当前这一步被摆到步骤条的视觉中心（第 10 步）',
       els.moves.scrollLeft === wantAt(10), els.moves.scrollLeft + ' vs ' + wantAt(10));
+    ok('而且是「滑」过去的（走 smooth），不是一跳',
+      els.moves._smooth === 'smooth', String(els.moves._smooth));
+    // 高亮色块：位置按这一条的 content 坐标算（和 scrollLeft 无关），大小就是那一片
+    ok('高亮色块正好落在这片步骤上',
+      pillOf().classList.contains('on') &&
+      pillOf().style.left === ((10 - 1) * (CHIP_W + CHIP_GAP)) + 'px' &&
+      pillOf().style.width === CHIP_W + 'px' && pillOf().style.height === '22px',
+      [pillOf().style.left, pillOf().style.width, pillOf().style.top].join(' / '));
+    // 换一步：色块要跟着挪（只查一次位置的话，就算根本不摆也看不出来）。
+    // 挑中间那一步，免得把后面「不是一直被夹在最右端」那条搅了
+    els.moves.fire('click', evStep(7));
+    ok('换到第 7 步：色块跟着挪过去',
+      pillOf().style.left === ((7 - 1) * (CHIP_W + CHIP_GAP)) + 'px',
+      String(pillOf().style.left));
     ok('而且不是一直被夹在最右端（offsetLeft 那套的毛病）',
       els.moves.scrollLeft !== stripMax && els.moves.scrollLeft > 0,
       String(els.moves.scrollLeft) + ' / max=' + stripMax + ' / 步数=' + chips.length);
@@ -2438,6 +2759,37 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
     ok('触摸拖动不接管（原生横滚更顺，还有惯性）', els.moves.scrollLeft === 150,
       String(els.moves.scrollLeft));
     docFire('pointerup', {});
+
+    // ---- 播放中点「公式」/「复原」：都是按一下就有反应，不该先暂停 ----
+    els.reset.fire('click');
+    els.alg.value = "R U R' U' F";
+    els.fwd.fire('click');
+    await wait(120);                                  // 正在播
+    const playing = () => PAUSE_ICON.test(els.play.innerHTML);
+    ok('（前提）此刻确实在播', playing(), els.play.innerHTML.slice(0, 40));
+    els.openpick.fire('click');
+    ok('播放中点「公式」：面板收起来，而且没有暂停',
+      els.picker.classList.contains('on') && playing(),
+      'panel=' + els.picker.classList.contains('on') + ' playing=' + playing());
+    els.openpick.fire('click');
+    ok('再点一下又展开，照样没暂停',
+      !els.picker.classList.contains('on') && playing(),
+      'panel=' + els.picker.classList.contains('on') + ' playing=' + playing());
+    const row = { dataset: { alg: "U R U' R'" } };
+    els.plist.fire('click', { target: { closest: s => (s === '.p' ? row : null) } });
+    ok('播放中点一条公式：只填进输入框，也没暂停',
+      els.alg.value === "U R U' R'" && playing(),
+      els.alg.value + ' / playing=' + playing());
+    // 复原：一下到位（以前要先暂停、再点第二次），而且旧动画收尾时不许把画面改回去
+    els.reset.fire('click');
+    ok('播放中点「复原」：一下就回到复原态（历史也清了、按钮回到三角形）',
+      sameState(readCube(), S.solved()) && String(els.hcount.textContent) === '0' &&
+      els.pos.textContent === '—' && !playing(),
+      els.pos.textContent + ' / 历史' + els.hcount.textContent);
+    await wait(600);                                  // 等那圈被打断的动画收尾
+    ok('复原之后那圈旧动画回来时不会把画面改回去（epoch 作废了它）',
+      sameState(readCube(), S.solved()) && els.pos.textContent === '—',
+      els.pos.textContent);
 
     console.log('\n结果: ' + pass + ' 通过, ' + fail + ' 失败');
     process.exit(fail ? 1 : 0);

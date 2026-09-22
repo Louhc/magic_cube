@@ -26,7 +26,7 @@
                 stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
   .themebtn{position:absolute;right:40px;top:14px}
 
-  /* 开头那张「认识魔方」的图要够大：面字母是绝对定位标上去的 */
+  /* 开头那张「认识魔方」的图：面字母是绝对定位标上去的 */
   .hero{position:relative;width:260px;margin:14px auto 0}
   .hero img{width:100%;display:block;border-radius:10px}
   .hero span{position:absolute;font:600 12px/1 ui-monospace,Menlo,Consolas,monospace;
@@ -42,21 +42,13 @@
   section > h2 .n{display:inline-grid;place-items:center;width:22px;height:22px;margin-right:8px;
                   border-radius:7px;background:var(--accent);color:var(--on-accent);
                   font-size:12.5px;vertical-align:1px}
-  h3{margin:16px 0 6px;font-size:14px}
   p{margin:8px 0}
-  ol,ul{margin:8px 0;padding-left:22px}
-  li{margin:4px 0}
-  .goal{color:var(--muted)}
-  .goal b{color:var(--text)}
   .tip{margin:12px 0 0;padding:9px 12px;border-left:3px solid var(--accent);
        background:var(--chip);border-radius:0 8px 8px 0;font-size:13px;color:var(--muted)}
   .tip b{color:var(--text)}
-  .duo{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin:12px 0 4px}
-  .duo figure{margin:0;text-align:center}
-  .duo img{width:170px;display:block;border-radius:8px}
-  .duo figcaption{margin-top:6px;color:var(--muted);font-size:12.5px}
   .one{text-align:center;margin:12px 0 4px}
   .one img{width:200px;border-radius:8px}
+  .one figcaption{margin-top:6px;color:var(--muted);font-size:12.5px}
 
   table{border-collapse:collapse;margin:10px 0;font-size:13px}
   th,td{border:1px solid var(--line);padding:5px 10px;text-align:left}
@@ -65,16 +57,43 @@
        cursor:pointer;border-radius:5px;padding:2px 6px;background:var(--chip)}
   code:hover{color:var(--accent-text)}
   code.copied{background:var(--accent);color:var(--on-accent)}
-  .alg{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0}
-  .alg .tag{color:var(--muted);font-size:12.5px}
   a.tocalc{flex:none;display:inline-flex;align-items:center;justify-content:center;
            width:22px;height:22px;border-radius:50%;color:var(--muted);
            border:1px solid var(--line);text-decoration:none;opacity:.7}
   a.tocalc:hover{color:var(--on-accent);background:var(--accent);border-color:var(--accent);opacity:1}
   a.tocalc svg{width:13px;height:13px;display:block}
-  .next{margin:14px 0 0;display:flex;gap:10px;flex-wrap:wrap}
-  .next a{color:var(--accent-text)}
 
+  /* 公式表：左边配图，右边公式。图、编号角标、图下说明的样式
+     跟 OLL / PLL / F2L 那几页保持一致，几页之间不要各长一个样。 */
+  .cases td{vertical-align:middle}
+  /* 缩略图是 256x258（F2L 那些）和 256x256（OLL/PLL 那些）两种，
+     用 contain 塞进方格里，既不变形，懒加载完也不会把行撑高。 */
+  .cases img{width:76px;height:76px;object-fit:contain;display:block;margin:0 auto;
+             border-radius:6px}
+  /* 编号：压在图片左上角，半透明底 —— 就是 OLL 页那种角标 */
+  .cases td.pic{padding:6px;text-align:center}
+  .cases td.pic .box{position:relative;display:inline-block;line-height:0}
+  .cases td.pic .no{position:absolute;left:3px;top:1px;font-size:11px;font-weight:600;
+                    color:var(--muted);line-height:1;background:var(--badge);
+                    padding:1px 3px;border-radius:4px}
+  /* 说明文字写在图下面单独一行，不跟公式挤一格 */
+  .cases .cap{display:block;margin-top:5px;font-size:12px;line-height:1.4;color:var(--muted)}
+  .cases .cs{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .cases code{font-size:13px}
+  /* 第三步那张「红面 / 绿面」对照表：两列图 + 两列公式，版式照搬 F2L 页 */
+  table.cases.pair{table-layout:fixed;width:100%}
+  col.side{width:112px}
+  col.formula{width:auto}
+  th.red{color:var(--head-red)}
+  th.green{color:var(--head-green)}
+
+  /* 第四步的四种情况（单点型 / 一字型 / 拐角型 / 十字型）：
+     四个小图缩小后并排一行，图下各自带说明 */
+  .shapes{display:flex;justify-content:center;align-items:flex-start;gap:18px;
+          flex-wrap:nowrap;margin:14px 0 6px}
+  .shapes figure{margin:0;text-align:center;min-width:0}
+  .shapes img{width:88px;height:88px;display:block;margin:0 auto;border-radius:8px}
+  .shapes figcaption{margin-top:4px;font-size:12px;color:var(--muted);white-space:nowrap}
   #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(12px);
          background:#111c;color:#fff;padding:8px 16px;border-radius:8px;font-size:13px;
          opacity:0;pointer-events:none;transition:.18s}
@@ -82,7 +101,11 @@
 
   @media (max-width:640px){
     .hero{width:210px}
-    .duo img{width:140px}
+    .cases img{width:60px;height:60px}
+    /* 四种形状仍然一行，只是再小一点、挤一点 */
+    .shapes{gap:8px}
+    .shapes img{width:62px;height:62px}
+    .shapes figcaption{font-size:11px}
   }
 
   /* 左边：教程目录（初级 / 进阶）；右边：本页步骤 + 回到顶部。
@@ -110,32 +133,45 @@
     header{padding:0 0 4mm;break-after:avoid}
     h1{font-size:19pt}
     h2{font-size:13pt}
-    h3{font-size:11.5pt}
-    h2,h3{break-after:avoid}
+    h2{break-after:avoid}
     section{margin:0;padding:4mm 0 0;border:0;border-top:1px solid #ccc;background:none;
             border-radius:0;break-inside:auto;overflow:visible}
     section:first-of-type{border-top:0}
     section > h2 .n{display:inline-grid;width:auto;min-width:6mm;height:6mm;padding:0 1.5mm;
                     background:none;color:#000;border:1px solid #666;border-radius:1.5mm;
                     font-size:9pt;vertical-align:1px}
-    .goal{color:#333}
-    .goal b{color:#000}
     .tip{border-left:2.5px solid #666;background:none;border-radius:0;
          padding:.5mm 0 .5mm 4mm;color:#333}
     .tip b{color:#000}
     .one img{width:46mm}
-    figure img{width:42mm}
-    .duo img{width:40mm}
-    figcaption,.duo figcaption{color:#444}
+    figcaption{color:#444}
     table{margin:3mm 0;border:1.5px solid #333}
     th,td{border:1px solid #333;padding:1.2mm 2.5mm}
     th{background:none;border-bottom:2px solid #333}
     code{font-size:11pt;font-weight:600;background:none;border:1px solid #999;
          border-radius:1mm;padding:.2mm 1.5mm;margin:0;cursor:auto}
-    .alg{gap:3mm;margin:2mm 0}
-    .alg .tag{color:#333}
+    .cases img{width:16mm;height:16mm}
+    .cases td.pic .no{color:#333;background:none}
+    .shapes{gap:3mm}
+    .shapes img{width:15mm;height:15mm}
+    .shapes figcaption{font-size:8.5pt}
+    /* 纸上是白底：按主题现拼的图（第 4 步四张形状图 + 第 5 步 OLL 表）
+       打印时统统换回白天那版 —— 夜晚版是配深色卡片的（黄顶 + 浅色壳），
+       印在白纸上几乎看不见。content:url 是拿 CSS 换图，同步生效、不用等加载。
+       不支持这条的浏览器就照原样印（和以前一样），不会更糟。 */
+    img[data-shape="dot"]{content:url(tutorial/shape-dot-day-256x256.png)}
+    img[data-shape="line"]{content:url(tutorial/shape-line-day-256x256.png)}
+    img[data-shape="corner"]{content:url(tutorial/shape-corner-day-256x256.png)}
+    img[data-shape="cross"]{content:url(tutorial/shape-cross-day-256x256.png)}
+    img[data-oll="21"]{content:url(oll/oll-21-day-256x256.png)}
+    img[data-oll="22"]{content:url(oll/oll-22-day-256x256.png)}
+    img[data-oll="23"]{content:url(oll/oll-23-day-256x256.png)}
+    img[data-oll="24"]{content:url(oll/oll-24-day-256x256.png)}
+    img[data-oll="25"]{content:url(oll/oll-25-day-256x256.png)}
+    img[data-oll="26"]{content:url(oll/oll-26-day-256x256.png)}
+    img[data-oll="27"]{content:url(oll/oll-27-day-256x256.png)}
     .side,.steps,a.tocalc,.themebtn,.printbtn{display:none}
-    .tip,.one,figure,.alg{break-inside:avoid}
+    .tip,.one,figure,tr{break-inside:avoid}
     #toast{display:none}
   }
 </style>
@@ -151,7 +187,7 @@
   </nav>
   <header>
     <h1>三阶魔方教程 · 初级</h1>
-    <p>层先法：一层一层来，七步把魔方复原。不需要记很多公式，看懂每一步在干什么就行。</p>
+    <p>层先法：一层一层来，七步把魔方复原。</p>
     <button class="themebtn" id="themebtn" type="button" title="切到夜晚"></button>
     <button class="printbtn" id="printbtn" type="button" title="打印 / 存成 PDF" aria-label="打印"><svg
       viewBox="0 0 24 24"><path d="M7 10.5V4h10v6.5"/><path
@@ -162,138 +198,229 @@
   <section id="s0">
     <h2>先认识魔方</h2>
     <div class="hero">
-      <img src="tutorial/complete-256x258.png" alt="三阶魔方：顶面 U、左前面 F、右前面 R">
+      <img src="tutorial/complete-256x258.png" data-zoom alt="三阶魔方：顶面 U、左前面 F、右前面 R">
       <span class="u">U</span><span class="f">F</span><span class="r">R</span>
     </div>
-    <p>三阶魔方有 6 个中心块、12 个棱块、8 个角块。<b>中心块永远不动</b>——所以「白色面」
-    就是白色中心所在的那一面，转来转去它还是白色面。</p>
-    <p><b>颜色是对着的</b>：白对黄、红对橙、蓝对绿。本站的配色表就是这一套。</p>
-    <h3>公式记号</h3>
-    <p>字母表示「把哪一面顺时针转 90°」，都是<b>面对那一面看</b>的时候的顺时针：</p>
+    <p>三阶魔方有 6 个中心块，12 个棱块，8 个角块。中心块之间的相对位置是不会变动的，
+    <b>中心块的颜色指示了该面的颜色</b>。</p>
+    <p>六个面的颜色各不相同，分别是白色，黄色，红色，橙色，绿色，蓝色。其中白色与黄色相对。
+    在还原魔方时，一般我们让黄色面朝上，黄色面的九个方块所构成的一层称为<b>顶层</b>，
+    白色面那一层称为<b>底层</b>。</p>
+    <p>我们将「自底向上」地还原魔方，也就是先还原底层，然后还原中间层，最后还原顶层。
+    底层的还原相对来说比较简单，即使没有接触过魔方也能较为轻松地还原，
+    但是从中间层开始，我们就需要借助公式来还原了。所谓的公式，其实就是一系列的操作，
+    让某些块移动到正确的位置，与此同时不影响已经还原的部分。下面是常见的公式记号
+    （字母代表把哪一面转 90°，方向都按<b>面对那一面看</b>时的顺时针算）：</p>
     <table>
-      <tr><th>记号</th><th>意思</th></tr>
-      <tr><td><code>R</code> <code>L</code></td><td>右面 / 左面顺时针 90°</td></tr>
-      <tr><td><code>U</code> <code>D</code></td><td>上面 / 下面顺时针 90°</td></tr>
-      <tr><td><code>F</code> <code>B</code></td><td>前面 / 后面顺时针 90°</td></tr>
-      <tr><td><code>R'</code></td><td>带一撇 = 反过来（逆时针）90°</td></tr>
-      <tr><td><code>R2</code></td><td>转 180°（顺逆都一样）</td></tr>
-      <tr><td><code>x y z</code></td><td>整个魔方跟着转：x 跟 R 同向、y 跟 U 同向、z 跟 F 同向</td></tr>
+      <thead><tr><th>记号</th><th>意思</th></tr></thead>
+      <tbody>
+        <tr><td><code>R</code> <code>L</code></td><td>右面 / 左面顺时针 90°</td></tr>
+        <tr><td><code>U</code> <code>D</code></td><td>上面 / 下面顺时针 90°</td></tr>
+        <tr><td><code>F</code> <code>B</code></td><td>前面 / 后面顺时针 90°</td></tr>
+        <tr><td><code>R'</code></td><td>带一撇 = 反过来（逆时针）90°</td></tr>
+        <tr><td><code>R2</code></td><td>转 180°（顺逆都一样）</td></tr>
+        <tr><td><code>x y z</code></td><td>整个魔方跟着转：x 跟 R 同向、y 跟 U 同向、z 跟 F 同向</td></tr>
+      </tbody>
     </table>
-    <div class="tip">看不懂公式没关系：本页每条公式右边的 <b>↗</b> 会把这条公式送进
-    <a href="calc.html">计算器</a>，点「提交」就能看着魔方一步步转出来。</div>
+    <div class="tip">看不懂公式？试试点击公式右边的计算器符号，跳转计算器开始演示。</div>
+    <p>接下来，我们分七步自底向上地还原三阶魔方。</p>
   </section>
 
   <section id="s1">
     <h2><span class="n">1</span>白色十字</h2>
-    <p class="goal"><b>目标</b>：底面拼出一个白色十字，而且每条白棱的<b>侧面颜色和同侧的中心块对齐</b>。</p>
-    <p>先不管别的块。把四条白棱都转到<b>黄色中心那一面</b>，摆成一朵「小花」：</p>
-    <div class="one"><img src="tutorial/cross-256x258.png" alt="小花：顶面中间是黄色中心，四条棱是白色"></div>
-    <p>然后一条一条处理：把某一瓣的<b>侧面颜色</b>转到和它同色的中心块对齐，再把这一面转 180°——
-    白棱就翻到底面去了。四条都做完，底面就是白十字。</p>
-    <div class="tip"><b>为什么先做小花</b>：直接拼白十字要一边看底面一边看侧面，很难；
-    先集中到顶面，一次只处理一条棱，眼睛轻松很多。</div>
+    <p>这一步的目标是还原底层（白色面）的四个棱块，保证棱块侧面的颜色和同侧中心块对齐。</p>
+    <div class="one"><img src="tutorial/whitecross-256x258.png" data-zoom alt="白色十字完成的样子"><figcaption>白色十字完成的样子</figcaption></div>
+    <p>我们可以先把四条白棱转到顶层（黄色面）：</p>
+    <div class="one"><img src="tutorial/flower-256x258.png" data-zoom alt="四条白棱转到顶层；棱块侧面的颜色不一定要与侧面中心块对齐"><figcaption>棱块侧面的颜色不一定要与侧面中心块对齐</figcaption></div>
+    <p>然后转动顶层，当某个棱块的侧面颜色和中心块颜色对上的时候，我们就可以把这面转 180°，
+    此时棱块就来到了底层的正确位置。当四个棱块都转到底层时，这一步就算完成了。</p>
   </section>
 
   <section id="s2">
     <h2><span class="n">2</span>底层角块（第一层完成）</h2>
-    <p class="goal"><b>目标</b>：四个白色角块归位，<b>第一层侧面也整整齐齐</b>。</p>
-    <p>在顶层找一个白色角块，把它转到「它该去的位置」的<b>正上方</b>（看它另外两种颜色，
-    对应哪两个中心块，就转到那两个中心之间），然后重复做这条公式：</p>
-    <div class="alg"><span class="tag">右手公式</span>
-      <code>R U R' U'</code>
-      <a class="tocalc" href="calc.html#R%20U%20R'%20U'" target="_blank" rel="noopener"></a></div>
-    <p>做到白角块翻进底层、而且侧面颜色对上了为止（最多做几次）。四个角都这样处理。</p>
-    <div class="tip"><b>小坑</b>：如果白色朝上或朝着侧面，先随便做一次让它跑到顶层侧边，
-    再按上面的方法摆好重来。</div>
-    <div class="one"><img src="tutorial/bottom-256x258.png" alt="第一层完成：白色面朝下、侧面一圈颜色对齐"></div>
+    <p>这一步的目标是还原底层（白色面）的四个角块，做完之后第一层（白色面这一层）就完成了。</p>
+    <p>在顶层找一个<b>白色角块</b>，看它另外两种颜色：比如「白-红-绿」角块，
+    该去的就是红色中心与绿色中心之间的那个角。把它转到<b>那个位置的正上方</b>
+    （也就是右前那一角的正上方），然后反复做这条公式：</p>
+    <table class="cases">
+      <thead><tr><th>情况</th><th>公式</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><img src="tutorial/bottom-256x258.png" alt="白角在右前上方，反复做这条公式"></td>
+          <td class="f"><div class="cs"><code>R U R' U'</code>
+            <a class="tocalc" href="calc.html#R%20U%20R'%20U'" target="_blank" rel="noopener"></a></div></td>
+        </tr>
+      </tbody>
+    </table>
+    <p>做的时候盯着那个白角：它会一进一出——先进到底层、又翻回顶层、再进一次……
+    每做完一次看一眼，直到<b>白色朝下、侧面两个颜色也和旁边的中心块对上</b>，
+    这个角就归位了（最多做 5 次一定会到位）。四个角都这样做完，第一层就完成了。</p>
+    <div class="tip">如果白角<b>卡在底层又没到位</b>（白色朝着侧面，或者蹲在别的槽位里）：
+    把它蹲着的那个槽位转到右前方，做一次公式，白角就翻回顶层了，再按上面的办法重做。</div>
   </section>
 
   <section id="s3">
     <h2><span class="n">3</span>中层棱块（第二层完成）</h2>
-    <p class="goal"><b>目标</b>：中层四条棱归位，前两层全部完成。</p>
-    <p>在顶层找一条<b>不带黄色的</b>棱块，把它的侧面颜色转到和同色中心对齐，看它该往左插还是往右插：</p>
-    <div class="alg"><span class="tag">往右插</span>
-      <code>U R U' R' U' F' U F</code>
-      <a class="tocalc" href="calc.html#U%20R%20U'%20R'%20U'%20F'%20U%20F" target="_blank" rel="noopener"></a></div>
-    <div class="alg"><span class="tag">往左插</span>
-      <code>U' L' U L U F U' F'</code>
-      <a class="tocalc" href="calc.html#U'%20L'%20U%20L%20U%20F%20U'%20F'" target="_blank" rel="noopener"></a></div>
-    <div class="tip"><b>小坑</b>：顶层找不到不带黄色的棱，说明它卡在中层但位置错了——
-    随便用上面一条公式把它顶出来，再重新插。</div>
-    <div class="one"><img src="tutorial/f2l-256x258.png" alt="前两层完成：只有顶面还没做"></div>
+    <p>这一步开始，我们就要背公式了。好消息是，这一层我们只需要背一对镜像公式。</p>
+    <p>下面就是要背的公式：</p>
+    <table class="cases pair">
+      <colgroup><col class="side"><col class="formula"><col class="side"><col class="formula"></colgroup>
+      <thead><tr><th class="red">红色为 F 面</th><th></th>
+        <th class="green">绿色为 F 面</th><th></th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="pic"><span class="box"><img src="tutorial/middle1-256x258.png"
+            alt="往右插" loading="lazy" data-zoom></span><span class="cap">往右插</span></td>
+          <td class="f"><div class="cs"><code>U R U' R' U' F' U F</code>
+            <a class="tocalc" href="calc.html#U%20R%20U'%20R'%20U'%20F'%20U%20F" target="_blank" rel="noopener"></a></div></td>
+          <td class="pic"><span class="box"><img src="tutorial/middle2-256x258.png"
+            alt="往左插" loading="lazy" data-zoom></span><span class="cap">往左插</span></td>
+          <td class="f"><div class="cs"><code>U' L' U L U F U' F'</code>
+            <a class="tocalc" href="calc.html#@g:U'%20L'%20U%20L%20U%20F%20U'%20F'" target="_blank" rel="noopener"></a></div></td>
+        </tr>
+      </tbody>
+    </table>
+    <p>我们首先在顶层找到一个不带黄色的棱块，然后把它转动到它侧面颜色对应的那一面，
+    然后运用上面的公式，就可以把顶层的一个棱块插入到中层了。</p>
+    <p>可以发现，这个公式不会影响中层的其他棱块。顶层找不到不带黄色的棱块时，
+    说明它卡在中层但位置错了 —— 随便用上面一条公式把它顶出来，再重新插即可。</p>
+    <div class="one"><img src="tutorial/f2l-256x258.png" data-zoom alt="前两层完成"><figcaption>前两层完成</figcaption></div>
   </section>
 
   <section id="s4">
-    <h2><span class="n">4</span>顶层黄十字</h2>
-    <p class="goal"><b>目标</b>：顶面出现黄色十字（先别管角块）。</p>
-    <p>看顶面黄色贴纸的形状：<b>一个点</b> → <b>一条线</b> → <b>一个拐角</b> → 十字。
-    摆好方向做这条公式，重复到出十字：</p>
-    <div class="alg"><span class="tag">黄十字</span>
-      <code>F R U R' U' F'</code>
-      <a class="tocalc" href="calc.html#F%20R%20U%20R'%20U'%20F'" target="_blank" rel="noopener"></a></div>
-    <p>摆法：出现「线」时让线<b>横着</b>；出现「拐角」时把拐角放在<b>左上角</b>。</p>
-    <div class="one"><img src="tutorial/topcross-256x258.png" alt="顶层黄十字"></div>
+    <h2><span class="n">4</span>顶层棱块翻面</h2>
+    <p>准确地说，这一步我们并没有把顶层的四个棱块还原到正确的位置，
+    而是仅仅让它们朝向正确，也就是黄色朝上，如下图所示。</p>
+    <div class="one"><img src="tutorial/topcross-256x258.png" data-zoom alt="顶层黄十字"><figcaption>顶层棱块黄色朝上（黄十字）</figcaption></div>
+    <p>一般我们会遇到四种情况：单点型，一字型，拐角型，十字型。
+    我们需要通过公式把任何一种情况都转化为十字型。</p>
+    <div class="shapes">
+      <figure><img data-shape="dot" alt="单点型" loading="lazy" data-zoom>
+        <figcaption>单点型</figcaption></figure>
+      <figure><img data-shape="line" alt="一字型" loading="lazy" data-zoom>
+        <figcaption>一字型</figcaption></figure>
+      <figure><img data-shape="corner" alt="拐角型" loading="lazy" data-zoom>
+        <figcaption>拐角型</figcaption></figure>
+      <figure><img data-shape="cross" alt="十字型" loading="lazy" data-zoom>
+        <figcaption>十字型</figcaption></figure>
+    </div>
+    <table class="cases">
+      <thead><tr><th>情况</th><th>公式</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="pic"><span class="box"><img data-shape="corner" alt="拐角型" loading="lazy" data-zoom></span><span class="cap">拐角型</span></td>
+          <td class="f"><div class="cs"><code>f (R U R' U') f'</code>
+            <a class="tocalc" href="calc.html#f%20%28R%20U%20R%27%20U%27%29%20f%27" target="_blank" rel="noopener"></a></div></td>
+        </tr>
+        <tr>
+          <td class="pic"><span class="box"><img data-shape="line" alt="一字型" loading="lazy" data-zoom></span><span class="cap">一字型</span></td>
+          <td class="f"><div class="cs"><code>F (R U R' U') F'</code>
+            <a class="tocalc" href="calc.html#F%20%28R%20U%20R%27%20U%27%29%20F%27" target="_blank" rel="noopener"></a></div></td>
+        </tr>
+      </tbody>
+    </table>
+    <p>这两个公式对应拐角型和一字型的情况，至于单点型，我们可以连续使用两个公式转为十字型。</p>
   </section>
 
   <section id="s5">
-    <h2><span class="n">5</span>顶层黄色面</h2>
-    <p class="goal"><b>目标</b>：整个顶面都是黄色。</p>
-    <p>把魔方摆成「小鱼」：<b>顶面只差三个角块没翻上来</b>，黄色角块的位置决定用哪条公式。</p>
-    <div class="alg"><span class="tag">小鱼（黄色角在左上）</span>
-      <code>R U R' U R U2 R'</code>
-      <a class="tocalc" href="calc.html#R%20U%20R'%20U%20R%20U2%20R'" target="_blank" rel="noopener"></a></div>
-    <div class="alg"><span class="tag">它的镜像</span>
-      <code>R U2 R' U' R U' R'</code>
-      <a class="tocalc" href="calc.html#R%20U2%20R'%20U'%20R%20U'%20R'" target="_blank" rel="noopener"></a></div>
-    <div class="tip"><b>摆法口诀</b>：顶面缺两个黄、且有两个黄在<b>左边</b>时，让黄色朝着<b>后面的左上角</b>做第一条。</div>
-    <div class="one"><img src="tutorial/oll-256x258.png" alt="顶面全黄"></div>
+    <h2><span class="n">5</span>顶层角块翻面</h2>
+    <p>这一步，我们将让顶层所有块的黄色面朝上，如图。</p>
+    <div class="one"><img src="tutorial/oll-256x258.png" data-zoom alt="顶面全黄"><figcaption>顶面全黄</figcaption></div>
+    <p>我们会遇到的情况一共有 7 种，每种情况都有对应的公式，根据形状使用正确的公式即可。</p>
+    <table class="cases">
+      <thead><tr><th>情况</th><th>公式</th></tr></thead>
+      <tbody>
+        <tr><td class="pic"><span class="box"><img data-oll="21" alt="OLL 21" loading="lazy" data-zoom><span class="no">21</span></span></td>
+          <td class="f"><div class="cs"><code>(R U2 R' U') (R U R' U') (R U' R')</code><a class="tocalc" href="calc.html#%28R%20U2%20R%27%20U%27%29%20%28R%20U%20R%27%20U%27%29%20%28R%20U%27%20R%27%29" target="_blank" rel="noopener"></a></div></td></tr>
+        <tr><td class="pic"><span class="box"><img data-oll="22" alt="OLL 22" loading="lazy" data-zoom><span class="no">22</span></span></td>
+          <td class="f"><div class="cs"><code>(R U'2) (R'2 U' R2 U') (R'2 U'2 R)</code><a class="tocalc" href="calc.html#%28R%20U%272%29%20%28R%272%20U%27%20R2%20U%27%29%20%28R%272%20U%272%20R%29" target="_blank" rel="noopener"></a></div></td></tr>
+        <tr><td class="pic"><span class="box"><img data-oll="23" alt="OLL 23" loading="lazy" data-zoom><span class="no">23</span></span></td>
+          <td class="f"><div class="cs"><code>(R2 D) (R' U2 R D') (R' U2 R')</code><a class="tocalc" href="calc.html#%28R2%20D%29%20%28R%27%20U2%20R%20D%27%29%20%28R%27%20U2%20R%27%29" target="_blank" rel="noopener"></a></div></td></tr>
+        <tr><td class="pic"><span class="box"><img data-oll="24" alt="OLL 24" loading="lazy" data-zoom><span class="no">24</span></span></td>
+          <td class="f"><div class="cs"><code>x' (R U R' D) (R U' R' D')</code><a class="tocalc" href="calc.html#x%27%20%28R%20U%20R%27%20D%29%20%28R%20U%27%20R%27%20D%27%29" target="_blank" rel="noopener"></a></div></td></tr>
+        <tr><td class="pic"><span class="box"><img data-oll="25" alt="OLL 25" loading="lazy" data-zoom><span class="no">25</span></span></td>
+          <td class="f"><div class="cs"><code>x' (R U' R' D) (R U R' D')</code><a class="tocalc" href="calc.html#x%27%20%28R%20U%27%20R%27%20D%29%20%28R%20U%20R%27%20D%27%29" target="_blank" rel="noopener"></a></div></td></tr>
+        <tr><td class="pic"><span class="box"><img data-oll="26" alt="OLL 26" loading="lazy" data-zoom><span class="no">26</span></span></td>
+          <td class="f"><div class="cs"><code>R' U' R U' R' U2 R</code><a class="tocalc" href="calc.html#R%27%20U%27%20R%20U%27%20R%27%20U2%20R" target="_blank" rel="noopener"></a></div></td></tr>
+        <tr><td class="pic"><span class="box"><img data-oll="27" alt="OLL 27" loading="lazy" data-zoom><span class="no">27</span></span></td>
+          <td class="f"><div class="cs"><code>L U L' U L U2 L'</code><a class="tocalc" href="calc.html#L%20U%20L%27%20U%20L%20U2%20L%27" target="_blank" rel="noopener"></a></div></td></tr>
+      </tbody>
+    </table>
+    <p>如果你暂时不想背那么多公式，也有偷懒的办法：只需要记忆「小鱼公式」就可以。</p>
+    <table class="cases">
+      <thead><tr><th>小鱼</th><th>公式</th></tr></thead>
+      <tbody>
+        <tr><td class="pic"><span class="box"><img data-oll="26" alt="OLL 26（小鱼 1）" loading="lazy" data-zoom><span class="no">26</span></span></td>
+          <td class="f"><div class="cs"><code>R' U' R U' R' U2 R</code><a class="tocalc" href="calc.html#R%27%20U%27%20R%20U%27%20R%27%20U2%20R" target="_blank" rel="noopener"></a></div></td></tr>
+        <tr><td class="pic"><span class="box"><img data-oll="27" alt="OLL 27（小鱼 2）" loading="lazy" data-zoom><span class="no">27</span></span></td>
+          <td class="f"><div class="cs"><code>L U L' U L U2 L'</code><a class="tocalc" href="calc.html#L%20U%20L%27%20U%20L%20U2%20L%27" target="_blank" rel="noopener"></a></div></td></tr>
+      </tbody>
+    </table>
+    <p>如果遇到其他情况，试着使用几次小鱼公式，就可以转化为小鱼形。如果没有特意记过该在哪个方向
+    使用小鱼公式，可能得多试错几次，拖慢还原的时间。所以如果有条件，最好还是记住完整的 7 个公式。</p>
   </section>
 
   <section id="s6">
     <h2><span class="n">6</span>顶层角块归位</h2>
-    <p class="goal"><b>目标</b>：四个角块回到正确位置（<b>方向先不管</b>）。</p>
-    <p>找一个<b>位置已经对了</b>的角块（三个面颜色和所在位置的三面中心都对得上），把它放在
-    <b>右前方</b>；如果四个都不对，随便找一条做一次再看。然后做这条公式：</p>
-    <div class="alg"><span class="tag">角块三循环</span>
-      <code>x' R2 D2 (R' U' R) D2 (R' U R')</code>
-      <a class="tocalc" href="calc.html#x'%20R2%20D2%20(R'%20U'%20R)%20D2%20(R'%20U%20R')" target="_blank" rel="noopener"></a></div>
+    <p>我们的目标是让四个角块回到正确的位置。</p>
+    <div class="one"><img src="tutorial/corners-256x258.png" data-zoom alt="角块都归位了（棱块还没）"><figcaption>角块都归位了（棱块还没）</figcaption></div>
+    <p>这里我们只有一对镜像公式，可以让三个角块按顺时针/逆时针转动一圈。</p>
+    <table class="cases">
+      <thead><tr><th>情况</th><th>公式</th></tr></thead>
+      <tbody>
+        <tr><td class="pic"><span class="box"><img src="pll/pll-Aa-256x256.png" alt="Aa" loading="lazy" data-zoom><span class="no">Aa</span></span></td>
+          <td class="f"><div class="cs"><code>x' R2 D2 (R' U' R) D2 (R' U R')</code><a class="tocalc" href="calc.html#x%27%20R2%20D2%20%28R%27%20U%27%20R%29%20D2%20%28R%27%20U%20R%27%29" target="_blank" rel="noopener"></a></div></td></tr>
+        <tr><td class="pic"><span class="box"><img src="pll/pll-Ab-256x256.png" alt="Ab" loading="lazy" data-zoom><span class="no">Ab</span></span></td>
+          <td class="f"><div class="cs"><code>x' (R U' R) D2 (R' U R) D2 R'2</code><a class="tocalc" href="calc.html#x%27%20%28R%20U%27%20R%29%20D2%20%28R%27%20U%20R%29%20D2%20R%272" target="_blank" rel="noopener"></a></div></td></tr>
+      </tbody>
+    </table>
+    <p>怎么找该转哪三个角块呢？这里有个小技巧，就是找是否有位于同一个侧面的角块，
+    朝向该侧面的颜色一样。如果有，那么把另外两个角块中的随便一个转动到正确的位置，
+    然后对另外三个使用公式转动即可。当然，有时候也会遇到找不到的情况，如下图，
+    这说明你需要用两次公式才行，可以先随便用一次然后再看。</p>
+    <div class="one"><img src="pll/pll-V-256x256.png" data-zoom alt="四个角块一个都不在正确位置" style="width:120px"></div>
   </section>
 
   <section id="s7">
-    <h2><span class="n">7</span>顶层棱块归位（完成！）</h2>
-    <p class="goal"><b>目标</b>：顶层四条棱归位，魔方复原。</p>
-    <p>看顶层四条棱哪三条在打转：需要<b>顺时针</b>换位就用第一条，<b>逆时针</b>用第二条。</p>
-    <div class="alg"><span class="tag">顺时针</span>
-      <code>R U' R U R U R U' R' U' R2</code>
-      <a class="tocalc" href="calc.html#R%20U'%20R%20U%20R%20U%20R%20U'%20R'%20U'%20R2" target="_blank" rel="noopener"></a></div>
-    <div class="alg"><span class="tag">逆时针</span>
-      <code>R2 U R U R' U' R' U' R' U R'</code>
-      <a class="tocalc" href="calc.html#R2%20U%20R%20U%20R'%20U'%20R'%20U'%20R'%20U%20R'" target="_blank" rel="noopener"></a></div>
-    <p>如果四条棱全乱了（两条对换），随便做一次其中一条，就会变成上面两种情况之一。</p>
+    <h2><span class="n">7</span>顶层棱块归位</h2>
+    <p>只差最后一步了！这一步有四种情况：</p>
+    <table class="cases">
+      <thead><tr><th>情况</th><th>公式</th></tr></thead>
+      <tbody>
+        <tr><td class="pic"><span class="box"><img src="pll/pll-Ua-256x256.png" alt="Ua" loading="lazy" data-zoom><span class="no">Ua</span></span></td>
+          <td class="f"><div class="cs"><code>R U' R U R U R U' R' U' R2</code><a class="tocalc" href="calc.html#R%20U%27%20R%20U%20R%20U%20R%20U%27%20R%27%20U%27%20R2" target="_blank" rel="noopener"></a></div></td></tr>
+        <tr><td class="pic"><span class="box"><img src="pll/pll-Ub-256x256.png" alt="Ub" loading="lazy" data-zoom><span class="no">Ub</span></span></td>
+          <td class="f"><div class="cs"><code>R2 U R U R' U' R' U' R' U R'</code><a class="tocalc" href="calc.html#R2%20U%20R%20U%20R%27%20U%27%20R%27%20U%27%20R%27%20U%20R%27" target="_blank" rel="noopener"></a></div></td></tr>
+        <tr><td class="pic"><span class="box"><img src="pll/pll-H-256x256.png" alt="H" loading="lazy" data-zoom><span class="no">H</span></span></td>
+          <td class="f"><div class="cs"><code>R2 U2 R U2 R2 U2 R2 U2 R U2 R2</code><a class="tocalc" href="calc.html#R2%20U2%20R%20U2%20R2%20U2%20R2%20U2%20R%20U2%20R2" target="_blank" rel="noopener"></a></div></td></tr>
+        <tr><td class="pic"><span class="box"><img src="pll/pll-Z-256x256.png" alt="Z" loading="lazy" data-zoom><span class="no">Z</span></span></td>
+          <td class="f"><div class="cs"><code>U (R' U' R U') (R U R U') (R' U R U) (R2 U' R' U)</code><a class="tocalc" href="calc.html#U%20%28R%27%20U%27%20R%20U%27%29%20%28R%20U%20R%20U%27%29%20%28R%27%20U%20R%20U%29%20%28R2%20U%27%20R%27%20U%29" target="_blank" rel="noopener"></a></div></td></tr>
+      </tbody>
+    </table>
+    <p>这一步也有偷懒的方法，你甚至可以一条公式都不记：</p>
+    <table class="cases">
+      <thead><tr><th>情况</th><th>用两次小鱼公式</th></tr></thead>
+      <tbody>
+        <tr><td class="pic"><span class="box"><img src="tutorial/top5-256x256.png" alt="Ua" loading="lazy" data-zoom><span class="no">Ua</span></span></td>
+          <td class="f"><div class="cs"><code>R' U' R U' R' U2 R y' L U L' U L U2 L'</code><a class="tocalc" href="calc.html#R%27%20U%27%20R%20U%27%20R%27%20U2%20R%20y%27%20L%20U%20L%27%20U%20L%20U2%20L%27" target="_blank" rel="noopener"></a></div></td></tr>
+        <tr><td class="pic"><span class="box"><img src="tutorial/top4-256x256.png" alt="Ub" loading="lazy" data-zoom><span class="no">Ub</span></span></td>
+          <td class="f"><div class="cs"><code>L U L' U L U2 L' y R' U' R U' R' U2 R</code><a class="tocalc" href="calc.html#L%20U%20L%27%20U%20L%20U2%20L%27%20y%20R%27%20U%27%20R%20U%27%20R%27%20U2%20R" target="_blank" rel="noopener"></a></div></td></tr>
+      </tbody>
+    </table>
+    <p>这两个写法其实就是各用了两次小鱼公式（26 和 27 各一次，中间把整个魔方转一下 ——
+    y' 或 y），照图上箭头的方向做就行；
+    另外两种情况 H、Z 也可以只靠小鱼公式解决，各做四次就行。</p>
   </section>
 
-  <section id="s8">
-    <h2>做完之后</h2>
-    <div class="one"><img src="tutorial/complete-256x258.png" alt="六面复原"></div>
-    <ul>
-      <li>去 <a href="practice.html">练习页</a> 随机出题，拿真魔方对着核；</li>
-      <li>公式记不住就用 <a href="calc.html">计算器</a> 一步步看，或者照
-        <a href="f2l.html">F2L</a> / <a href="oll.html">OLL</a> / <a href="pll.html">PLL</a>
-        三张速查表对号入座；</li>
-      <li>能稳定复原之后，下一步是提速：<a href="tutorial-advanced.html">三阶魔方教程 · 进阶（CFOP）</a>
-        —— 十字、F2L、OLL、PLL，以及手法和练习方法。</li>
-    </ul>
-    <p class="next">本站公式表里每条公式都能直接点 ↗ 送到计算器试跑。</p>
-  </section>
   <nav class="steps" aria-label="本页步骤">
     <a href="#s0">先认识魔方</a>
     <a href="#s1">1 白色十字</a>
     <a href="#s2">2 底层角块</a>
     <a href="#s3">3 中层棱块</a>
-    <a href="#s4">4 顶层黄十字</a>
-    <a href="#s5">5 顶层黄色面</a>
-    <a href="#s6">6 顶层角块归位</a>
-    <a href="#s7">7 顶层棱块归位</a>
+    <a href="#s4">4 顶层棱翻面</a>
+    <a href="#s5">5 顶层角翻面</a>
+    <a href="#s6">6 顶层角归位</a>
+    <a href="#s7">7 顶层棱归位</a>
   </nav>
 </main>
 
@@ -351,6 +478,22 @@
     if (!a.getAttribute('aria-label')) a.setAttribute('aria-label', '在计算器里打开这条公式');
   });
 
+  /* ---------- 分昼夜两版的图：OLL 表 + 第 4 步那四张形状图 ----------
+     两类都是「只记名字、src 按当前主题拼出来」，切主题时再同步一次：
+       OLL    <img data-oll="21">     -> oll/oll-21-day|night-256x256.png
+       形状图 <img data-shape="dot">  -> tutorial/shape-dot-day|night-256x256.png
+     形状图白天是紫顶 + 深色壳，夜晚是黄顶 + 浅色壳（深色卡片上紫的几乎看不见）。 */
+  function syncThemeImgs() {
+    var tone = document.documentElement.dataset.theme === 'dark' ? '-night' : '-day';
+    Array.prototype.forEach.call(document.querySelectorAll('img[data-oll]'), function (im) {
+      im.src = 'oll/oll-' + im.getAttribute('data-oll') + tone + '-256x256.png';
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('img[data-shape]'), function (im) {
+      im.src = 'tutorial/shape-' + im.getAttribute('data-shape') + tone + '-256x256.png';
+    });
+  }
+  syncThemeImgs();
+
   document.getElementById('printbtn').addEventListener('click', function () { window.print(); });
 
   /* 右边目录标识「现在看到哪一步」：滚动时把最后一段已经划过去的高亮 */
@@ -376,12 +519,11 @@
     sync();
   })();
 
-
-
   /* ---------- 夜晚模式 ---------- */
   var root = document.documentElement, btn = document.getElementById('themebtn');
   function applyTheme(t) {
     root.dataset.theme = t;
+    syncThemeImgs();                      // OLL 表 + 第 4 步形状图跟着换昼夜版
     btn.title = t === 'dark' ? '切到白天' : '切到夜晚';
     try { localStorage.setItem('cube-theme', t); } catch (e) {}
   }

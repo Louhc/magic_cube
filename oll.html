@@ -229,9 +229,9 @@ var CALC_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
   '<circle cx="9.4" cy="16.6" r="1.35" fill="currentColor"/>' +
   '<circle cx="14.6" cy="16.6" r="1.35" fill="currentColor"/></svg>';
 function toCalc(alg, id) {
-  // F2L 的 b 版是「绿色为 F 面」写的，要告诉计算器，让它按 y 公式 y' 执行。
-  // 约定：hash 以 @g: 开头表示「绿面朝前」。
-  var green = /b$/.test(String(id || ''));
+  // OLL 用数字编号（21、22…），没有「绿色为 F 面」的版本，所以链接一律不带 @g:。
+  // （@g: 那个约定只属于 F2L 的 b 版：计算器收到它会先 y、做完公式再 y'。）
+  var green = false;
   var frag = (green ? '@g:' : '') + encodeURIComponent(alg);
   var tip = '在计算器里打开这条公式' + (green ? '（绿色为 F 面）' : '');
   return '<a class="tocalc" href="calc.html#' + frag + '" title="' + tip +

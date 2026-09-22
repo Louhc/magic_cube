@@ -986,10 +986,11 @@ console.log('\n[19c] 教程页：公式都能送进计算器，进阶页的 OLL 
   });
   const bad = imgs.filter(f => {
     const b = fs.readFileSync(path.join(ROOT, f));
-    return b.readUInt32BE(16) !== 256 || b.readUInt32BE(20) !== 258;
+    // 256x258 是编辑器导出的立体图；256x256 是顶层俯视图（步骤 4 / 7 那几张）
+    return b.readUInt32BE(16) !== 256 || (b.readUInt32BE(20) !== 258 && b.readUInt32BE(20) !== 256);
   });
-  ok('教程配图 ' + imgs.length + ' 张都在、都是 256x258', imgs.length >= 5 && bad.length === 0,
-    bad.slice(0, 3).join(' '));
+  ok('教程配图 ' + imgs.length + ' 张都在、都是 256 宽（立体图 258 高、俯视图 256）',
+    imgs.length >= 5 && bad.length === 0, bad.slice(0, 3).join(' '));
 }
 
 console.log('\n[20] OLL 图的昼夜两版 + 图片尺寸/体积');

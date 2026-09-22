@@ -510,7 +510,9 @@ def check_tutorial(page, tmpdir):
     bad += len(broken)
 
     # 2) 步骤图
-    dirs = {'f2l': (256, 258), 'oll': (256, 256), 'pll': (256, 256), 'tutorial': (256, 258)}
+    # tutorial/ 里两种都有：编辑器导出的立体图 256x258、顶层俯视图 256x256
+    dirs = {'f2l': (256, 258), 'oll': (256, 256), 'pll': (256, 256),
+            'tutorial': (256, 258), 'tutorial-top': (256, 256)}
     refs = sorted(set(re.findall(r'src="((?:f2l|oll|pll|tutorial)/[\w.-]+\.png)"', html)))
     wrong = []
     for r in refs:
@@ -520,10 +522,68 @@ def check_tutorial(page, tmpdir):
             continue
         with Image.open(p) as im:
             want = dirs[r.split('/')[0]]
-            if im.size != want:
+            if (im.size != want and not (r.startswith('tutorial/') and im.size == (256, 256))):
                 wrong.append('%s %s≠%s' % (r, im.size, want))
     print('  %d 张图引用，%s' % (len(refs), '全部存在且尺寸对 ✓' if not wrong else '✗ ' + '; '.join(wrong)))
     bad += len(wrong)
+
+    # 2b) data-shape / data-oll 的图，src 是脚本按主题现拼的，上面那轮静态 src 看不到 ——
+    #     按命名规律把昼夜两版都查一遍，少了哪一版都会红（换主题时才发现的坑最烦）。
+    kinds = sorted(set(re.findall(r'data-shape="([\w-]+)"', html)))
+    nol = sorted(set(re.findall(r'data-oll="(\d+)"', html)))
+    dyn, dynbad = [], []
+    for k in kinds:
+        for tone in ('day', 'night'):
+            dyn.append('tutorial/shape-%s-%s-256x256.png' % (k, tone))
+    for n in nol:
+        for tone in ('day', 'night'):
+            dyn.append('oll/oll-%s-%s-256x256.png' % (n, tone))
+    for r in dyn:
+        p = os.path.join(ROOT, r)
+        if not os.path.exists(p):
+            dynbad.append(r + ' 不存在')
+        else:
+            with Image.open(p) as im:
+                if im.size != (256, 256):
+                    dynbad.append('%s %s≠(256, 256)' % (r, im.size))
+    if kinds or nol:
+        print('  按主题现拼的图：%d 种形状图 + %d 个 OLL 编号 × 昼夜两版，%s'
+              % (len(kinds), len(nol),
+                 '都在且尺寸对 ✓' if not dynbad else '✗ ' + '; '.join(dynbad)))
+    # 初级教程那四张形状图就是这四种，少一种（或者名字写错）都得报出来
+    if page.endswith('tutorial-basic.html') and kinds != ['corner', 'cross', 'dot', 'line']:
+        dynbad.append('第 4 步的形状图不是 dot/line/corner/cross 四种：%s' % ', '.join(kinds))
+    bad += len(dynbad)
+
+    # 3) 「图 + 公式」是不是同一个局面 —— 只查第七步那张「用两次小鱼公式」的表。
+    #    这类错最隐蔽：公式没错、图也没错，就是放错了行；而且整页里图最容易被悄悄换掉。
+    #    判据：把公式的局面（逆运算作用在复原魔方上）转四个 AUF，看有没有一个和图上的
+    #    12 条侧面色带完全一致。图上那两张是带箭头的顶层俯视图，配色和 PLL 图一样。
+    m7 = re.search(r'<th>用两次小鱼公式</th>([\s\S]*?)</table>', html)
+    pairs = []
+    if m7:
+        pairs = re.findall(r'src="((?:f2l|oll|pll|tutorial)/[\w.-]+\.png)"[\s\S]*?'
+                           r'<span class="no">([^<]*)</span>[\s\S]*?<code>([^<]+)</code>', m7.group(1))
+    mism = []
+    # 初级教程这张表必须还在（图或公式被删掉就该报错，而不是「0 组，通过」）
+    if page.endswith('tutorial-basic.html') and len(pairs) != 2:
+        mism.append('没有找到「两次小鱼」表的 2 组图与公式（找到 %d 组）' % len(pairs))
+    for img, no, alg in pairs:
+        st = sim.case_of(alg, 'pll')
+        if st is None:
+            mism.append('%s：公式局面不是合法 PLL' % alg)
+            continue
+        rots, cur = [], st
+        for _ in range(4):
+            rots.append(sim.pll_sig(cur))
+            cur = sim.turn(cur, 'U', 1)
+        sig = S.read_pll(os.path.join(ROOT, img))
+        if sig not in rots:
+            mism.append('%s 图上是 %s，公式解的是 %s' % (no or img, sig, ' / '.join(rots)))
+    if pairs or page.endswith('tutorial-basic.html'):
+        print('  第七步「两次小鱼」表：%d 组图与公式%s'
+              % (len(pairs), '对得上 ✓' if not mism else '✗ ' + '; '.join(mism)))
+    bad += len(mism)
 
     return bad
 

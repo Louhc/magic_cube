@@ -336,7 +336,7 @@
   /* 不能用的时候要一眼看出来：褪成和旁边一样的灰底，主按钮那两层投影和光环全摘掉 */
   .ctrl .play:disabled{color:var(--muted);border-color:var(--line);background:var(--field);
               box-shadow:none;filter:none;opacity:.5}
-  .ctrl .play svg{width:21px;height:21px;display:block;fill:none;stroke:currentColor;
+  .ctrl .play svg{width:25px;height:25px;display:block;fill:none;stroke:currentColor;
                   stroke-linejoin:round;stroke-linecap:round}
 
   /* 步骤小片：一串公式有二十来个，要是每个都做成立体按钮，
@@ -345,17 +345,33 @@
   /* 单行横滚，不换行：十一二步一换行会变成「9 个 + 2 个」两行，
      看着像「被挤下去了」而不是一行公式。一条到底、当前那个滚进视野，
      读起来才像播放器里的进度。 */
-  .moves{display:flex;flex-wrap:nowrap;gap:4px;min-height:26px;overflow-x:auto;
+  .moves{position:relative;display:flex;flex-wrap:nowrap;gap:4px;min-height:26px;overflow-x:auto;
          overflow-y:hidden;user-select:none;
          /* 滚动条藏起来：一条 6px 的横条夹在这几行控件中间太抢眼。
            滚的办法在下面那段 JS 里（滚轮 / 按住拖 / 手机上原生横划） */
          scrollbar-width:none;-ms-overflow-style:none}
   .moves::-webkit-scrollbar{display:none;width:0;height:0}
+  /* 「当前这一步」的高亮是一条会滑过去的色块（和顶部导航那条 .pill 一个思路）：
+     以前是这块灭、那块亮，一下一下地闪；现在它从上一块滑到下一块。
+     层次是这么排的：小片自己的底色（在流里）< 这条色块（position:absolute）<
+     小片里的字（那层 <b> 抬到 z-index:2）—— 所以它滑过去的路上不会被别的小片挡住，
+     也不会盖住任何一个字母。 */
+  .moves .pill{position:absolute;left:0;top:0;width:0;height:0;z-index:1;
+               border-radius:5px;background:var(--accent);
+               box-shadow:0 1px 4px var(--accent-glow);
+               opacity:0;pointer-events:none;
+               transition:left .18s cubic-bezier(.32,.8,.3,1), width .18s cubic-bezier(.32,.8,.3,1),
+                          top .18s cubic-bezier(.32,.8,.3,1), height .18s cubic-bezier(.32,.8,.3,1),
+                          opacity .12s ease}
+  .moves .pill.on{opacity:1}
+  /* 换了一串公式 / 刚排版完：这一下不做过渡，直接落位（别从上一处飞过来） */
+  .moves .pill.instant{transition:none}
   .moves span{flex:none;white-space:nowrap;
               font:12.5px/1 ui-monospace,Menlo,Consolas,monospace;color:var(--muted);
               background:var(--chip);border:1px solid transparent;
               border-radius:5px;padding:5px 7px;cursor:pointer;
-              transition:background .12s ease, color .12s ease, box-shadow .12s ease}
+              transition:background .12s ease, color .12s ease}
+  .moves span b{position:relative;z-index:2;font-weight:inherit}
   /* 指上去：底色浮一档 + 一层很短的投影。这些片子原来是纯平的，
      光换个浅底不够说明「能点」；投影用中性的 --btn-drop ——
      主色那圈光晕只留给「当前」那一块（黄 = 当前状态，这条规矩别破） */
@@ -367,8 +383,8 @@
      写得更具体一点（多一个 .done），把底色 / 字色 / 投影一起补上。 */
   .moves span.done:hover{background:var(--chip-hover);color:var(--text);
                          box-shadow:0 2px 6px var(--btn-drop)}
-  .moves span.cur{background:var(--accent);border-color:var(--accent);color:var(--on-accent, #fff);
-                  box-shadow:0 1px 4px var(--accent-glow)}
+  .moves span.cur{background:transparent;border-color:transparent;color:var(--on-accent, #fff)}
+  .moves span.cur:hover{background:transparent}
 
   /* 选公式：三个来源按钮一排，下面是可滚动的公式表 */
   .openpick{width:100%;height:32px;margin-bottom:8px;border-radius:8px;cursor:pointer;
@@ -652,6 +668,7 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   var pickerEl = document.getElementById('picker');
 
   var steps = [], frames = [], at = 0;   // 最近一次提交的步骤与各阶段局面
+  var pillInstant = true;                // 下一块高亮直接落位（不做滑动过渡）
   var cur = CubeSim.solved();            // 当前局面（累积的）
   var hist = [];                         // 历史：{kind:'alg'|'scramble'|'rotate'|'move', alg}
   var histAt = -1;                       // 当前停在历史里的哪一条（-1 = 空）
@@ -896,6 +913,39 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     '<circle cx="12" cy="12" r="9.1" fill="none" stroke="currentColor" stroke-width="1.8"/>' +
     '<path d="M10.1 8.5v7M13.9 8.5v7" stroke-width="2.3" stroke-linecap="round"/></svg>';
 
+  /* 高亮色块：一个绝对定位的 span，摆在当前那一片上，动的时候由 CSS 过渡滑过去。 */
+  var movesPill = null;
+  function pillEl() {
+    if (!movesPill || movesPill.parentNode !== movesEl) {   // innerHTML 重画会把它冲掉
+      movesPill = document.createElement('span');
+      movesPill.className = 'pill';
+      movesEl.appendChild(movesPill);
+    }
+    return movesPill;
+  }
+  function placePill() {
+    var p = pillEl();
+    var cur = movesEl.querySelector ? movesEl.querySelector('span.cur') : null;
+    if (!cur || !cur.getBoundingClientRect || !movesEl.getBoundingClientRect) {
+      p.classList.remove('on');
+      return;
+    }
+    var box = movesEl.getBoundingClientRect(), r = cur.getBoundingClientRect();
+    if (!r.width) { p.classList.remove('on'); return; }
+    if (pillInstant) {                       // 这一下不做过渡（换了一串公式 / 刚排版）
+      p.classList.add('instant');
+      setTimeout(function () { p.classList.remove('instant'); }, 0);
+      pillInstant = false;
+    }
+    p.classList.add('on');
+    // 位置按「这一条的 content 坐标」算：rect 相减 + 当前 scrollLeft（和 scrollStrip 同一套，
+    // 别用 offsetLeft —— 那是相对 offsetParent 的，会算飞）
+    p.style.left = (movesEl.scrollLeft + r.left - box.left) + 'px';
+    p.style.top = (r.top - box.top) + 'px';
+    p.style.width = r.width + 'px';
+    p.style.height = r.height + 'px';
+  }
+
   /* 步骤条是单行横滚的：把**当前这一步**摆到这一条的视觉中心，播放时不用跟着去找。
      位置用两个 bounding rect 相减算（当前块相对这一条左端有多远），不要用 offsetLeft ——
      那是相对 offsetParent 的，而 .moves 没有定位，offsetParent 会一路找到 body，
@@ -911,7 +961,17 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     var want = movesEl.scrollLeft + (chip.left - box.left)
              - (movesEl.clientWidth - chip.width) / 2;
     want = Math.max(0, Math.min(max, want));
-    if (Math.abs(movesEl.scrollLeft - want) > 1) movesEl.scrollLeft = want;
+    if (Math.abs(movesEl.scrollLeft - want) <= 1) return;
+    // 滑过去，不要一跳：跳一下整条内容都在闪（「黄色的框」看着就是一闪一闪的）。
+    // 系统开了「减少动态效果」就照旧瞬移。
+    if (movesEl.scrollTo && !noMotion()) movesEl.scrollTo({ left: want, behavior: 'smooth' });
+    else movesEl.scrollLeft = want;
+  }
+  // 用户是不是要求「减少动态效果」（没有 matchMedia 就当没有要求）
+  function noMotion() {
+    try {
+      return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    } catch (e) { return false; }
   }
   function chrome() {
     Array.prototype.forEach.call(movesEl.children, function (el) {
@@ -919,6 +979,7 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
       el.classList.toggle('cur', k === at);
       el.classList.toggle('done', k < at);
     });
+    placePill();
     scrollStrip();
     posEl.textContent = steps.length ? (at + ' / ' + steps.length) : '—';
     var noSteps = steps.length === 0;
@@ -978,8 +1039,10 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
       frames.push(CubeSim.turn(CubeSim.clone(frames[frames.length - 1]), x.mv, x.times));
     });
     at = frames.length - 1;
+    pillInstant = true;          // 换了一串步骤：这一串的高亮直接落位
     movesEl.innerHTML = steps.map(function (x, i) {
-      return '<span data-k="' + (i + 1) + '">' + mvLabel(x) + '</span>';
+      // 字包一层 <b>：它在色块之上（见 CSS 里那段层次说明）
+      return '<span data-k="' + (i + 1) + '"><b>' + mvLabel(x) + '</b></span>';
     }).join('');
   }
   // 点历史里第 i 条：回到「这一条执行完」的局面，并把这条公式摆成可播放的步骤。
@@ -992,7 +1055,6 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     queue.length = 0;
     playing = false;
     busy = false;
-    pendingRun = null;       // 换了一串步骤，没记完的那次执行作废
     histAt = i;
     cur = after;
     showSteps(histMoves(hist[i]), before);
@@ -1088,20 +1150,24 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   /* 执行一串动作（提交 / 反向 / 打乱 / 跳转都走这里）。
      它不是「另一套播放」：先把这串动作摆成可播放的步骤，再交给 autoPlay ——
      于是播放中按键照旧可用（点一下就暂停）、进度和播放键状态一致，
-     长动画也不会把界面锁死。 */
+     长动画也不会把界面锁死。
+
+     **先记账、再播动画**：历史记的是「我下过什么公式」，动画只是把这一步演给我看。
+     所以按下去的那一刻：这一条就进历史（并且立刻高亮成当前那条）、累积局面直接落到
+     这一串做完的样子；画面再从第一步开始演。好处是「按了就有反馈」，
+     中途暂停也不会留下一条记了一半的记录（记录和 cur 从按下那刻起就是一致的）。
+     代价：动画演到一半暂停时，画面停在半路而累积局面已经到末尾 ——
+     和「跳到某一步只是换个位置看」是一个道理，下一次动作会从 cur 重新画。 */
   var runKey = '', runFirst = null;     // 这次执行的动作串 / 出发局面
-  // 这一串还没记进历史的收尾动作。中途暂停后（再按播放键）接着播完，仍算执行过这一串，
-  // 所以得记着 —— 播放键自己那个入口（没有回调）也要用它来收尾
-  var pendingRun = null;
   function run(list, label, kind, rev) {
     if (!list.length) return;
     var key = list.map(mvLabel).join(' ') + '|' + (rev ? 'r' : '') + '|' + label;
-    pendingRun = finishRun(label, kind, rev);
     // 上一串执行到一半就停了（按了暂停或转而单步）：再按一次是「接着播」。
-    // 单看 at 不够 —— frames[0] 没用同一局面就说明步骤已经换过一串了
+    // 单看 at 不够 —— frames[0] 没用同一局面就说明步骤已经换过一串了。
+    // 注意这条不记账：那一串按下去的时候已经记过了
     if (key === runKey && frames[0] === runFirst && !busy && at > 0 && at < steps.length) {
       playing = false;
-      autoPlay(pendingRun);
+      autoPlay(afterRun());
       return;
     }
     runKey = key;
@@ -1109,31 +1175,23 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     playing = false;
     showSteps(list, cur);
     at = 0;
-    paint(frames[0]);
+    // 先记账（截断回溯点之后那几条 + push + 高亮），再把累积局面推到这个末尾
+    if (histAt < hist.length - 1) hist.length = histAt + 1;
+    hist.push({ kind: kind || 'alg', alg: label, rev: !!rev });
+    histAt = hist.length - 1;
+    renderHist();
+    cur = frames[frames.length - 1];
+    paint(frames[0]);          // 画面还是从第一步开始演
     chrome();
-    autoPlay(pendingRun);
+    autoPlay(afterRun());
   }
-  /* 播完了才算「执行过这一串」，记一条历史；中途停下（暂停 / 转而单步）不记 ——
-     记录里存的是整串公式，局面却停在半路，点这条历史就对不上了 */
-  function finishRun(label, kind, rev) {
-    var self = function (finished) {
-      // 这一串已经被换掉了（点了历史 / 跳转 / 复原，或又下了新公式）：
-      // 那圈还在跑的动画收尾时会带着旧的回调回来，别再记一笔
-      if (self !== pendingRun) return;
-      if (finished) {
-        pendingRun = null;
-        cur = frames[at];
-        // 回溯到旧记录之后又做了新动作：后面那几条作废（和撤销栈一个道理）
-        if (histAt < hist.length - 1) hist.length = histAt + 1;
-        hist.push({ kind: kind || 'alg', alg: label, rev: !!rev });
-        histAt = hist.length - 1;
-        renderHist();
-        paint(cur);
-      }
+  /* 这一串演完之后要收的尾。记账已经在 run() 里做过了，所以这里不做历史的事——
+     只把按钮状态和排队着的单步接上。 */
+  function afterRun() {
+    return function () {
       chrome();
       drainQueue();
     };
-    return self;
   }
   /* ---------- 粘贴 ---------- */
   // 本页复制过的东西：浏览器不给读剪贴板时拿它顶（改成 file:// 打开也能用）
@@ -1379,12 +1437,17 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     submit('scramble', false);
   }
 
+  /* 复原 = 「立刻回到复原态」：播放中也是按一下就复原，不必先暂停、再点第二次。
+     所以这里不走 pausedFirst()，也不看 busy —— 直接把还在跑的那一步作废掉：
+       · epoch++ 让那一步动画回调回来时认得「我已经过期了」，不会再去 paint 老 frames
+         （reset 之后 frames 只剩 [复原态]，不加这一下会 paint 到 undefined）
+       · playing / busy 落下来，动画那圈 nextStep 下次判断就会自己收尾
+     .layer 不用手动清：paint() 重画 cubeEl 时把它一起换掉了。 */
   function reset() {
-    if (pausedFirst()) return;
-    queue.length = 0;          // 复原 = 停手，排队的单步作废
-    if (busy) return;
+    epoch++;                   // 作废进行中的那一步
     playing = false;
-    pendingRun = null;         // 复原 = 那串执行不再有意义
+    busy = false;
+    queue.length = 0;          // 复原 = 停手，排队的单步也作废
     try { localStorage.removeItem(STORE); } catch (e) {}
     // 视角也回到默认 —— 从 b 版公式跳过来时视角补过 90 度，
     // 复原后要重新回到「红面在左、绿面在右」
@@ -1431,8 +1494,10 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     });
   }
 
-  // 播放中点任何别的按钮：先暂停；再点一次才真正执行。
-  // 这样不会在动画中途插进新动作，行为可预期。
+  // 播放中点**会改动局面**的按钮（提交 / 反向 / 打乱 / 单步 / 整体旋转）：
+  // 先暂停，再点一次才真正执行 —— 免得在动画中途插进新动作。
+  // 两个例外不走这里：公式面板（开合 / 换表 / 填公式，压根不碰魔方）
+  // 和复原（那是「立刻回去」，按一下就到位）。
   function pausedFirst() {
     if (!playing) return false;
     playing = false;
@@ -1518,8 +1583,9 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     syncTabs();
     renderPick();
   }
+  // 公式面板只管「收发列表 / 换表 / 填公式」，不碰魔方 —— 播放中点它不该暂停，
+  // 就是单纯地展开或收起（「播放时点公式先暂停」是以前的毛病）
   openBtn.addEventListener('click', function () {
-    if (pausedFirst()) return;
     setPicker(!pickerEl.classList.contains('on'));
   });
   // 栏右上角的 × ：收起并把光标送回输入框，接着敲公式
@@ -1534,7 +1600,6 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   }
   Array.prototype.forEach.call(document.querySelectorAll('.tabs button'), function (b) {
     b.addEventListener('click', function () {
-      if (pausedFirst()) return;
       pickKind = b.dataset.pick;
       syncTabs();
       renderPick();
@@ -1543,8 +1608,8 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   pickEl.addEventListener('click', function (e) {
     var el = e.target.closest ? e.target.closest('.p') : null;
     if (!el) return;
-    if (pausedFirst() || busy) return;
-    // 只填入，不执行 —— 让用户自己确认方向（正向/反向）再按
+    // 只填入，不执行 —— 让用户自己确认方向（正向/反向）再按。
+    // 也只动输入框，不碰魔方：播放中点一条公式不该把播放打断
     algEl.value = el.dataset.alg;
     algEl.focus();
     syncClr();
@@ -1560,8 +1625,8 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     b.addEventListener('click', function () { doMove(b.dataset.mv, 'move'); });
   });
   document.getElementById('reset').addEventListener('click', reset);
-  // 播放键：有没记完的执行就顺手收尾（中途暂停后按它接着播完，照样记一条）
-  document.getElementById('play').addEventListener('click', function () { autoPlay(pendingRun || undefined); });
+  // 播放键：接着演（历史在按「执行公式」那一下已经记过了，这里不用收尾）
+  document.getElementById('play').addEventListener('click', function () { autoPlay(); });
   document.getElementById('first').addEventListener('click', function () { jump(0); });
   document.getElementById('last').addEventListener('click', function () { jump(steps.length); });
   document.getElementById('prev').addEventListener('click', function () { stepBy(-1); });

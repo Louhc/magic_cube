@@ -229,9 +229,11 @@ var CALC_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
   '<circle cx="9.4" cy="16.6" r="1.35" fill="currentColor"/>' +
   '<circle cx="14.6" cy="16.6" r="1.35" fill="currentColor"/></svg>';
 function toCalc(alg, id) {
-  // F2L 的 b 版是「绿色为 F 面」写的，要告诉计算器，让它按 y 公式 y' 执行。
-  // 约定：hash 以 @g: 开头表示「绿面朝前」。
-  var green = /b$/.test(String(id || ''));
+  // PLL 用字母编号（Aa / Ab / Ga / Gb / Nb…），末尾那个 b 是「第二个变体」，
+  // **不是** F2L 那种「绿色为 F 面」的 b 版 —— 所以链接一律不带 @g:。
+  // 这里曾经跟着 F2L 抄了 /b$/，结果 Ab / Gb / Jb / Nb / Rb / Ub 六条都被当成
+  // 「绿面朝前」，从这儿跳进计算器会先转个 y，摆出来的图自然和本站的图对不上。
+  var green = false;
   var frag = (green ? '@g:' : '') + encodeURIComponent(alg);
   var tip = '在计算器里打开这条公式' + (green ? '（绿色为 F 面）' : '');
   return '<a class="tocalc" href="calc.html#' + frag + '" title="' + tip +
