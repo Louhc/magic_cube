@@ -110,8 +110,13 @@ console.log('\n[5] 真跑一遍 calc.html 的脚本（DOM 桩）');
   // 结果一打开就报 "S.steps is not a function"。只查结构是发现不了的。
   const vm = require('vm');
   const mkEl = (t, init) => {
-    const e = { tagName: t, children: [], style: {}, dataset: {},
-      classList: { add() {}, remove() {}, toggle() {} }, addEventListener() {},
+    const e = { tagName: t, children: [], style: {}, dataset: {}, _cls: new Set(),
+      classList: { add(c) { e._cls.add(c); }, remove(c) { e._cls.delete(c); },
+                   toggle(c, on) { if (on === undefined) { e._cls.has(c) ? e._cls.delete(c) : e._cls.add(c); } else { on ? e._cls.add(c) : e._cls.delete(c); } },
+                   contains(c) { return e._cls.has(c); } },
+      _e: {},
+      addEventListener(t2, fn) { (e._e[t2] = e._e[t2] || []).push(fn); },
+      fire(t2, a) { (e._e[t2] || []).forEach(f => f(a || {})); },
       // 真 DOM 的 appendChild 会写上 parentNode —— 桩不写的话，
       // 「这个元素还在不在树里」这类判断全会误判（高亮色块会被反复重建）
       appendChild(c) { this.children.push(c); c.parentNode = this; return c; },
@@ -124,10 +129,13 @@ console.log('\n[5] 真跑一遍 calc.html 的脚本（DOM 桩）');
     return e;
   };
   const els = { alg: mkEl('input', "R U R' U'") };
+  const store5 = {};
   const ctx = { console, navigator: {},
     // 页面里会挂 resize 监听，桩也得有
     window: { addEventListener() {} }, setTimeout, clearTimeout,
-    localStorage: { getItem: () => null, setItem() {} }, CubeSim: S,
+    localStorage: { getItem: k => (k in store5 ? store5[k] : null),
+                    setItem: (k, v) => { store5[k] = String(v); }, removeItem: k => { delete store5[k]; } },
+    CubeSim: S,
     location: { hash: '' },
     document: { getElementById: id => els[id] || (els[id] = mkEl('div')),
                 // 这一节不需要箭头和选公式
@@ -154,7 +162,14 @@ console.log('\n[5] 真跑一遍 calc.html 的脚本（DOM 桩）');
   const html = els.cube.innerHTML;
   const pos = [...html.matchAll(/data-pos="([^"]+)"/g)].map(m => m[1]);
   ok('画出 26 个小方块', pos.length === 26, String(pos.length));
-  ok('每个小方块 6 个面（26×6=156）', (html.match(/<i /g) || []).length === 156);
+  // 26 个方块 × 6 个面 = 156；每个有贴纸的面再带一份投影面（.ghost，默认不画，
+  // 由 .g-<面> 决定当下显示哪三面）—— 复原态 54 张贴纸，所以是 156 + 54
+  ok('每个小方块 6 个面（26×6=156）+ 54 个投影面位',
+    (html.match(/<i /g) || []).length === 156 + 54, String((html.match(/<i /g) || []).length));
+  ok('投影面都是 ghost 开头的 class（不会被当成真贴纸）',
+    (html.match(/<i class="ghost on /g) || []).length === 54 &&
+    (html.match(/class="on /g) || []).length === 54,
+    String((html.match(/<i class="ghost on /g) || []).length));
   ok('朝外的贴纸 54 张', (html.match(/class="on /g) || []).length === 54);
 
   // 画出来的颜色必须和模拟器算出来的一致 —— 这是页面正确性的核心
@@ -180,6 +195,76 @@ console.log('\n[5] 真跑一遍 calc.html 的脚本（DOM 桩）');
     if (((got[p] || {})[nn]) !== COLOR[st[k]]) bad++;
   }
   ok('54 张贴纸配色与模拟器一致', bad === 0 && n === 54, '核对 ' + n + ' 张，' + bad + ' 张不符');
+
+  // 「显示投影」开关（面板里的 .tg 一行）
+  {
+    const css = fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8');
+    ok('面板里有「显示投影」开关（默认勾上）',
+      /<label class="tg" id="tg-ghost"[\s\S]{0,200}<input type="checkbox" id="ghost" checked> 显示投影/.test(css));
+    ok('关投影＝把 .g-* 全摘掉（不另外加一层 no-ghost 规则）',
+      /NALL\.forEach\(function \(n\) \{\s*\n\s*cubeEl\.classList\.toggle\('g-' \+ NCLS\[n\], ghostOn && viewZ\(CSS_N\[NCLS\[n\]\]\) < 0\);/.test(css) &&
+      !/no-ghost/.test(css));
+    ok('投影面允许看到背面（否则整层被 backface-visibility 剔掉）',
+      /\.cubie i\.ghost\{[^}]*backface-visibility:visible/.test(css));
+    // 投影的"看得见"只靠透明度（不用 display:none）—— display 是没法补间的
+    ok('投影的显隐只用透明度（元素一直在场上，才能有过渡）',
+      /\.cubie i\.ghost\{[^}]*opacity:0/.test(css) &&
+      /\.g-nx \.cubie i\.ghost\.nx/.test(css) &&
+      /\.g-px \.cubie i\.ghost\.px,[\s\S]{0,300}?\.g-nz \.cubie i\.ghost\.nz\{opacity:\.42\}/.test(css) &&
+      !/\.cubie i\.ghost\{[^}]*display:none/.test(css));
+    // 转动时：转到正面的淡出、转到背面的淡入，淡的时长/缓动跟这次转动一样
+    ok('转动时投影跟着淡：fo-（淡出）/ fi-（淡入），时长走 --gm-dur',
+      /\.layer \.cubie i\.ghost\{[^}]*transition-duration:var\(--gm-dur/.test(css) &&
+      /\.layer\.fo-nx \.cubie i\.ghost\.nx,[\s\S]{0,400}?\{opacity:0\}/.test(css) &&
+      /\.layer\.fi-nx \.cubie i\.ghost\.nx,[\s\S]{0,400}?\{opacity:\.42\}/.test(css));
+    ok('按【面】算：animate() 里比较转之前 / 转之后看不看得见（viewZ + rotCss）',
+      /function viewZ\(v\)/.test(css) && /function rotCss\(axis, deg, v\)/.test(css) &&
+      /var was = viewZ\(CSS_N\[k\]\) < 0, will = viewZ\(rotCss\(ax, deg, CSS_N\[k\]\)\) < 0;/.test(css) &&
+      /layer\.classList\.add\('fo-' \+ k\)/.test(css) &&
+      /layer\.classList\.add\('fi-' \+ k\)/.test(css) &&
+      /layer\.style\.setProperty\('--gm-dur', dur \+ 'ms'\)/.test(css));
+    ok('不再有"整套淡出"的做法（没有 turning / ghost-in 那套）',
+      !/classList\.add\('turning'\)/.test(css) && !/ghost-in/.test(css));
+    // 顺序要紧：先把"转之前"那一帧结算掉，再改透明度 —— 小方块刚被搬进 .layer 时
+    // 直接改会被当成"没有旧值"，直接就位（用户看到的就是"直接出现再转动"）
+    ok('先重排一帧再改透明度（否则补间不生效）',
+      /void layer\.offsetWidth;\s*\n\s*if \(ghostOn\) \{[\s\S]{0,500}?void layer\.offsetWidth;\s*\n\s*layer\.style\.transform = 'rotate'/
+        .test(css));
+    ok('练习页的舞台也一样（同一套 CSS + 同样的算法）',
+      (() => {
+        const prac = fs.readFileSync(path.join(__dirname, '..', 'practice.html'), 'utf8');
+        return ['function viewZ(v)', 'function rotCss(axis, deg, v)',
+                "layer.classList.add('fo-' + k)", "layer.classList.add('fi-' + k)",
+                '.layer.fi-nx .cubie i.ghost.nx'].every(x => prac.includes(x));
+      })());
+    ok('开关存本机（calc-ghost-v1），默认开',
+      /var GHOST_KEY = 'calc-ghost-v1'/.test(css) && /applyGhost\(v !== '0'\)/.test(css));
+    // 开屏（视角 -24/-32）看不见 nx/ny/nz —— 这三面的 .g-* 该打开，另外三面关着
+    const gcls = () => [...els.cube._cls].filter(c => /^g-/.test(c)).sort().join(' ');
+    ok('开屏：魔方根上打开的正是背对镜头的那三面（' + gcls() + '）',
+      gcls() === 'g-nx g-ny g-nz', gcls());
+    ok('开屏就把选择写了存档（1）', store5['calc-ghost-v1'] === '1', String(store5['calc-ghost-v1']));
+    els.ghost.checked = false;
+    els.ghost.fire('change');
+    ok('取消勾选：一个 .g-* 都不留（整层投影不画）、存档变 0',
+      gcls() === '' && store5['calc-ghost-v1'] === '0',
+      gcls() + ' / ' + store5['calc-ghost-v1']);
+    els.ghost.checked = true;
+    els.ghost.fire('change');
+    ok('再勾上：那三面又回来了、存档回 1',
+      gcls() === 'g-nx g-ny g-nz' && store5['calc-ghost-v1'] === '1',
+      gcls() + ' / ' + store5['calc-ghost-v1']);
+
+    // 换视角 -> 投影跟着换（用户要的是"由视角决定，而不是由 F 面决定"）
+    // 直接甩一下视角：拖 240px，view.y 大约 +132°
+    const pe = { clientX: 0, clientY: 0, pointerId: 1, target: { closest: () => null } };
+    els.stage.fire('pointerdown', pe);
+    els.stage.fire('pointermove', { clientX: 240, clientY: 0, pointerId: 1, target: { closest: () => null } });
+    els.stage.fire('pointerup', { clientX: 240, clientY: 0, pointerId: 1, target: { closest: () => null } });
+    const turned = gcls();
+    ok('转视角之后投影跟着换面（不再是 nx/ny/nz）：' + turned,
+      turned !== 'g-nx g-ny g-nz' && turned.split(' ').length === 3, turned);
+  }
 }
 
 console.log('\n[6] 六个面的贴纸必须朝外（不是陷进方块里）');
@@ -220,6 +305,48 @@ console.log('\n[6] 六个面的贴纸必须朝外（不是陷进方块里）');
     ok(k + ' 面朝外（贴纸不陷进方块）',
       got[k] && got[k].join() === w.join(), '推出 ' + JSON.stringify(got[k]) + ' 期望 ' + JSON.stringify(w));
   });
+
+  // ---- 看不到的那三面投的「图例」 ----
+  // 投影面只把推出距离改大（--half），旋转还是那六条规则里的 ——
+  // 所以这里查两件事：① 推得比原位远（在外面，不是陷进方块）；
+  // ② 这三个法向确实背对默认视角（用同一套矩阵算相机前的朝向）。
+  {
+    const ghost = html.match(/\.cubie i\.ghost\{([^}]*)\}/);
+    ok('投影面有样式（半透明 + 推得更远）', !!ghost, String(ghost && ghost[1]));
+    const body = (ghost || ['', ''])[1];
+    const f = (body.match(/--half:calc\(var\(--cs\) \* ([\d.]+)\)/) || [])[1];
+    ok('投影面推到 1.4 个方块处（原位 0.5，和魔方表面空出 0.9 个方块）',
+      !!f && Math.abs(parseFloat(f) - 1.4) < 1e-6, String(f));
+    ok('投影面自己是半透明的（底态 0，打开时 .42）',
+      /opacity:0/.test(body) && /\.g-nx \.cubie i\.ghost\.nx/.test(html) &&
+      /\.g-nz \.cubie i\.ghost\.nz\{opacity:\.42\}/.test(html), body);
+    ok('投影面不自己写 transform（沿用已经验过的那六条）',
+      !/transform:/.test(body), body);
+
+    // 默认视角：rotateX(-24) rotateY(-32)（页面里的 VIEW）。
+    // CSS 的变换是 v' = rotateX · rotateY · v，+z 朝观察者；
+    // 六个面的"屏幕法向"就是上面那张 want 表（模型 +y 在 CSS 里朝上 = (0,-1,0)）。
+    const V = { x: -24, y: -32 };
+    const mm = mul(rot('X', V.x), rot('Y', V.y));
+    const CSS_N = { px: [1, 0, 0], nx: [-1, 0, 0], py: [0, -1, 0],
+                    ny: [0, 1, 0], pz: [0, 0, 1], nz: [0, 0, -1] };
+    const towardsCamera = k => apply(mm, CSS_N[k])[2];
+    const vis = Object.keys(CSS_N).filter(k => towardsCamera(k) > 0).sort();
+    const hid = Object.keys(CSS_N).filter(k => towardsCamera(k) < 0).sort();
+    ok('默认视角看得见的是 ' + vis.join(' / ') + '，看不见的是 ' + hid.join(' / '),
+      vis.join() === 'px,py,pz' && hid.join() === 'nx,ny,nz',
+      vis.join() + ' | ' + hid.join());
+    // 哪三面投影由【视角】现算，不是写死某三个面
+    const js = fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8');
+    ok('页面按视角算哪几面背对镜头（viewZ + syncGhosts，applyView 里同步）',
+      /function viewZ\(v\)/.test(js) &&
+      /function syncGhosts\(\)/.test(js) &&
+      /function applyView\(\) \{[\s\S]{0,220}syncGhosts\(\)/.test(js));
+    ok('每个有贴纸的面都带一份投影（默认透明），由 .g-<面> 打开',
+      /\.cubie i\.ghost\{[^}]*opacity:0/.test(js) &&
+      /\.g-nx \.cubie i\.ghost\.nx/.test(js));
+    ok('页面里没有写死「就投 nx/ny/nz」的死名单', !/GHOST_N/.test(js));
+  }
 }
 
 console.log('\n[7] 转动动画的方向必须和模拟器的移动一致');
@@ -315,12 +442,19 @@ console.log('\n[9] 布局：和编辑器一样（左边画布铺满，操作区�
   ok('窄屏改为上下布局', /@media \(max-width:760px\)[\s\S]*?\.app\{flex-direction:column\}/.test(html));
 
   // 尺寸要留出余量，别把舞台撑满 —— 撑满时边角会被裁掉，观感也太挤
-  const div = +(html.match(/Math\.min\(w, h\) \/ ([\d.]+)/) || [])[1];
-  ok('能读出尺寸除数（' + div + '）', div > 4, String(div));
-  const spanX = 3 * 1.38 / div, spanY = 3 * 1.32 / div;   // 相对 min(w,h)
-  ok('魔方投影后不超过舞台的 ' + Math.round(spanX * 100) + '%（宽）/ ' +
-     Math.round(spanY * 100) + '%（高）', spanX <= 0.8 && spanY <= 0.8,
-     'div=' + div);
+  // 除数有两个：不开投影 6.15、开了投影 7.7（背面那三面各往外推 0.9 个方块，
+  // 整体跨度从 3 变成 4.8 个方块，所以除数按比例放大、留白略收）
+  const divG = +(html.match(/ghostOn \? ([\d.]+) : ([\d.]+)/) || [])[1];
+  const divN = +(html.match(/ghostOn \? ([\d.]+) : ([\d.]+)/) || [])[2];
+  ok('能读出两个尺寸除数（投影 ' + divG + ' / 不投影 ' + divN + '）',
+    divG > 4 && divN > 4 && divG > divN, divG + ' / ' + divN);
+  const span = (size, div) => [size * 1.38 / div, size * 1.32 / div];   // 相对 min(w,h)
+  const [sx0, sy0] = span(3, divN);                        // 只有魔方
+  const [sx1, sy1] = span(4.8, divG);                      // 魔方 + 投影
+  ok('不开投影：魔方占舞台的 ' + Math.round(sx0 * 100) + '%（宽）/ ' + Math.round(sy0 * 100) + '%（高）',
+    sx0 <= 0.8 && sy0 <= 0.8, 'div=' + divN);
+  ok('开投影：魔方加投影占 ' + Math.round(sx1 * 100) + '%（宽）/ ' + Math.round(sy1 * 100) + '%（高），也装得下',
+    sx1 <= 0.9 && sy1 <= 0.9, 'div=' + divG);
 }
 
 console.log('\n[10] 方块必须是实心的（不能有镂空感）');
@@ -395,7 +529,7 @@ console.log('\n[13] 练习页：显示的图形必须是「从复原态执行该
     /\['practice\.html'/.test(fs.readFileSync(path.join(__dirname, '..', 'nav.js'), 'utf8')));
 
   const vm5 = require('vm');
-  const mk = (t) => ({ tagName: t, children: [], style: {}, dataset: {},
+  const mk = (t) => ({ tagName: t, children: [], style: { setProperty() {} }, dataset: {},
     classList: { _s: new Set(), add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); },
       toggle(c, v) { v === undefined ? (this._s.has(c) ? this._s.delete(c) : this._s.add(c)) : (v ? this._s.add(c) : this._s.delete(c)); },
       contains(c) { return this._s.has(c); } },
@@ -442,16 +576,23 @@ console.log('\n[13] 练习页：显示的图形必须是「从复原态执行该
     }
     const parts = els5.qid.textContent.split(' ');
     const kind5 = parts[0].toLowerCase();
-    // 同一个题号可能收了好几条写法（题面相同、答案不同），光按题号 find
-    // 只能拿到第一条 —— 抽到第二条时就误判。页面把当前是第几条写进了
-    // practice-round-v1（last），照它取才对得上。
-    const list5 = ctx5.ALG_LIST[kind5];
+    // 题库按题号去过重（一个题号只留第一行 = 主公式），存档里的 last 是
+    // 【去重后】题库的下标 —— 照它取，抽到的就该是这一条。
+    const raw5 = ctx5.ALG_LIST[kind5];
+    const uniqList5 = (function () {
+      const s = {};
+      return raw5.filter(r => !s[r[0]] && (s[r[0]] = 1));
+    })();
     let rec5 = null;
     try { rec5 = JSON.parse(st5['practice-round-v1'] || 'null'); } catch (e) {}
     const idx5 = rec5 && typeof rec5.last === 'number' ? rec5.last : -1;
-    const row = (list5[idx5] && list5[idx5][0] === parts[1]) ? list5[idx5] : null;
-    ok('存档里记的当前题号就是题面上的（' + parts[1] + ' 第 ' + idx5 + ' 条）',
+    const row = (uniqList5[idx5] && uniqList5[idx5][0] === parts[1]) ? uniqList5[idx5] : null;
+    ok('存档里记的下标就是题面上的那一条（' + parts[1] + '，去重后第 ' + idx5 + ' 条）',
       !!row && rec5.id === parts[1], rec5 && JSON.stringify(rec5).slice(0, 60));
+    // 题号有多写法时，练习用的必须是第一行（页面上那条主公式）
+    ok('练习用的是主公式（题号 ' + parts[1] + ' 的第一行）',
+      !!row && row[1] === raw5.filter(r => r[0] === parts[1])[0][1],
+      row && row[1]);
     // b 版要按共轭执行，期望值同样处理
     const want5 = (row && kind5 === 'f2l' && /b$/.test(parts[1]))
       ? ('y ' + row[1]) : (row ? row[1] : '');
@@ -580,63 +721,72 @@ console.log('\n[13] 练习页：显示的图形必须是「从复原态执行该
       ok('对应的范围按钮也是选中态', btns6[2].classList.contains('on'));
     }
 
-    // 洗牌袋：切到 PLL 连点到底，应把题库各条各出一次、无一漏掉
+    // 洗牌袋：切到 PLL 连点到底，应把题库各题各出一次、无一漏掉。
+    // 题库按题号去过重（一个题号只留第一行 = 主公式），所以一轮就是
+    // 【每个题号恰好一次】—— 多写法的格子不会一轮里冒两次。
     (scopeBtns[2]._h.click || []).forEach(function (f) { f({}); });
-    const total = ctx5.ALG_LIST.pll.length;      // 从题库动态取，加公式不用改测试
+    const uniq = kind => {
+      const seenIds = {};
+      return ctx5.ALG_LIST[kind].filter(r => !seenIds[r[0]] && (seenIds[r[0]] = 1));
+    };
+    const total = uniq('pll').length;            // 从题库动态取，加公式不用改测试
     const seen = [els5.qid.textContent];
     for (let i = 0; i < total - 1; i++) {
       (els5.next._h.click || []).forEach(function (f) { f({}); });
       seen.push(els5.qid.textContent);
     }
-    // 一个题号能收多条写法（Ua / Ub / Z 等）—— 题面（图）相同，标签都是
-    // 「PLL Z」，不能用标签去重。改成按"每个标签出现的次数正好等于题库里
-    // 该标签的条数"来验，等价于洗牌袋覆盖了每一条。
     {
       const counts = {};
       seen.forEach(t => { counts[t] = (counts[t] || 0) + 1; });
-      const expect = {};
-      ctx5.ALG_LIST.pll.forEach(r => {
-        const t = 'PLL ' + r[0];
-        expect[t] = (expect[t] || 0) + 1;
-      });
-      const labels = Object.keys(expect).sort();
-      ok('一轮抽出 ' + seen.length + ' 题，覆盖题库全部 ' + labels.length + ' 个标签',
-        seen.length === total && labels.every(t => counts[t] === expect[t]),
+      const labels = uniq('pll').map(r => 'PLL ' + r[0]).sort();
+      ok('一轮抽出 ' + seen.length + ' 题 = 去重后题库的 ' + total + ' 个题号',
+        seen.length === total, String(seen.length));
+      ok('一轮里每个题号恰好一次（多写法不再重复出现）',
+        labels.every(t => counts[t] === 1) &&
+        Object.keys(counts).sort().join() === labels.join(),
         JSON.stringify(counts));
-      ok('多写法的格子被抽到对应次数（Z 两条）',
-        counts['PLL Z'] === 2, String(counts['PLL Z']));
-      // 多写法的格子（Ua / Ub / Z）会各出现两次，单条的出现一次 ——
-      // 统一成「每个标签的次数都等于题库里的条数」
-      const multi = labels.filter(t => expect[t] > 1);
-      ok('单条写法的标签恰好一次',
-        labels.filter(t => expect[t] === 1).every(t => counts[t] === 1));
-      ok('多写法的格子按条数各出现多次（' + multi.join(' ') + '）',
-        multi.every(t => counts[t] === expect[t]), JSON.stringify(multi.map(t => [t, counts[t], expect[t]])));
+      ok('题库里有多写法时，页面用的是第一行（主公式）',
+        uniq('pll').every(r => r[1] === ctx5.ALG_LIST.pll.filter(x => x[0] === r[0])[0][1]));
+    }
+
+    // 用户反馈过的那道题：OLL 29 在题库里有两条（主公式 + 备选写法），
+    // 以前抽到第二条时答案就变成备选的那条。现在只练第一行。
+    {
+      const rows29 = ctx5.ALG_LIST.oll.filter(r => r[0] === '29');
+      ok("OLL 29 题库里还是两条，第一行是主公式 (R' F R F') (R U2 R' U') y' (R' U' R)",
+        rows29.length === 2 && rows29[0][1] === "(R' F R F') (R U2 R' U') y' (R' U' R)",
+        JSON.stringify(rows29.map(r => r[1])));
+      const one29 = uniq('oll').filter(r => r[0] === '29')[0];
+      ok('练习取 OLL 29 时用的是主公式，不是备选那条',
+        !!one29 && one29[1] === rows29[0][1] && one29[1] !== rows29[1][1], one29 && one29[1]);
     }
     (els5.next._h.click || []).forEach(function (f) { f({}); });
     ok('换轮时不紧接着重复上一题', els5.qid.textContent !== seen[seen.length - 1],
       seen[seen.length - 1] + ' -> ' + els5.qid.textContent);
 
-    // 判重按【题号】算，不是按下标：一个题号能收好几条写法（OLL 13/14/29/30/34、
-    // PLL Ga…/Ra/Ua/Ub/Z 都是），题号、题面（图）一模一样，只有答案不同；
-    // 按下标判重就会在换轮处连出两张看起来完全一样的题。
-    // 这里把随机数钉死，逼出「新一轮第一张正好和上一张同题号」的牌堆：
-    // 洗牌后 bag[n-1] 只由第一个随机数决定（= floor(r*n)），让它正对上另一条同题号。
+    // 换轮那一下的判重：上一轮最后一张和这一轮第一张不能是同一题（否则看着
+    // 像「点了没反应」）。题库按题号去过重了，一轮里不会重样，所以只有跨轮
+    // 才会撞上 —— 这里把随机数钉死，逼出「新一轮第一张正好是上一张」的牌堆：
+    // 洗牌后 bag[n-1] 只由第一个随机数决定（= floor(r*n)）。
     {
       const vm7 = require('vm');
-      const cases = [
-        { scope: 'oll', id: '29', list: ctx5.ALG_LIST.oll },
-        { scope: 'pll', id: 'Ra', list: ctx5.ALG_LIST.pll }
-      ];
-      cases.forEach(function (c) {
-        const dup = c.list.map((r, i) => i).filter(i => c.list[i][0] === c.id);
-        const n = c.list.length, from = dup[0], to = dup[1];
-        ok('题号 ' + c.id + ' 确实收了多条写法（' + dup.length + ' 条）', dup.length > 1);
-        if (dup.length < 2) return;
-        // 存档：上一张是第 from 条，袋已抽空
+      const uniqOf = kind => {
+        const seenIds = {};
+        return ctx5.ALG_LIST[kind].filter(r => !seenIds[r[0]] && (seenIds[r[0]] = 1));
+      };
+      [
+        { scope: 'oll', id: '29' },              // 多写法的格子（现在也只留主公式）
+        { scope: 'pll', id: 'Ra' }
+      ].forEach(function (c) {
+        const list = uniqOf(c.scope);
+        const n = list.length;
+        const at = list.map((r, i) => i).filter(i => list[i][0] === c.id);
+        ok('去重后题号 ' + c.id + ' 只有一条（主公式）', at.length === 1, String(at.length));
+        if (!at.length) return;
+        // 存档：上一张就是这一条，袋已抽空
         const st7 = {
           'practice-scope-v1': c.scope,
-          'practice-round-v1': JSON.stringify({ scope: c.scope, id: c.id, bag: [], last: from })
+          'practice-round-v1': JSON.stringify({ scope: c.scope, id: c.id, bag: [], last: at[0] })
         };
         const els7 = { cube: mk('div'), stage: mk('div'), next: mk('button') };
         const btns7 = ['f2l', 'oll', 'pll'].map(k => { const b = mk('button'); b.dataset.scope = k; return b; });
@@ -651,16 +801,47 @@ console.log('\n[13] 练习页：显示的图形必须是「从复原态执行该
                       body: { appendChild() {} }, addEventListener() {} } };
         ctx7.globalThis = ctx7;
         vm7.createContext(ctx7);
-        vm7.runInContext('Math.random = function () { return ' + ((to + 0.5) / n) + '; };', ctx7);
+        // 让新洗的牌堆把「同一题」摆在末尾（也就是下一张会被抽到的那张）
+        vm7.runInContext('Math.random = function () { return ' + ((at[0] + 0.5) / n) + '; };', ctx7);
         vm7.runInContext(fs.readFileSync(path.join(__dirname, '..', 'alglist.js'), 'utf8'), ctx7);
         vm7.runInContext(page, ctx7);
         const label = c.scope.toUpperCase() + ' ' + c.id;
-        ok('前置条件：现在出的是 ' + label + '（第 ' + from + ' 条）',
-          els7.qid.textContent === label, els7.qid.textContent);
+        ok('前置条件：现在出的是 ' + label, els7.qid.textContent === label, els7.qid.textContent);
         (els7.next._h.click || []).forEach(f => f({}));
-        ok('换轮第一张不和上一张同题号（下一张本该是第 ' + to + ' 条）',
+        ok('换轮第一张不和上一张同题（抽到的是主公式那条，也不会重复）',
           els7.qid.textContent !== label, label + ' -> ' + els7.qid.textContent);
       });
+    }
+    // 存档里的下标是「当时的题库」的下标；题库去掉重复写法后旧存档可能越界 ——
+    // 恢复时要把不合法的清掉，否则下一抽拿到 undefined，整页就废了
+    {
+      const vm10 = require('vm');
+      const st10 = {
+        'practice-scope-v1': 'oll',
+        'practice-round-v1': JSON.stringify({ scope: 'oll', id: '33', bag: [999, -3, 1], last: 999 })
+      };
+      const els10 = { cube: mk('div'), stage: mk('div'), next: mk('button') };
+      const btns10 = ['f2l', 'oll', 'pll'].map(k => { const b = mk('button'); b.dataset.scope = k; return b; });
+      const ctx10 = { console, navigator: {}, window: { addEventListener() {} },
+        setTimeout(fn) { return 0; }, clearTimeout() {},
+        localStorage: { getItem: k => (k in st10 ? st10[k] : null),
+                        setItem: (k, v) => { st10[k] = String(v); }, removeItem: k => { delete st10[k]; } },
+        CubeSim: S, location: { hash: '' },
+        document: { getElementById: id => els10[id] || (els10[id] = mk('div')),
+                    querySelectorAll: sel => sel === '#scope button' ? btns10 : [],
+                    documentElement: mk('html'), createElement: mk,
+                    body: { appendChild() {} }, addEventListener() {} } };
+      ctx10.globalThis = ctx10;
+      vm10.createContext(ctx10);
+      let err10 = null;
+      try {
+        vm10.runInContext(fs.readFileSync(path.join(__dirname, '..', 'alglist.js'), 'utf8'), ctx10);
+        vm10.runInContext(page, ctx10);
+        for (let i = 0; i < 4; i++) (els10.next._h.click || []).forEach(f => f({}));
+      } catch (e) { err10 = e; }
+      ok('旧存档里越界的下标不会把练习页搞崩', !err10, err10 && err10.message);
+      ok('恢复后抽到的仍是正常的 OLL 题（' + els10.qid.textContent + '）',
+        /^OLL \d+$/.test(els10.qid.textContent), els10.qid.textContent);
     }
     ok('显示了公式要解决的图形（' + els5.qimg.src + '）',
       /^pll\/pll-[A-Za-z]+-256x256\.png$/.test(els5.qimg.src) &&
@@ -845,7 +1026,7 @@ console.log('\n[11f] 跳转过来的朝向：只有 @g:（F2L 的 b 版）才补
   const boot = (hash) => {
     const els = {};
     const mkEl = (t, init) => {
-      const e = { tagName: t, children: [], dataset: {}, style: {}, _h: '', _t: '',
+      const e = { tagName: t, children: [], dataset: {}, style: { setProperty() {} }, _h: '', _t: '',
         classList: { _s: new Set(), add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); },
           toggle(c, v) { v ? this._s.add(c) : this._s.delete(c); }, contains(c) { return this._s.has(c); } },
         addEventListener() {}, appendChild(c) { this.children.push(c); return c; },
@@ -1396,7 +1577,13 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
   const wait = ms => new Promise(r => setTimeout(r, ms));
   (async () => {
     els.fwd.fire('click');
+    // 桩里没有真的小方块，淡出/淡入是挂在"这一层的方块"上的，
+    // 所以这里只钉住"整套不淡"：魔方根上不该出现 turning（那是上一版的做法）
+    ok('播放时不是整套淡出（魔方根上没有 turning）',
+      !els.cube.classList.contains('turning'), [...(els.cube.classList._s || [])].join(','));
     await wait(1200);                     // 2 步 × (340+80)ms = 840ms，留足余量
+    ok('转完之后魔方根上也没有 turning',
+      !els.cube.classList.contains('turning'), [...(els.cube.classList._s || [])].join(','));
     ok('第一次正向执行后历史有 1 条', String(els.hcount.textContent) === '1', els.hcount.textContent);
     ok('第一次提交后局面 = R U',
       sameState(readCube(), S.apply(S.solved(), 'R U')),
@@ -2001,7 +2188,8 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
           /function applyZoom\(\) \{[\s\S]{0,220}?setProperty\('--cs'[\s\S]{0,120}?setProperty\('--half'/.test(h) &&
           !/function applyZoom\(\) \{[\s\S]{0,300}?paint\(/.test(h));
         ok(f + ' fit() 走 applyZoom（窗口尺寸变了也不丢缩放）',
-          /CS = Math\.max\(12, Math\.min\(w, h\) \/ 6\.15\);\s*\n\s*applyZoom\(\);/.test(h));
+          /CS = Math\.max\(12, Math\.min\(w, h\) \/ [^\n]*?;\s*\n\s*applyZoom\(\);/.test(h) &&
+          /ghostOn \? 7\.7 : 6\.15/.test(h));
         // 滚轮：必须 preventDefault + passive:false，否则轮子会连带把页面滚了
         ok(f + ' 舞台上滚轮能缩放，并且拦掉页面滚动',
           /stageEl\.addEventListener\('wheel', function \(e\) \{\s*\n\s*e\.preventDefault\(\);/.test(h) &&

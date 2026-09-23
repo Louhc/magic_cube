@@ -118,6 +118,35 @@
   .cubie i.ny{transform:rotateX(-90deg) translateZ(var(--half))}
   .cubie i.pz{transform:translateZ(var(--half))}
   .cubie i.nz{transform:rotateY(180deg) translateZ(var(--half))}
+  /* 正面看不到的那三面（左 nx / 下 ny / 后 nz）各投一层半透明的「图例」：
+     面本身再往外推一段，整块压到半透明 —— 背面、底面的颜色也看得见，
+     又不挡住正面的魔方。
+     --half 在方块上本来是「面离方块中心多远」（半个方块），投影面把它改大：
+     1.4 = 推到离中心 1.4 个方块处，比原位多出 0.9 个方块的空隙。
+     方块 i.on 的圆角和贴纸高光都还在，所以和正面那三面是同一套质感。 */
+  /* backface-visibility 必须显式改回 visible：方块本体那六面是 hidden（免得
+     近处的面透出背后的贴纸），而投影面本来就背对镜头 —— 不改的话整层投影
+     会被浏览器直接剔掉，什么都看不到。 */
+  /* 投影面的"看得见"只用透明度表达，不用 display:none —— 元素一直挂在场上，
+     透明度才有过渡（display 的切换是没法补间的）。 */
+  .cubie i.ghost{--half:calc(var(--cs) * 1.4);opacity:0;pointer-events:none;
+                 backface-visibility:visible;transition:opacity .16s ease}
+  /* 哪三面背对镜头由【视角】决定（见 syncGhosts）：转动视角时会换成别的面，
+     所以每个面都带一份投影，这里按 .g-<面> 打开。 */
+  .g-px .cubie i.ghost.px,.g-nx .cubie i.ghost.nx,.g-py .cubie i.ghost.py,
+  .g-ny .cubie i.ghost.ny,.g-pz .cubie i.ghost.pz,.g-nz .cubie i.ghost.nz{opacity:.42}
+  /* 转动：投影跟着那一层一起转，于是"转到正面"的那面慢慢淡掉、"转到背面"的那面
+     慢慢浮现 —— 淡的时长和缓动跟这次转动一样（--gm-dur 由 JS 按这一步填）。
+     一直背对的（本来就 .42）、一直朝着镜头的（本来就 0）不用管，保持原样。
+     fo- = 转出来（fade out），fi- = 转过去（fade in）。 */
+  .layer .cubie i.ghost{transition-duration:var(--gm-dur, 340ms);
+                        transition-timing-function:cubic-bezier(.34,.86,.32,1)}
+  .layer.fo-px .cubie i.ghost.px,.layer.fo-nx .cubie i.ghost.nx,
+  .layer.fo-py .cubie i.ghost.py,.layer.fo-ny .cubie i.ghost.ny,
+  .layer.fo-pz .cubie i.ghost.pz,.layer.fo-nz .cubie i.ghost.nz{opacity:0}
+  .layer.fi-px .cubie i.ghost.px,.layer.fi-nx .cubie i.ghost.nx,
+  .layer.fi-py .cubie i.ghost.py,.layer.fi-ny .cubie i.ghost.ny,
+  .layer.fi-pz .cubie i.ghost.pz,.layer.fi-nz .cubie i.ghost.nz{opacity:.42}
 
   /* ---------- 右侧操作面板（与编辑器同一套样式） ---------- */
   .panel{width:322px;flex:none;background:var(--panel);border-left:1px solid var(--line);
@@ -566,6 +595,14 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
       </div>
     </section>
 
+    <!-- 舞台显示：投影 = 给正面看不到的那三面（左 / 下 / 后）补的半透明图例 -->
+    <section class="sec">
+      <h2>舞台</h2>
+      <label class="tg" id="tg-ghost" title="把正面看不到的那三面（左 / 下 / 后）投成半透明的图例；关掉就只看得到正面这三面">
+        <input type="checkbox" id="ghost" checked> 显示投影
+      </label>
+    </section>
+
     <section class="sec">
       <h2>步骤<span class="pos" id="pos">—</span></h2>
       <div class="spd">
@@ -658,6 +695,7 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   var algEl = document.getElementById('alg');
   var movesEl = document.getElementById('moves');
   var cubeEl = document.getElementById('cube');
+  var ghostOn = true;                 // 「显示投影」开关（计算器面板那个；练习页恒为开）
   var stageEl = document.getElementById('stage');
   var posEl = document.getElementById('pos');
   var errEl = document.getElementById('err');
@@ -741,8 +779,11 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     var w = stageEl.clientWidth, h = stageEl.clientHeight;
     if (!w || !h) return;
     // 立方体投影后的跨度约为边长的 1.4 倍（旋转后）。
-    // 除数 4.3 会让它基本撑满，实际观感偏大，所以整体再收 30% -> 6.15
-    CS = Math.max(12, Math.min(w, h) / 6.15);
+    // 除数 4.3 会让它基本撑满，实际观感偏大，所以整体再收 30% -> 6.15。
+    // 开了投影要更大：背面那三面各往外推 0.9 个方块，整体跨度从 3 变成 4.8 个方块，
+    // 除数按比例放大；同时把留白收一点 —— 投影是半透明的，可以离舞台边近些。
+    var divisor = ghostOn ? 7.7 : 6.15;
+    CS = Math.max(12, Math.min(w, h) / divisor);
     applyZoom();
     syncZoom();
     paint(cur);
@@ -797,6 +838,55 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     syncZoom();
   }
   // 缩放是「看魔方的习惯」，三页共用同一个键 —— 在计算器里调大，编辑器里也一样大
+  var NCLS = { '1,0,0': 'px', '-1,0,0': 'nx', '0,1,0': 'py',
+               '0,-1,0': 'ny', '0,0,1': 'pz', '0,0,-1': 'nz' };
+  var NALL = ['1,0,0', '-1,0,0', '0,1,0', '0,-1,0', '0,0,1', '0,0,-1'];
+
+  /* ---------- 投影（图例）：哪三面看不见，由【视角】算 ----------
+     不是按模型里的 F/B/L/R/D/U 定死的：转动视角时，"看不见的那三面"会换成
+     别的面，投影也要跟着换。判据和 CSS 一样 —— 面法向先过 rotateY 再过 rotateX
+     （CSS 的 v' = Rx·Ry·v），z 分量 < 0 就是背对镜头（CSS 的 +z 朝观察者）。
+     每个有贴纸的面都带一份 .ghost（默认不画），由 .g-<面> class 打开。 */
+  var CSS_N = { px: [1, 0, 0], nx: [-1, 0, 0], py: [0, -1, 0],
+                ny: [0, 1, 0], pz: [0, 0, 1], nz: [0, 0, -1] };
+  // 一个 CSS 法向过一遍当前视角之后，朝向镜头的分量（<0 = 背对镜头 = 看不见）
+  function viewZ(v) {
+    var ax = view.x * Math.PI / 180, ay = view.y * Math.PI / 180;
+    var cy = Math.cos(ay), sy = Math.sin(ay), cx = Math.cos(ax), sx = Math.sin(ax);
+    var z1 = -v[0] * sy + v[2] * cy;              // 先 rotateY
+    return v[1] * sx + z1 * cx;                   // 再 rotateX
+  }
+  // 层自己的旋转（CSS 轴 + 角度）：转动时投影就跟着它转
+  function rotCss(axis, deg, v) {
+    var r = deg * Math.PI / 180, c = Math.cos(r), s = Math.sin(r);
+    if (axis === 'X') return [v[0], v[1] * c - v[2] * s, v[1] * s + v[2] * c];
+    if (axis === 'Y') return [v[0] * c + v[2] * s, v[1], -v[0] * s + v[2] * c];
+    return [v[0] * c - v[1] * s, v[0] * s + v[1] * c, v[2]];
+  }
+  function syncGhosts() {
+    NALL.forEach(function (n) {
+      cubeEl.classList.toggle('g-' + NCLS[n], ghostOn && viewZ(CSS_N[NCLS[n]]) < 0);
+    });
+  }
+
+  /* ---------- 「显示投影」开关 ----------
+     关掉就不画背面那三面的图例（.cubie i.ghost）。选择存起来，和缩放一样。 */
+  var GHOST_KEY = 'calc-ghost-v1';
+  var ghostEl = document.getElementById('ghost'), tgGhost = document.getElementById('tg-ghost');
+  function applyGhost(on) {
+    ghostOn = on;                              // 开关本身只管"画不画"，画哪几面由视角定
+    ghostEl.checked = on;
+    tgGhost.classList.toggle('on', on);
+    syncGhosts();
+    try { localStorage.setItem(GHOST_KEY, on ? '1' : '0'); } catch (e) {}
+  }
+  ghostEl.addEventListener('change', function () { applyGhost(ghostEl.checked); });
+  (function () {
+    var v = null;
+    try { v = localStorage.getItem(GHOST_KEY); } catch (e) {}
+    applyGhost(v !== '0');                    // 默认开
+  })();
+
   var ZOOM_KEY = 'cube-zoom-v1';
   function saveZoom() { try { localStorage.setItem(ZOOM_KEY, String(zoom)); } catch (e) {} }
   function loadZoom() {
@@ -827,17 +917,24 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     }
     return out;
   }
-  var NCLS = { '1,0,0': 'px', '-1,0,0': 'nx', '0,1,0': 'py',
-               '0,-1,0': 'ny', '0,0,1': 'pz', '0,0,-1': 'nz' };
-  var NALL = ['1,0,0', '-1,0,0', '0,1,0', '0,-1,0', '0,0,1', '0,0,-1'];
 
   // 只画朝外的贴纸：state 里没有 (位置,法向) 这一项，说明那块没贴纸
+  // 默认视角（rotateX -24 / rotateY -32）看不到的那三面：
+  // 模型 -x（左）、-y（下）、-z（后）。这三面各投一层半透明的「图例」，样式见 .cubie i.ghost。
   function cubieHTML(faces) {
-    return NALL.map(function (n) {
+    var out = NALL.map(function (n) {
       var col = faces[n];
       if (!col) return '<i class="' + NCLS[n] + '"></i>';
       return '<i class="on ' + NCLS[n] + '" style="--c:' + COLOR[col] + '"></i>';
-    }).join('');
+    });
+    // 每个有贴纸的面都再出一份投影面：class 里 ghost 写在 on 前面 ——
+    // 页面各处按 class="on …" 抠贴纸的地方（测试、快照的对照）都只认真贴纸。
+    NALL.forEach(function (n) {
+      if (faces[n]) {
+        out.push('<i class="ghost on ' + NCLS[n] + '" style="--c:' + COLOR[faces[n]] + '"></i>');
+      }
+    });
+    return out.join('');
   }
 
   function paint(state) {
@@ -860,6 +957,7 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   }
   function applyView() {
     cubeEl.style.transform = 'rotateX(' + view.x + 'deg) rotateY(' + view.y + 'deg)';
+    syncGhosts();                              // 视角一变，看不见的那三面就跟着换
   }
 
   /* ---------- 转动动画 ---------- */
@@ -890,7 +988,24 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     cubeEl.appendChild(layer);
     moving.forEach(function (el) { layer.appendChild(el); });
 
-    // 强制一次重排，保证 0 -> deg 的过渡真的会跑
+    // 这一层的投影：转完之后还看不看得见？
+    //   转到正面（本来背对、转完朝着镜头）-> 淡出；转到背面 -> 淡入；
+    //   一直背对 / 一直朝着镜头的保持原样（CSS 里本来就是 .42 / 0）。
+    // 同一层里每个方块的朝向变化是一样的，所以按【面】算一次就够。
+
+    // 先把"转之前"这一帧结算掉：小方块刚被搬进 .layer，这时才知道它们的起始透明度。
+    // 少了这一步，下面改透明度会被当成"没有旧值"，直接就位 ——
+    // 看着就是"投影先整个出现、然后才开始转"。
+    void layer.offsetWidth;
+    if (ghostOn) {
+      layer.style.setProperty('--gm-dur', dur + 'ms');
+      NALL.forEach(function (n) {
+        var k = NCLS[n];
+        var was = viewZ(CSS_N[k]) < 0, will = viewZ(rotCss(ax, deg, CSS_N[k])) < 0;
+        if (was && !will) layer.classList.add('fo-' + k);        // 转到正面：淡出
+        else if (!was && will) layer.classList.add('fi-' + k);   // 转到背面：淡入
+      });
+    }
     void layer.offsetWidth;
     layer.style.transform = 'rotate' + ax + '(' + deg + 'deg)';
 
@@ -898,7 +1013,7 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     function finish() {
       if (finished) return;
       finished = true;
-      done();
+      done();                          // 里面会重画，投影回到静态状态
     }
     layer.addEventListener('transitionend', finish);
     setTimeout(finish, dur + 80);      // 兜底：transitionend 偶尔不触发
