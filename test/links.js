@@ -1072,9 +1072,12 @@ console.log('\n[19c] 教程页：公式都能送进计算器，进阶页的 OLL 
   ['tutorial-basic.html', 'tutorial-advanced.html'].forEach(p => {
     const h = fs.readFileSync(path.join(ROOT, p), 'utf8');
     const n = (h.match(/class="tocalc"/g) || []).length;
+    const mv = (h.match(/class="mv"/g) || []).length;      // 记号表里那些"点记号跳计算器"
+    const all = (h.match(/href="calc\.html#/g) || []).length;
     // 每条公式一个 ↗，链接里带 hash；计算器只认 calc.html#...
-    ok(p + ' 有 ' + n + ' 条公式带 ↗（都指向 calc.html#）',
-      n >= 7 && n === (h.match(/href="calc\.html#/g) || []).length);
+    // 初级教程的记号表也在跳计算器（class="mv"），所以两种加起来才是全部 calc 链接
+    ok(p + ' 有 ' + n + ' 条公式带 ↗、' + mv + ' 个记号链接（共 ' + all + ' 条 calc.html#）',
+      n >= 7 && all === n + mv);
     ok(p + ' 点公式能复制（<code> + copied 态 + toast）',
       /document\.addEventListener\('click'/.test(h) && /closest\('code'\)/.test(h) &&
       /classList\.add\('copied'\)/.test(h) && /id="toast"/.test(h));

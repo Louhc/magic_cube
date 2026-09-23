@@ -57,6 +57,9 @@
        cursor:pointer;border-radius:5px;padding:2px 6px;background:var(--chip)}
   code:hover{color:var(--accent-text)}
   code.copied{background:var(--accent);color:var(--on-accent)}
+  /* 记号表里的记号是链接（点一下带着这一步跳计算器）：不要下划线，悬停变主色 */
+  a.mv{color:inherit;text-decoration:none}
+  a.mv:hover code,a.mv:focus-visible code{color:var(--accent-text)}
   a.tocalc{flex:none;display:inline-flex;align-items:center;justify-content:center;
            width:22px;height:22px;border-radius:50%;color:var(--muted);
            border:1px solid var(--line);text-decoration:none;opacity:.7}
@@ -210,19 +213,23 @@
     底层的还原相对来说比较简单，即使没有接触过魔方也能较为轻松地还原，
     但是从中间层开始，我们就需要借助公式来还原了。所谓的公式，其实就是一系列的操作，
     让某些块移动到正确的位置，与此同时不影响已经还原的部分。下面是常见的公式记号
-    （字母代表把哪一面转 90°，方向都按<b>面对那一面看</b>时的顺时针算）：</p>
+    （字母代表把哪一面转 90°，方向都按<b>面对那一面看</b>时的顺时针算；
+    M、S、E 说的不是面，而是<b>中间那一层</b>，方向跟着同向的那个面走）：</p>
     <table>
       <thead><tr><th>记号</th><th>意思</th></tr></thead>
       <tbody>
-        <tr><td><code>R</code> <code>L</code></td><td>右面 / 左面顺时针 90°</td></tr>
-        <tr><td><code>U</code> <code>D</code></td><td>上面 / 下面顺时针 90°</td></tr>
-        <tr><td><code>F</code> <code>B</code></td><td>前面 / 后面顺时针 90°</td></tr>
-        <tr><td><code>R'</code></td><td>带一撇 = 反过来（逆时针）90°</td></tr>
-        <tr><td><code>R2</code></td><td>转 180°（顺逆都一样）</td></tr>
-        <tr><td><code>x y z</code></td><td>整个魔方跟着转：x 跟 R 同向、y 跟 U 同向、z 跟 F 同向</td></tr>
+        <tr><td><a class="mv" href="calc.html#R" target="_blank" rel="noopener" title="在计算器里看 R"><code>R</code></a> <a class="mv" href="calc.html#L" target="_blank" rel="noopener" title="在计算器里看 L"><code>L</code></a></td><td>右面 / 左面顺时针 90°</td></tr>
+        <tr><td><a class="mv" href="calc.html#U" target="_blank" rel="noopener" title="在计算器里看 U"><code>U</code></a> <a class="mv" href="calc.html#D" target="_blank" rel="noopener" title="在计算器里看 D"><code>D</code></a></td><td>上面 / 下面顺时针 90°</td></tr>
+        <tr><td><a class="mv" href="calc.html#F" target="_blank" rel="noopener" title="在计算器里看 F"><code>F</code></a> <a class="mv" href="calc.html#B" target="_blank" rel="noopener" title="在计算器里看 B"><code>B</code></a></td><td>前面 / 后面顺时针 90°</td></tr>
+        <tr><td><a class="mv" href="calc.html#M" target="_blank" rel="noopener" title="在计算器里看 M"><code>M</code></a> <a class="mv" href="calc.html#S" target="_blank" rel="noopener" title="在计算器里看 S"><code>S</code></a> <a class="mv" href="calc.html#E" target="_blank" rel="noopener" title="在计算器里看 E"><code>E</code></a></td>
+          <td>中间那一层转 90°：M 夹在左右之间、跟 L 同向；S 夹在前后之间、跟 F 同向；
+              E 夹在上下之间、跟 D 同向</td></tr>
+        <tr><td><a class="mv" href="calc.html#R%27" target="_blank" rel="noopener" title="在计算器里看 R'"><code>R'</code></a></td><td>带一撇 = 反过来（逆时针）90°</td></tr>
+        <tr><td><a class="mv" href="calc.html#R2" target="_blank" rel="noopener" title="在计算器里看 R2"><code>R2</code></a></td><td>转 180°（顺逆都一样）</td></tr>
+        <tr><td><a class="mv" href="calc.html#x" target="_blank" rel="noopener" title="在计算器里看 x"><code>x</code></a> <a class="mv" href="calc.html#y" target="_blank" rel="noopener" title="在计算器里看 y"><code>y</code></a> <a class="mv" href="calc.html#z" target="_blank" rel="noopener" title="在计算器里看 z"><code>z</code></a></td><td>整个魔方跟着转：x 跟 R 同向、y 跟 U 同向、z 跟 F 同向</td></tr>
       </tbody>
     </table>
-    <div class="tip">看不懂公式？试试点击公式右边的计算器符号，跳转计算器开始演示。</div>
+    <div class="tip">看不懂公式？点击公式右边的计算器符号可以跳转计算器开始演示；上面记号表里的记号本身也能点，会带着这一步打开计算器。</div>
     <p>接下来，我们分七步自底向上地还原三阶魔方。</p>
   </section>
 
@@ -451,6 +458,9 @@
   document.addEventListener('click', function (e) {
     var el = e.target.closest ? e.target.closest('code') : null;
     if (!el) return;
+    // 记号表里那些 <code> 是包在链接里的（点一下跳计算器看这一步怎么转），
+    // 不要再拦下来"复制"—— 复制一个 R 也没什么用
+    if (el.closest('a.mv')) return;
     var text = el.textContent.replace(/\s+/g, '');
     function done() {
       el.classList.add('copied');

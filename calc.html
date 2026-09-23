@@ -716,6 +716,8 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   var VIEW = { x: -24, y: -32 };
   var view = { x: VIEW.x, y: VIEW.y };
   var busy = false;                      // 播放中不接受新操作
+  var HOLD_MS = 1000;                    // 「先停一下再动」的停顿：播完之后再按播放、点公式跳转过来
+  var SCRAMBLE_HOLD_MS = 2000;           // 计时器 ↗ 过来的打乱：多停一会（一进来就动像已经播过了）
   var playing = false;                   // 是否在自动连播
   var epoch = 0;                         // 跳转时 +1，用来作废进行中的那一步
   var CS = 46;                           // 小方块边长，随舞台尺寸自适应
@@ -1741,7 +1743,20 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   });
   document.getElementById('reset').addEventListener('click', reset);
   // 播放键：接着演（历史在按「执行公式」那一下已经记过了，这里不用收尾）
-  document.getElementById('play').addEventListener('click', function () { autoPlay(); });
+  // 播放键：在公式结尾（已经播完）时按下 —— 先回到开头、停一秒，然后再播。
+  // 中间按别处（单步 / 跳步 / 再按一次播放）就作废，免得两个循环叠在一起。
+  // 提交公式那条路不走这里：那是"立刻从头演一遍"，不该等。
+  document.getElementById('play').addEventListener('click', function () {
+    if (!playing && at >= steps.length && steps.length && !busy) {
+      jump(0);                                   // 回到开头（顺带停掉队列 / 作废在播的那一步）
+      setTimeout(function () {
+        if (at !== 0 || playing || busy) return;
+        autoPlay();
+      }, HOLD_MS);
+      return;
+    }
+    autoPlay();
+  });
   document.getElementById('first').addEventListener('click', function () { jump(0); });
   document.getElementById('last').addEventListener('click', function () { jump(steps.length); });
   document.getElementById('prev').addEventListener('click', function () { stepBy(-1); });
@@ -1914,7 +1929,7 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
         // 打乱：从复原态【直接正向】执行（不先摆「要解的局面」），
         // 但也和公式一样先停 2 秒再开始 —— 一进来就动会让人以为已经播过了
         paint(cur);
-        setTimeout(function () { run(fwd, hashAlg, 'scramble', false); }, 2000);
+        setTimeout(function () { run(fwd, hashAlg, 'scramble', false); }, SCRAMBLE_HOLD_MS);
         throw { __done: true };                 // 交给下面的 catch 收尾（只跳过后面那半段）
       }
       var r = CubeSim.netRotation(hashAlg);
@@ -1926,9 +1941,9 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
       invert(fwd).forEach(function (x) {
         cur = CubeSim.turn(cur, x.mv, x.times);
       });
-      // 先让用户看清「公式要解的局面」，停 2 秒再正向播公式
+      // 先让用户看清「公式要解的局面」，停 1 秒再正向播公式（和播完再播同一个节奏）
       paint(cur);
-      setTimeout(function () { run(fwd, hashAlg, 'alg', false); }, 2000);
+      setTimeout(function () { run(fwd, hashAlg, 'alg', false); }, HOLD_MS);
     } catch (e) {
       if (!e || !e.__done) {                    // 上面那条 throw 只是「这半段做完了」
         // 公式不合法：退回旧行为，只填进输入框，不执行

@@ -1179,7 +1179,41 @@ console.log('\n[11d] 教程页：主题开关能切、写进存档（真跑一�
         String((h.match(/<img[^>]*data-zoom/g) || []).length));
       // 记号表退回静态那一版（不再是脚本生成的箭头图）
       ok('教程：公式记号表是静态的（没有内联 SVG 箭头）',
-        /<code>x y z<\/code>/.test(h) && !/data-top|<svg class="topview"/.test(h));
+        /<code>x<\/code>/.test(h) && !/data-top|<svg class="topview"/.test(h));
+      // 记号表补了 M / S / E（中间层）
+      ok('教程：记号表里有 M / S / E 一行（中间那一层）',
+        ['M', 'S', 'E'].every(k => h.includes('<code>' + k + '</code>')) &&
+        /中间那一层转 90°/.test(h));
+      // M/S/E 的方向得和模拟器一致：M 跟 L 同向、S 跟 F、E 跟 D
+      {
+        const one = (alg, pos, n) => S.apply(S.solved(), alg)[pos + '|' + n];
+        ok('教程：M 跟 L 同向（前面中心换成原来上面的那块）',
+          one('M', '0,0,1', '0,0,1') === 'U', one('M', '0,0,1', '0,0,1'));
+        ok('教程：S 跟 F 同向（上面中心换成原来左面的那块）',
+          one('S', '0,1,0', '0,1,0') === 'L', one('S', '0,1,0', '0,1,0'));
+        ok('教程：E 跟 D 同向（前面中心换成原来左面的那块）',
+          one('E', '0,0,1', '0,0,1') === 'L', one('E', '0,0,1', '0,0,1'));
+      }
+      // 记号本身是链接：点一下带着这一步打开计算器（不再是"复制一个 R"）
+      {
+        const links = [...h.matchAll(/<a class="mv" href="calc\.html#([^"]+)"[^>]*><code>([^<]+)<\/code><\/a>/g)];
+        ok('教程：记号表 14 个记号都包成了跳计算器的链接（x/y/z 分开，' + links.length + ' 个）',
+          links.length === 14, String(links.length));
+        const bad = links.filter(m => {
+          let alg;
+          try { alg = decodeURIComponent(m[1]); } catch (e) { return true; }
+          if (alg !== m[2]) return true;                    // 链接的公式要和记号一致
+          try { S.parse(alg); } catch (e) { return true; }   // 而且计算器得认识
+          return false;
+        });
+        ok('教程：每个记号链接的公式都能被计算器解析，且和记号一致',
+          bad.length === 0, JSON.stringify(bad.map(m => m[2])));
+        ok('教程：点记号是跳转，不再被"点公式复制"拦下来',
+          /if \(el\.closest\('a\.mv'\)\) return;/.test(h) &&
+          /a\.mv:hover code/.test(h));
+        ok('教程：提示里说了记号本身可以点',
+          /记号表里的记号本身也能点/.test(h));
+      }
       // 编号角标不能只是「有 class="no"」——样式漏掉的话它就是一段裸文字，
       // 排在图片下面，跟 OLL / PLL / F2L 页那种压在左上角的角标完全两回事。
       // 这里把四页的规则抠出来按「去空白」比对，防止哪天又各改各的。
@@ -1672,7 +1706,7 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
       !/demoActive|cancelDemo/.test(src2) && !/startLikePlay/.test(src2) &&
       /function run\(list, label, kind, rev\) \{\s*if \(!list\.length\) return;/.test(src2) &&
       /autoPlay\(afterRun\(\)\)/.test(src2) &&
-      /document\.getElementById\('play'\)\.addEventListener\('click', function \(\) \{ autoPlay\(\); \}\)/.test(src2) &&
+      /document\.getElementById\('play'\)\.addEventListener\('click', function \(\) \{[\s\S]{0,400}?jump\(0\);[\s\S]{0,300}?HOLD_MS/.test(src2) &&
       /function submit\(kind, rev\) \{\s*if \(pausedFirst\(\)\) return;\s*if \(busy\) return;/.test(src2));
     // 顺序反过来：先把这一条记进历史（并把累积局面推到末尾），再开始播动画
     ok('先记账再播动画（hist.push 排在 autoPlay 之前，按了就有反馈）',
@@ -1967,7 +2001,7 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
       /syncSpd\(\);\s*\/\/ 滑条/.test(src2) && /saveState\(\);\s*\/\/ 再把设置写回去/.test(src2));
     ok('计算器认识 @s: 前缀（打乱：直接正向执行，不先摆局面）',
       /h\.indexOf\('@s:'\) === 0/.test(src2) &&
-      /setTimeout\(function \(\) \{ run\(fwd, hashAlg, 'scramble', false\); \}, 2000\)/.test(src2) &&
+      /setTimeout\(function \(\) \{ run\(fwd, hashAlg, 'scramble', false\); \}, SCRAMBLE_HOLD_MS\)/.test(src2) &&
       /@s:' \+ encodeURIComponent\(scramble\)/.test(fs.readFileSync(path.join(__dirname, '..', 'timer.html'), 'utf8')));
     ok('计算器认识 @g: 前缀',
       /indexOf\('@g:'\) === 0/.test(src2));
@@ -1999,8 +2033,9 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
       !/concat\(rinv\)/.test(src2) && !/playCoda/.test(src2) && !/simplify\(/.test(src2),
       '代码里还在往动画里加东西');
     ok('逆执行完再正向播一遍（动画）', /run\(fwd, hashAlg, 'alg', false\)/.test(src2));
-    ok('正向播放前先停 2 秒',
-      /setTimeout\(function \(\) \{ run\(fwd, hashAlg, 'alg', false\); \}, 2000\)/.test(src2));
+    ok('正向播放前先停 1 秒（HOLD_MS，和播完再播同一个节奏）',
+      /setTimeout\(function \(\) \{ run\(fwd, hashAlg, 'alg', false\); \}, HOLD_MS\)/.test(src2) &&
+      /var HOLD_MS = 1000;/.test(src2));
     ok('计算器会读取 hash 里的公式',
       /location\.hash/.test(fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')));
     // 带上 hash 打开时，输入框应当被填好
@@ -2371,7 +2406,11 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
       els.play.fire('click');
       ok('点播放会从这条公式的开头播起（先退回执行前）',
         els.pos.textContent === '0 / ' + N1, els.pos.textContent);
-      await wait(900);
+      // 用户要的节奏：在结尾按播放 —— 回到开头后先停一秒再开始播
+      await wait(400);
+      ok('回到开头后先停一秒再播（400ms 时还停在 0 / ' + N1 + '）',
+        els.pos.textContent === '0 / ' + N1, els.pos.textContent);
+      await wait(1600);                    // 剩下 0.6s 停顿 + 3 步动画
       ok('播完停在公式结束的局面',
         els.pos.textContent === N1 + ' / ' + N1 &&
         sameState(readCube(), S.apply(S.solved(), "R U R'")), els.pos.textContent);
