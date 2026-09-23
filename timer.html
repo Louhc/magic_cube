@@ -21,12 +21,37 @@
   .themebtn{position:absolute;right:40px;top:14px}
   .printbtn{display:none}
 
+  /* 三阶 / 二阶 / 四阶：和编辑器、计算器那块模式栏逐字同一套（面板底 + 竖着一摞
+     按钮 + 会滑过去的药丸），摆在打乱框左边、和它并排 —— 换阶数换的就是这一条打乱，
+     手边就是那个框，比挂在页头更顺。 */
+  .scrrow{display:flex;align-items:stretch;gap:12px;margin:16px 0 0;flex-wrap:wrap}
+  .modebar{position:relative;display:flex;flex-direction:column;gap:2px;flex:none;
+           min-width:88px;background:var(--panel);border:1px solid var(--line);
+           border-radius:9px;padding:3px}
+  .mpill{position:absolute;left:0;top:0;border-radius:6px;background:var(--accent);
+         transition:transform .18s ease,width .18s ease,height .18s ease;pointer-events:none}
+  .modebar button{position:relative;z-index:1;background:none;border:none;color:var(--muted);
+                  text-align:center;font:inherit;font-size:11.5px;font-weight:600;
+                  letter-spacing:.09em;padding:4px 13px;border-radius:6px;cursor:pointer;
+                  transition:color .18s ease .18s}
+  .modebar button:not(.on){transition-delay:0s}
+  .modebar button:hover{color:var(--text)}
+  .modebar button.on{color:var(--on-accent, #fff)}
+  @media (prefers-reduced-motion: reduce){ .mpill{transition:none} }
+
   /* 打乱 */
-  .scr{margin:16px 0 0;padding:14px 16px;background:var(--card);border:1px solid var(--line);
-       border-radius:12px;display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}
+  .scr{flex:1;min-width:0;margin:0;padding:14px 16px;background:var(--card);
+       border:1px solid var(--line);border-radius:12px;
+       display:flex;align-items:center;gap:12px;flex-wrap:wrap}
   .scr .txt{flex:1;min-width:240px;font:15px/1.7 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
             word-break:break-word}
   .scr .txt.bad{color:var(--muted);font-family:inherit}
+  /* 「换一个」：和旁边两个小图标一样垂直居中。
+     不能挂 .bar —— 那是下面成绩栏那一行的样式，自带 14px 上边距，在这条居中的框里
+     就会把按钮压偏下（用户看出来的那个毛病）。 */
+  .scr .go{flex:none;padding:5px 12px;border-radius:8px;cursor:pointer;font:inherit;
+           background:var(--field);border:1px solid var(--line);color:var(--text)}
+  .scr .go:hover{color:var(--accent-text);border-color:var(--accent-text)}
 
   /* 计时区：整块都能按（按住预备、松开开始、再按停止） */
   .pad{margin:16px 0 0;padding:26px 16px 22px;border-radius:14px;background:var(--card);
@@ -73,7 +98,7 @@
     .pad{padding:20px 12px 18px}
     .row .s{display:none}
   }
-  @media print{ .themebtn,.pad,.bar{display:none} }
+  @media print{ .themebtn,.pad,.bar,.modebar{display:none} }
 </style>
 <script>try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.dataset.theme='dark'}catch(e){}</script>
 </head>
@@ -88,15 +113,27 @@
     <button class="themebtn" id="themebtn" type="button" title="切到夜晚"></button>
   </header>
 
-  <div class="scr">
-    <div class="txt" id="scr"></div>
-    <button class="bar" id="newscr" type="button" style="border:1px solid var(--line);
-      background:var(--field);color:var(--text);border-radius:8px;padding:5px 12px;cursor:pointer">
-      换一个</button>
-    <!-- 还没开始计时也能用：复制这条打乱 / 送进计算器 -->
-    <button class="ico" id="scr-copy" type="button" title="复制这条打乱" aria-label="复制这条打乱"></button>
-    <a class="ico" id="scr-calc" href="calc.html#" target="_blank" rel="noopener"
-       title="在计算器里打开这条打乱" aria-label="在计算器里打开这条打乱"></a>
+  <!-- 三阶 / 二阶 / 四阶：换阶数会换一套打乱 + 一套成绩（不同阶数没有可比性，分开算），
+       打乱条和成绩里那个 ↗ 也会带上对应的标记（@2s: / @4s:），点过去自动切阶数。 -->
+  <div class="scrrow">
+    <div class="modebar" id="modebar">
+      <span class="mpill" id="mpill"></span>
+      <button id="mode2" type="button" data-mode="2" aria-pressed="false"
+              title="二阶（2×2×2）：11 步打乱（只写 U R F）">二阶</button>
+      <button id="mode3" type="button" data-mode="3" class="on" aria-pressed="true"
+              title="三阶（3×3×3）：20 步打乱">三阶</button>
+      <button id="mode4" type="button" data-mode="4" aria-pressed="false"
+              title="四阶（4×4×4）：40 步打乱（一半左右是宽转 Rw）">四阶</button>
+    </div>
+    <div class="scr">
+      <div class="txt" id="scr"></div>
+      <button class="go" id="newscr" type="button" title="换一条打乱">换一个</button>
+      <!-- 还没开始计时也能用：复制这条打乱 / 送进计算器 -->
+      <button class="ico" id="scr-copy" type="button" title="复制这条打乱"
+              aria-label="复制这条打乱"></button>
+      <a class="ico" id="scr-calc" href="calc.html#" target="_blank" rel="noopener"
+         title="在计算器里打开这条打乱" aria-label="在计算器里打开这条打乱"></a>
+    </div>
   </div>
 
   <div class="pad" id="pad">
@@ -124,7 +161,8 @@
   'use strict';
 
   var KEY = 'cube-timer-v1';
-  var MAX = 300;                       // 只留最近 300 次，别把 localStorage 撑爆
+  var MAX = 300;                       // 每阶只留最近 300 次，别把 localStorage 撑爆
+  var MODES = { '3': '三阶', '2': '二阶', '4': '四阶' };   // 按钮顺序：二阶 / 三阶 / 四阶
 
   var scrEl = document.getElementById('scr');
   var padEl = document.getElementById('pad');
@@ -145,25 +183,45 @@
 
   var solves = [];                     // [{ms, scramble, at}]，新的在后面
   var scramble = '';
+  var mode = '3';                      // '3' | '2' | '4'
+  var saves = {};                      // 其他阶数的那几套：{ '2': {solves, scramble}, … }
   var phase = 'idle';                  // idle | ready | run
   var t0 = 0, raf = 0, timer = 0;
 
+  /* 存档：**当前这一阶**的 solves / scramble 放在顶层（老版本、老的读法照样能用），
+     别的阶数塞在 saves 里 —— 加上顶层那个 mode，就是「上次离开时那一阶」。
+     所以打开时是什么阶数，全看这个 mode；第一次打开（还没有存档）是三阶。
+     这样三阶那套成绩和以前完全一样，不会因为加了阶数就丢。 */
   try {
     var raw = JSON.parse(localStorage.getItem(KEY) || 'null');
     if (Object.prototype.toString.call(raw) === '[object Array]') {
-      // 老格式：只有成绩列表
+      // 老格式：只有成绩列表（那时候只有三阶）
       solves = raw.filter(function (s) { return s && typeof s.ms === 'number'; });
     } else if (raw && typeof raw === 'object') {
+      if (raw.mode === '2' || raw.mode === '4' || raw.mode === '3') mode = raw.mode;
       solves = (raw.solves || []).filter(function (s) { return s && typeof s.ms === 'number'; });
       scramble = typeof raw.scramble === 'string' ? raw.scramble : '';
+      if (raw.saves && typeof raw.saves === 'object') {
+        Object.keys(raw.saves).forEach(function (k) {
+          var v = raw.saves[k];
+          if (!v) return;
+          saves[k] = {
+            solves: (v.solves || []).filter(function (s) { return s && typeof s.ms === 'number'; }),
+            scramble: typeof v.scramble === 'string' ? v.scramble : ''
+          };
+        });
+      }
     }
   } catch (e) {}
   function save() {
     try {
-      localStorage.setItem(KEY, JSON.stringify({
-        solves: solves.slice(-MAX),
-        scramble: scramble          // 当前这条也要存：切走再回来不该换题
-      }));
+      // mode 也存：下次打开就停在那一阶（第一次打开没有存档，默认三阶）
+      var doc = { mode: mode, solves: solves.slice(-MAX), scramble: scramble, saves: {} };
+      Object.keys(saves).forEach(function (k) {
+        if (k === mode || !saves[k]) return;
+        doc.saves[k] = { solves: saves[k].solves.slice(-MAX), scramble: saves[k].scramble || '' };
+      });
+      localStorage.setItem(KEY, JSON.stringify(doc));
     } catch (e) {}
   }
 
@@ -171,18 +229,24 @@
   var scrCopy = document.getElementById('scr-copy'), scrCalc = document.getElementById('scr-calc');
   scrCopy.innerHTML = ICON.copy;
   scrCalc.innerHTML = ICON.calc;
+  /* 跳计算器时带哪个标记：三阶 @s:、二阶 @2s:、四阶 @4s: ——
+     计算器按它决定用哪一阶、以及「这是一条打乱」（直接执行，不先摆局面）。 */
+  function scrPrefix() { return mode === '2' ? '@2s:' : mode === '4' ? '@4s:' : '@s:'; }
+  function syncScrLink() {
+    scrCalc.setAttribute('href', 'calc.html#' + scrPrefix() + encodeURIComponent(scramble));
+  }
   function newScramble() {
-    scramble = Timer.scramble(20);
+    scramble = Timer.scrambleFor(mode);
     scrEl.textContent = scramble;
     scrEl.classList.remove('bad');
     // 没开始计时也能把这条送进计算器（换打乱时链接跟着换）
-    scrCalc.setAttribute('href', 'calc.html#@s:' + encodeURIComponent(scramble));
+    syncScrLink();
     save();          // 换了打乱立刻存：否则切页回来又变回上一条
   }
   // 存档里有当前打乱就接着用（切页、刷新都不换题），没有才新生成一条
   if (scramble) {
     scrEl.textContent = scramble;
-    scrCalc.setAttribute('href', 'calc.html#@s:' + encodeURIComponent(scramble));
+    syncScrLink();
   } else {
     newScramble();
   }
@@ -190,6 +254,62 @@
     flash('已复制：' + scramble);
     copyText(scramble, function () {});
   });
+
+  /* ---------- 阶数：三阶 / 二阶 / 四阶 ----------
+     换阶数只换「打乱 + 成绩」这两套，计时本身不受影响（计时中换就先把这次作废）。
+     成绩按阶数分开算：二阶、四阶和二阶之间没有可比性，混在一张榜上没意义。 */
+  var modeBtns = { '3': document.getElementById('mode3'), '2': document.getElementById('mode2'),
+                   '4': document.getElementById('mode4') };
+  var mpill = document.getElementById('mpill');
+  // 选中态那块药丸：和编辑器 / 计算器一个做法（切的时候滑过去，不是跳过去）
+  function placeMPill(el, animate) {
+    if (!mpill || !el) return;
+    if (!animate) mpill.style.transition = 'none';
+    mpill.style.width = el.offsetWidth + 'px';
+    mpill.style.height = el.offsetHeight + 'px';
+    mpill.style.transform = 'translate(' + el.offsetLeft + 'px,' + el.offsetTop + 'px)';
+    if (!animate) {
+      void mpill.offsetWidth;            // 逼一次重排，免得初始定位也被当成动画
+      mpill.style.transition = '';
+    }
+  }
+  function syncMode(animate) {
+    var active = null;
+    Object.keys(modeBtns).forEach(function (k) {
+      var b = modeBtns[k];
+      b.classList.toggle('on', k === mode);
+      // 桩里没有 setAttribute（真 DOM 有）；读屏靠 aria-pressed 知道选的是哪个
+      if (b.setAttribute) b.setAttribute('aria-pressed', k === mode ? 'true' : 'false');
+      if (k === mode) active = b;
+    });
+    placeMPill(active, animate !== false);
+    syncScrLink();
+  }
+  function setMode(m) {
+    var nm = (m === '2' || m === '4') ? m : '3';
+    if (nm === mode) return;
+    if (phase !== 'idle') {              // 计时中换阶数：这一次作废（没法算到另一阶上）
+      stopTicking();
+      pressed = skipUp = false;
+      paintTime(0);
+      setPhase('idle');
+      flash('换阶数了，这一次不算');
+    }
+    saves[mode] = { solves: solves, scramble: scramble };   // 这一套收起来
+    var back = saves[nm] || { solves: [], scramble: '' };
+    solves = back.solves;                                   // 目标那一套取出来
+    scramble = back.scramble || '';
+    mode = nm;
+    syncMode(true);
+    if (scramble) scrEl.textContent = scramble;
+    else newScramble();                  // 这一阶还没有题：现生成一条
+    render();
+    save();
+  }
+  modeBtns['3'].addEventListener('click', function () { setMode('3'); });
+  modeBtns['2'].addEventListener('click', function () { setMode('2'); });
+  modeBtns['4'].addEventListener('click', function () { setMode('4'); });
+  syncMode(false);
 
   /* ---------- 计时 ---------- */
   function paintTime(ms) { timeEl.textContent = Timer.fmt(ms); }
@@ -282,7 +402,7 @@
               '<span class="s">' + scr + '</span>' +
               '<button class="ico" type="button" data-copy="' + i + '" title="复制这条打乱"' +
               ' aria-label="复制这条打乱">' + ICON.copy + '</button>' +
-              (scr ? '<a class="ico" href="calc.html#@s:' + encodeURIComponent(scr) + '"' +
+              (scr ? '<a class="ico" href="calc.html#' + scrPrefix() + encodeURIComponent(scr) + '"' +
                      ' target="_blank" rel="noopener" title="在计算器里打开这条打乱"' +
                      ' aria-label="在计算器里打开这条打乱">' + ICON.calc + '</a>' : '') +
               '<button class="ico del" type="button" data-del="' + i + '" title="删掉这条"' +
@@ -340,7 +460,8 @@
   document.getElementById('save').addEventListener('click', function () {
     if (!solves.length) { flash('还没有成绩'); return; }
     var t = new Date(), p = function (n) { return (n < 10 ? '0' : '') + n; };
-    var name = 'cube-timer-' + t.getFullYear() + p(t.getMonth() + 1) + p(t.getDate()) + '-' +
+    var name = 'cube-timer-' + mode + 'x' + mode + '-' +
+               t.getFullYear() + p(t.getMonth() + 1) + p(t.getDate()) + '-' +
                p(t.getHours()) + p(t.getMinutes()) + p(t.getSeconds()) + '.csv';
     var blob = new Blob([Timer.csv(solves)], { type: 'text/csv;charset=utf-8' });
     var a = document.createElement('a');

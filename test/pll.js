@@ -188,5 +188,115 @@ console.log('\n[9] 线段端点必须收在箭头头里面');
   ok('每根箭头的线尾都缩进箭头头里（' + pairs + ' 根）', pairs === 3 && bad === 0, bad + ' 根没缩够');
 }
 
+console.log('\n[10] 二阶（2×2）：OLL / PBL');
+{
+  // --- OLL：2x2 只有四个角 ---
+  const o = C.oll2All(true), bo = C.buildOll2(o, {});
+  ok('2×2 OLL：4 格 + 8 条划线（每个角两条）',
+    bo.cells.length === 4 && bo.bars.length === 8,
+    bo.cells.length + ' 格 / ' + bo.bars.length + ' 线');
+  ok('2×2 OLL：没有中心格（四格都能点）', bo.cells.every(c => !c.center));
+  ok('2×2 OLL：点一下循环朝向，三轮回到朝上', (() => {
+    const a = C.oll2All(true), v = [];
+    for (let i = 0; i < 3; i++) { C.cycleOll2(a, 0, 0); v.push(a[0][0]); }
+    return v.join() === '1,2,0';
+  })());
+  ok('2×2 OLL：全部设为未朝向 = 四角都指向侧面',
+    JSON.stringify(C.oll2All(false)) === '[[1,1],[1,1]]', JSON.stringify(C.oll2All(false)));
+  const so = C.toOll2Svg(o, {});
+  ok('2×2 OLL 的 SVG：4 格 + 8 条线',
+    (so.match(/class="cell"/g) || []).length === 4 &&
+    (so.match(/<line class="bar"/g) || []).length === 8);
+
+  // --- PBL：上下两层各 4 个角 ---
+  const home = C.pbl2Default(), b0 = C.buildPbl2(home, {});
+  ok('2×2 PBL：两层共 8 格（每层 2×2）',
+    b0.cells.length === 8 && b0.cells.filter(c => c.layer === 'u').length === 4 &&
+    b0.cells.filter(c => c.layer === 'd').length === 4);
+  ok('2×2 PBL：复原态没有箭头', b0.arrows.length === 0, String(b0.arrows.length));
+  const yU = Math.max.apply(null, b0.cells.filter(c => c.layer === 'u')
+    .map(c => Math.max.apply(null, c.pts.map(p => p[1]))));
+  const yD = Math.min.apply(null, b0.cells.filter(c => c.layer === 'd')
+    .map(c => Math.min.apply(null, c.pts.map(p => p[1]))));
+  ok('2×2 PBL：D 层整块排在 U 层下面（和教程那张图的排法一致）', yD > yU, yU + ' / ' + yD);
+  ok('2×2 PBL：不做配色（格子不填色）', b0.cells.every(c => c.fill === 'none'));
+
+  // 参考图那几种情况：换两块 = 一根双头箭头
+  // 网格是斜的，所以"横/竖"要按倾斜后的两个基向量来判方向
+  const dirOf = a => {
+    const dx = a.p2[0] - a.p1[0], dy = a.p2[1] - a.p1[1], L = Math.hypot(dx, dy) || 1;
+    return [dx / L, dy / L];
+  };
+  const unit = v => { const L = Math.hypot(v[0], v[1]) || 1; return [v[0] / L, v[1] / L]; };
+  const near = (a, b) => Math.abs(a[0] - b[0]) < 0.02 && Math.abs(a[1] - b[1]) < 0.02;
+  const ROW = unit(C.PBL2_SKEW.u), COL = unit(C.PBL2_SKEW.v);
+
+  const adj = { u: [1, 0, 2, 3], d: [1, 0, 2, 3] }, ba = C.buildPbl2(adj, {});
+  ok('2×2 PBL：上下层各换前两邻角 -> 两根双头箭头（沿"行"方向）',
+    ba.arrows.length === 2 && ba.arrows.every(a => a.both) &&
+    ba.arrows.map(a => a.layer).sort().join() === 'd,u' &&
+    ba.arrows.every(a => near(dirOf(a), ROW)),
+    JSON.stringify(ba.arrows.map(a => [a.layer, a.from, a.to, dirOf(a)])));
+  const bd = C.buildPbl2({ u: [3, 1, 2, 0], d: [0, 1, 2, 3] }, {});
+  ok('2×2 PBL：只换一对对角 -> 一根斜的双头箭头（既不沿行也不沿列）',
+    bd.arrows.length === 1 && bd.arrows[0].both &&
+    !near(dirOf(bd.arrows[0]), ROW) && !near(dirOf(bd.arrows[0]), COL),
+    JSON.stringify(bd.arrows.map(dirOf)));
+  const bv = C.buildPbl2({ u: [0, 1, 2, 3], d: [2, 1, 0, 3] }, {});
+  ok('2×2 PBL：换同一列两块 -> 沿"列"方向的箭头',
+    bv.arrows.length === 1 && near(dirOf(bv.arrows[0]), COL),
+    JSON.stringify(bv.arrows.map(dirOf)));
+
+  // 倾斜度可调（编辑器里那根滑条）
+  const flat = C.buildPbl2(adj, { skew: 0 });
+  ok('2×2 PBL：skew=0 时是正上方俯视（行方向水平）',
+    flat.arrows.every(a => Math.abs(a.p1[1] - a.p2[1]) < 1e-6) &&
+    Math.abs(flat.size.w - flat.size.h * 0.5) < 0.6,
+    flat.size.w + 'x' + flat.size.h);
+  // 两层的间距（上层的下边 -> 下层的上边）可以单独设，而且和倾斜度无关
+  const layerBox = (b, layer) => {
+    const ys = [];
+    b.cells.filter(c => c.layer === layer).forEach(c => c.pts.forEach(p => ys.push(p[1])));
+    return [Math.min.apply(null, ys), Math.max.apply(null, ys)];
+  };
+  [0, 0.14, 0.6].forEach(gap => {
+    const b = C.buildPbl2(adj, { skew: 1, layerGap: gap });
+    const u = layerBox(b, 'u'), d = layerBox(b, 'd');
+    ok('2×2 PBL：间距 ' + gap + ' 格 = 上层下边到下层上边的距离',
+      Math.abs((d[0] - u[1]) - gap) < 1e-6, (d[0] - u[1]).toFixed(4));
+  });
+  ok('2×2 PBL：间距和倾斜度无关（斜度变了间距不动）', (() => {
+    const a1 = C.buildPbl2(adj, { skew: 0.2, layerGap: 0.3 });
+    const a2 = C.buildPbl2(adj, { skew: 1.2, layerGap: 0.3 });
+    const g1 = layerBox(a2, 'd')[0] - layerBox(a2, 'u')[1];
+    const g0 = layerBox(a1, 'd')[0] - layerBox(a1, 'u')[1];
+    return Math.abs(g0 - 0.3) < 1e-6 && Math.abs(g1 - 0.3) < 1e-6;
+  })());
+
+  const st1 = C.buildPbl2(adj, { skew: 1 }), st2 = C.buildPbl2(adj, { skew: 1.4 });
+  ok('2×2 PBL：倾斜越大，两层叠起来越矮、越宽',
+    st2.size.h < st1.size.h && st2.size.w > st1.size.w,
+    JSON.stringify([st1.size, st2.size]));
+
+  // 只动一层
+  const st = C.pbl2Default();
+  ok('2×2 PBL：换两块只动那一层',
+    C.pbl2Swap(st, 'u', 0, 1) && st.u.join() === '1,0,2,3' && st.d.join() === '0,1,2,3',
+    JSON.stringify(st));
+  ok('2×2 PBL：越界的下标不动手', C.pbl2Swap(st, 'u', 0, 9) === false && st.u.join() === '1,0,2,3');
+  ok('2×2 PBL：clone 是深拷贝', (() => {
+    const c2 = C.pbl2Clone(st); c2.u[0] = 3; return st.u[0] === 1;
+  })());
+
+  const sp = C.toPbl2Svg(adj, {});
+  ok('2×2 PBL 的 SVG：每格带 data-layer / data-slot（编辑器靠它找落点）',
+    (sp.match(/<g class="cell"[^>]*data-layer="u"/g) || []).length === 4 &&
+    (sp.match(/<g class="cell"[^>]*data-layer="d"/g) || []).length === 4 &&
+    /data-slot="u0"/.test(sp) && /data-slot="d3"/.test(sp),
+    (sp.match(/<g class="cell"[^>]*>/g) || []).slice(0, 2).join(' '));
+  ok('2×2 PBL 的 SVG：互换成环画成一根双头箭头（data-both=1）',
+    (sp.match(/data-both="1"/g) || []).length === 2, sp.match(/data-both="1"/g));
+}
+
 console.log('\n结果: ' + pass + ' 通过, ' + fail + ' 失败');
 process.exit(fail ? 1 : 0);

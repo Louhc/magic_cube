@@ -374,58 +374,59 @@
     };
   }
 
-  function ollFacesAt(r, c) { return OLL_FACES[r][c]; }
-  function ollIsCenter(r, c) { return ollFacesAt(r, c).length === 1; }
+  // faces 省略时就是三阶那张表；2x2 传自己的表进来（见下面 二阶 那一段）
+  function ollFacesAt(r, c, faces) { return (faces || OLL_FACES)[r][c]; }
+  function ollIsCenter(r, c, faces) { return ollFacesAt(r, c, faces).length === 1; }
   function ollIsOriented(oll, r, c) { return !oll[r] || oll[r][c] === 0; }
 
   // 点一下：在"黄色朝向哪个面"之间循环；中心块只有 U 一种，点不动
-  function cycleOll(oll, r, c) {
-    var n = ollFacesAt(r, c).length;
+  function cycleOll(oll, r, c, faces) {
+    var n = ollFacesAt(r, c, faces).length;
     if (n < 2) return false;
     oll[r][c] = (oll[r][c] + 1) % n;
     return true;
   }
 
   // 全部设为某一个状态：oriented=true 全朝上，false 全指向第一个侧面
-  function ollAll(oriented) {
-    return [0, 1, 2].map(function (r) {
-      return [0, 1, 2].map(function (c) {
-        if (ollIsCenter(r, c)) return 0;
-        return oriented ? 0 : 1;
-      });
+  function ollAll(oriented, faces) {
+    var tb = faces || OLL_FACES;
+    return tb.map(function (row, r) {
+      return row.map(function (_, c) { return ollIsCenter(r, c, tb) ? 0 : (oriented ? 0 : 1); });
     });
   }
 
   function cloneOll(oll) { return oll.map(function (r) { return r.slice(); }); }
 
-  function buildOll(oll, userCfg) {
+  function buildOll(oll, userCfg, faces) {
+    var tb = faces || OLL_FACES;
+    var n = tb.length;
     var g = Object.assign({}, OLL_CFG, userCfg || {});
     var pal = ollPalette(g.theme, g.scheme);
     var pitch = g.cell + g.gap;
-    var board = 3 * pitch - g.gap;
+    var board = n * pitch - g.gap;
     var pad = g.pad * board;
     var cells = [], bars = [];
 
-    for (var r = 0; r < 3; r++) {
-      for (var c = 0; c < 3; c++) {
+    for (var r = 0; r < n; r++) {
+      for (var c = 0; c < n; c++) {
         var x = pad + c * pitch, y = pad + r * pitch;
         var cx = x + g.cell / 2, cy = y + g.cell / 2;
         var rect = [[x, y], [x + g.cell, y], [x + g.cell, y + g.cell], [x, y + g.cell]];
-        var faces = ollFacesAt(r, c);
-        var idx = ollIsCenter(r, c) ? 0 : ((oll[r] && oll[r][c]) || 0);
+        var faces = ollFacesAt(r, c, tb);
+        var idx = ollIsCenter(r, c, tb) ? 0 : ((oll[r] && oll[r][c]) || 0);
         if (idx >= faces.length) idx = 0;
         var on = idx === 0;
 
         cells.push({
           row: r, col: c, id: 'oll-' + r + '-' + c,
-          center: ollIsCenter(r, c), on: on, face: faces[idx],
+          center: ollIsCenter(r, c, tb), on: on, face: faces[idx],
           pts: roundedPoints(rect, g.radius * g.cell, 5),
           fill: on ? pal.on : pal.off
         });
 
         // 每个能放黄色的侧面画一条线段：选中的用实心格颜色，其余用浅灰
         // （黄色只有一个面，选了别的就变淡）
-        if (!ollIsCenter(r, c)) {
+        if (!ollIsCenter(r, c, tb)) {
           var half = g.barLen * g.cell / 2;
           var off = g.barOff;
           for (var k = 1; k < faces.length; k++) {
@@ -448,9 +449,9 @@
              size: { w: board + pad * 2, h: board + pad * 2 } };
   }
 
-  function toOllSvg(oll, userCfg, opts) {
+  function toOllSvg(oll, userCfg, opts, faces) {
     opts = opts || {};
-    var b = buildOll(oll, userCfg);
+    var b = buildOll(oll, userCfg, faces);
     var g = b.cfg, w = b.size.w, h = b.size.h;
     var out = ['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + w.toFixed(3) + ' ' + h.toFixed(3) +
       '" width="' + w.toFixed(3) + '" height="' + h.toFixed(3) + '" shape-rendering="geometricPrecision">'];
@@ -546,7 +547,10 @@
     { key: 'navy',    zh: '藏蓝', on: '#2B4C8C' },
     { key: 'forest',  zh: '墨绿', on: '#2A5F45' },
     { key: 'crimson', zh: '深红', on: '#9E2B3A' },
-    { key: 'umber',   zh: '赭石', on: '#7A4A1E' }
+    // 黄：和 PLL「无色夜间」那版箭头同一个黄（HEX.yellow）。
+    // 注意它压不到黄色格子上 —— 要把「显示颜色」关掉（格子透明）才好看，
+    // 也就是夜晚那套无色图的用法。
+    { key: 'yellow',  zh: '黄',   on: HEX.yellow }
   ];
   var PLL_DEFAULT_ARROW = 'violet';
   function pllArrowColorOf(key) {
@@ -613,6 +617,41 @@
 
   function pllIsHome(perm) { for (var i = 0; i < perm.length; i++) if (perm[i] !== i) return false; return true; }
 
+  /* 箭头几何：每个不在自己家的块，从当前槽位指向它的家。
+     slots 是这一层的槽位表，centerOf(i) 给第 i 个槽位的格心（屏幕坐标）——
+     三阶 PLL 和二阶 PBL 都用这一份，免得两处箭头推导各写一遍。
+     互换成环的两块只画**一根双头箭头**（两头都有头）。
+     曾经画成两根平行的单向箭头，各自偏 0.16 —— 结果它们的头尾挤在一起，
+     看着像连成一条，很难看；而且"到底哪个方向"本来也没有意义。 */
+  function pllArrowGeom(perm, slots, centerOf, g) {
+    var arrows = [], done = {};
+    var raw = pllArrows(perm).filter(function (a) {
+      if (done[a.from]) return false;
+      var mutual = (perm[a.to] === a.from);
+      if (mutual) done[a.to] = true;
+      return true;
+    });
+    // 数一下每个格心上落了多少个箭头端点
+    var ends = {};
+    raw.forEach(function (a) {
+      ends[a.from] = (ends[a.from] || 0) + 1;     // 这根箭头的尾
+      ends[a.to] = (ends[a.to] || 0) + 1;         // 这根箭头的头
+    });
+    raw.forEach(function (a) {
+      var mutual = (perm[a.to] === a.from);
+      var p1 = centerOf(a.from), p2 = centerOf(a.to);
+      var dx = p2[0] - p1[0], dy = p2[1] - p1[1], L = Math.hypot(dx, dy) || 1;
+      var ux = dx / L, uy = dy / L;
+      // 该格上不止一个端点就回缩，留出缝
+      var gm = ends[a.from] > 1 ? g.cell * g.joinGap : 0;
+      var gn = ends[a.to] > 1 ? g.cell * g.joinGap : 0;
+      p1 = [p1[0] + ux * gm, p1[1] + uy * gm];
+      p2 = [p2[0] - ux * gn, p2[1] - uy * gn];
+      arrows.push({ from: a.from, to: a.to, p1: p1, p2: p2, both: mutual });
+    });
+    return arrows;
+  }
+
   function buildPll(perm, userCfg) {
     var g = Object.assign({}, PLL_CFG, userCfg || {});
     var showColors = g.showColors !== false;
@@ -657,39 +696,10 @@
       });
     }
 
-    // 箭头：从当前槽位中心指向家的中心
-    function centerOf(i) {
+    var arrows = pllArrowGeom(perm, PLL_SLOTS, function (i) {
       var sl = PLL_SLOTS[i];
       return [pad + sl.col * pitch + g.cell / 2, pad + sl.row * pitch + g.cell / 2];
-    }
-    // 互换成环的两块只画**一根双头箭头**（两头都有头）。
-    // 曾经画成两根平行的单向箭头，各自偏 0.16 —— 结果它们的头尾挤在一起，
-    // 看着像连成一条，很难看；而且"到底哪个方向"本来也没有意义。
-    var arrows = [], done = {};
-    var raw = pllArrows(perm).filter(function (a) {
-      if (done[a.from]) return false;
-      var mutual = (perm[a.to] === a.from);
-      if (mutual) done[a.to] = true;
-      return true;
-    });
-    // 数一下每个格心上落了多少个箭头端点
-    var ends = {};
-    raw.forEach(function (a) {
-      ends[a.from] = (ends[a.from] || 0) + 1;     // 这根箭头的尾
-      ends[a.to] = (ends[a.to] || 0) + 1;         // 这根箭头的头
-    });
-    raw.forEach(function (a) {
-      var mutual = (perm[a.to] === a.from);
-      var p1 = centerOf(a.from), p2 = centerOf(a.to);
-      var dx = p2[0] - p1[0], dy = p2[1] - p1[1], L = Math.hypot(dx, dy) || 1;
-      var ux = dx / L, uy = dy / L;
-      // 该格上不止一个端点就回缩，留出缝
-      var gm = ends[a.from] > 1 ? g.cell * g.joinGap : 0;
-      var gn = ends[a.to] > 1 ? g.cell * g.joinGap : 0;
-      p1 = [p1[0] + ux * gm, p1[1] + uy * gm];
-      p2 = [p2[0] - ux * gn, p2[1] - uy * gn];
-      arrows.push({ from: a.from, to: a.to, p1: p1, p2: p2, both: mutual });
-    });
+    }, g);
 
     return {
       cells: cells, bars: bars, arrows: arrows, cfg: g, paint: paint,
@@ -775,16 +785,209 @@
     return -1;
   }
 
-  function ollToJSON(oll) {
-    var named = [0, 1, 2].map(function (r) {
-      return [0, 1, 2].map(function (c) {
-        return ollFacesAt(r, c)[oll[r][c]] || 'U';
-      });
+  function ollToJSON(oll, faces) {
+    var tb = faces || OLL_FACES;
+    var named = tb.map(function (row, r) {
+      return row.map(function (_, c) { return ollFacesAt(r, c, tb)[oll[r][c]] || 'U'; });
     });
     return JSON.stringify({ oll: oll, faces: named }, null, 2);
   }
 
 
+
+  /* ============================================================
+   * 二阶（2x2）：2x2 只有角块，所以
+   *   OLL（顶面朝向）= 四个角各自朝哪，和上面同一个渲染器，只是格子表换成 2x2；
+   *   PBL（上下两层排序）= 每层 4 个角怎么换，样式照 2x2 教程那种
+   *   「两个空网格 + 双向箭头」—— 不做配色，只看换哪几个角。
+   * ============================================================ */
+
+  // 2x2 顶视图：每个角能朝向的面，数组顺序 = 点击时的循环顺序
+  var OLL2_FACES = [
+    [['U', 'B', 'L'], ['U', 'B', 'R']],
+    [['U', 'F', 'L'], ['U', 'F', 'R']]
+  ];
+  var DEFAULT_OLL2 = [[0, 0], [0, 0]];
+
+  function oll2All(oriented) { return ollAll(oriented, OLL2_FACES); }
+  function cycleOll2(oll, r, c) { return cycleOll(oll, r, c, OLL2_FACES); }
+  function buildOll2(oll, cfg) { return buildOll(oll, cfg, OLL2_FACES); }
+  function toOll2Svg(oll, cfg, opts) { return toOllSvg(oll, cfg, opts, OLL2_FACES); }
+
+  /* 每层 4 个角槽位。ang = 绕 U 轴的顺时针角序（和三阶 PLL 的角块同一套：
+     UFR=0 UFL=1 ULB=2 UBR=3），faces = 这个角朝外的两个面。 */
+  var PBL2_SLOTS = [
+    { id: '0-0', row: 0, col: 0, ang: 2, faces: ['L', 'B'] },   // ULB
+    { id: '0-1', row: 0, col: 1, ang: 3, faces: ['B', 'R'] },   // UBR
+    { id: '1-0', row: 1, col: 0, ang: 1, faces: ['F', 'L'] },   // UFL
+    { id: '1-1', row: 1, col: 1, ang: 0, faces: ['F', 'R'] }    // UFR
+  ];
+  PBL2_SLOTS.forEach(function (sl, i) { sl.idx = i; });
+
+  // 两层：u 在上、d 在下（和 2x2 教程那张图的排法一致）
+  var PBL2_LAYERS = ['u', 'd'];
+  var PBL2_CFG = Object.assign({}, PLL_CFG, {
+    showColors: false,     // 不带配色：只有网格 + 箭头
+    gap: 0.08,             // 线稿网格：格子挨得紧一些（PLL 那 0.17 是给立体贴纸留缝的）
+    radius: 0.06,          // 圆角也要小（PLL 那 0.20 是给立体贴纸的）
+    // 两层之间的间距：**上面那层的下边**到**下面那层的上边**的距离，
+    // 单位是"格子宽"（行方向 1 格 = 1）。和倾斜度无关 —— 调斜度不会把这个距离改掉。
+    layerGap: 0.14,
+    /* 倾斜：把平面网格映射到画面。0 = 正上方俯视（两个正方形网格），
+       1 = 2x2 教程那种斜着的两层。
+       教程那图里**前后边（行方向）是水平的**，只有左右边（列方向）斜着：
+       列方向往下 1、往左 1.04，并且只占 0.75 的高度（贴纸那种压扁的比例）。
+       照片上看着有点歪是拍摄角度，不是画法。 */
+    skew: 1
+  });
+  // 从教程图上量出来的（按"格的宽"归一）：行方向 (1, 0) 完全水平，
+  // 列方向每往下 1 往左 0.21、并且只占 0.39 的高度 —— 格子是扁的，
+  // 斜度不大，照片上那种"歪"是拍摄角度。
+  var PBL2_SKEW = { u: [1, 0], v: [-0.21, 0.39] };
+
+  function pbl2Default() {
+    return { u: PBL2_SLOTS.map(function (_, i) { return i; }),
+             d: PBL2_SLOTS.map(function (_, i) { return i; }) };
+  }
+  function pbl2Clone(st) { return { u: st.u.slice(), d: st.d.slice() }; }
+  function pbl2IsHome(st) {
+    return PBL2_LAYERS.every(function (k) {
+      return st[k].every(function (home, i) { return home === i; });
+    });
+  }
+  // 把某一层上的两个角对调（拖方块 = 换这两块）
+  function pbl2Swap(st, layer, a, b) {
+    var perm = st[layer];
+    if (!perm || a === b || a < 0 || b < 0 || a >= perm.length || b >= perm.length) return false;
+    var t = perm[a]; perm[a] = perm[b]; perm[b] = t;
+    return true;
+  }
+  function pbl2Arrows(st, layer) { return pllArrows(st[layer]); }
+
+  function buildPbl2(st, userCfg) {
+    var g = Object.assign({}, PBL2_CFG, userCfg || {});
+    var paint = g.paint || { line: '#1A1A1A', ghost: '#6E7A8A', text: '#FFFFFF', accent: '#C8D0DC' };
+    var skew = (g.skew == null) ? PBL2_CFG.skew : g.skew;
+    var pitch = g.cell + g.gap;
+    var board = 2 * pitch - g.gap;                 // 一层棋盘的边长（平面坐标里）
+
+    /* 平面坐标 -> 画面：行方向跟着 u，列方向跟着 v（都由 skew 缩放） */
+    var uy = PBL2_SKEW.u[1] * skew;
+    var vx = PBL2_SKEW.v[0] * skew;
+    var vy = 1 - (1 - PBL2_SKEW.v[1]) * skew;
+    function map(p) { return [p[0] + p[1] * vx, p[0] * uy + p[1] * vy]; }
+
+    /* 一层：4 个格子 + 4 个格心（都映射过），坐标以这一层自己的左上角为原点 */
+    function layerGeom(perm) {
+      var cells = [], centres = [];
+      for (var r = 0; r < 2; r++) {
+        for (var c = 0; c < 2; c++) {
+          var x = c * pitch, y = r * pitch;
+          var rect = [[x, y], [x + g.cell, y], [x + g.cell, y + g.cell], [x, y + g.cell]].map(map);
+          cells.push({ row: r, col: c, pts: roundedPoints(rect, g.radius * g.cell, 5) });
+        }
+      }
+      PBL2_SLOTS.forEach(function (sl) {
+        centres.push(map([sl.col * pitch + g.cell / 2, sl.row * pitch + g.cell / 2]));
+      });
+      var ys = [], xs = [];
+      cells.forEach(function (c) { c.pts.forEach(function (p) { xs.push(p[0]); ys.push(p[1]); }); });
+      return { cells: cells, centres: centres,
+               box: { x0: Math.min.apply(null, xs), x1: Math.max.apply(null, xs),
+                      y0: Math.min.apply(null, ys), y1: Math.max.apply(null, ys) } };
+    }
+
+    var gears = PBL2_LAYERS.map(function (layer) { return layerGeom(st[layer]); });
+    var hLayer = gears[0].box.y1 - gears[0].box.y0;            // 一层斜着之后的高
+    // 两层的间距直接按"格"给（g.cell = 1 格宽），所以和倾斜度无关：
+    // 行方向水平（u=[1,0]）时，一层的下边和另一层的上边都是水平的，
+    // 这个间距就是两条边之间的垂直距离。
+    var gapY = g.layerGap * g.cell;
+    var offs = [0, hLayer + gapY];
+    var allX = [], allY = [];
+    gears.forEach(function (gear, li) {
+      var dx = gears[0].box.x0 - gear.box.x0, dy = offs[li] - gear.box.y0;
+      gear.cells.forEach(function (c) { c.pts = c.pts.map(function (p) { return [p[0] + dx, p[1] + dy]; }); });
+      gear.centres = gear.centres.map(function (p) { return [p[0] + dx, p[1] + dy]; });
+      gear.cells.forEach(function (c) { c.pts.forEach(function (p) { allX.push(p[0]); allY.push(p[1]); }); });
+    });
+
+    // 整体留白（画面单位）—— 斜过来之后按包围盒算，比按棋盘比例稳
+    var w0 = Math.max.apply(null, allX) - Math.min.apply(null, allX);
+    var pad = g.pad * w0;
+    var tx = pad - Math.min.apply(null, allX), ty = pad - Math.min.apply(null, allY);
+    var cells = [], arrows = [];
+    gears.forEach(function (gear, li) {
+      gear.cells.forEach(function (c, ci) {
+        var slot = ci;                                          // 0..3，和 PBL2_SLOTS 同序
+        cells.push({
+          layer: PBL2_LAYERS[li], row: c.row, col: c.col,
+          id: 'pbl2-' + PBL2_LAYERS[li] + '-' + c.row + '-' + c.col,
+          slot: PBL2_LAYERS[li] + slot,
+          pts: c.pts.map(function (p) { return [p[0] + tx, p[1] + ty]; }),
+          fill: g.showColors ? PLL_FACE_COLORS.U : 'none',
+          stroke: paint.line
+        });
+      });
+      var ctr = gear.centres;
+      pllArrowGeom(st[PBL2_LAYERS[li]], PBL2_SLOTS, function (i) { return ctr[i]; }, g)
+        .forEach(function (a) {
+          arrows.push({ layer: PBL2_LAYERS[li], from: a.from, to: a.to,
+                        p1: [a.p1[0] + tx, a.p1[1] + ty], p2: [a.p2[0] + tx, a.p2[1] + ty],
+                        both: a.both });
+        });
+    });
+
+    var wOut = w0 + pad * 2;
+    var hOut = (Math.max.apply(null, allY) - Math.min.apply(null, allY)) + pad * 2;
+    return {
+      cells: cells, arrows: arrows, cfg: g, paint: paint,
+      size: { w: wOut, h: hOut }
+    };
+  }
+
+  function toPbl2Svg(st, userCfg, opts) {
+    opts = opts || {};
+    var b = buildPbl2(st, userCfg);
+    var g = b.cfg, pal = b.paint, w = b.size.w, h = b.size.h;
+    var out = ['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + w.toFixed(3) + ' ' + h.toFixed(3) +
+      '" width="' + w.toFixed(3) + '" height="' + h.toFixed(3) + '" shape-rendering="geometricPrecision">'];
+    if (opts.background) out.push('<rect width="' + w.toFixed(3) + '" height="' + h.toFixed(3) + '" fill="' + opts.background + '"/>');
+    b.cells.forEach(function (c) {
+      out.push('<g class="cell" data-id="' + c.id + '" data-layer="' + c.layer +
+        '" data-slot="' + c.slot + '">');
+      out.push('<polygon class="sticker" pointer-events="all" points="' + ptsAttr(c.pts) +
+        '" fill="' + c.fill + '" stroke="' + c.stroke + '" stroke-width="' +
+        (g.arrow * 0.9).toFixed(4) + '" stroke-linejoin="round"/>');
+      out.push('</g>');
+    });
+    b.arrows.forEach(function (a) {
+      var p1 = a.p1, p2 = a.p2;
+      var dx = p2[0] - p1[0], dy = p2[1] - p1[1];
+      var L = Math.hypot(dx, dy) || 1;
+      var ux = dx / L, uy = dy / L;
+      var s0 = [p1[0] + ux * g.cell * (g.tailIn || 0), p1[1] + uy * g.cell * (g.tailIn || 0)];
+      var e0 = [p2[0] - ux * g.cell * (g.headIn || 0), p2[1] - uy * g.cell * (g.headIn || 0)];
+      var hl = g.cell * g.head, inset = hl * 0.8;
+      var ls = a.both ? [s0[0] + ux * inset, s0[1] + uy * inset] : s0;
+      var le = [e0[0] - ux * inset, e0[1] - uy * inset];
+      out.push('<g class="pllarrow" data-layer="' + a.layer + '" data-from="' + a.layer + a.from +
+        '" data-to="' + a.layer + a.to + '" data-both="' + (a.both ? 1 : 0) + '">');
+      out.push('<line x1="' + ls[0].toFixed(3) + '" y1="' + ls[1].toFixed(3) +
+        '" x2="' + le[0].toFixed(3) + '" y2="' + le[1].toFixed(3) +
+        '" stroke="' + pal.head + '" stroke-width="' + g.arrow.toFixed(4) +
+        '" stroke-linecap="round" pointer-events="none"/>');
+      out.push('<polygon points="' + ptsAttr(arrowHead(s0, e0, hl, g.headW)) +
+        '" fill="' + pal.head + '" pointer-events="none"/>');
+      if (a.both) {
+        out.push('<polygon points="' + ptsAttr(arrowHead(e0, s0, hl, g.headW)) +
+          '" fill="' + pal.head + '" pointer-events="none"/>');
+      }
+      out.push('</g>');
+    });
+    out.push('</svg>');
+    return out.join('');
+  }
 
   return {
     CUBE: CUBE,
@@ -807,6 +1010,12 @@
     DEFAULT_OLL: DEFAULT_OLL, ollScheme: ollScheme, ollFacesAt: ollFacesAt,
     ollIsCenter: ollIsCenter, ollIsOriented: ollIsOriented, cycleOll: cycleOll,
     ollAll: ollAll, cloneOll: cloneOll, buildOll: buildOll, toOllSvg: toOllSvg,
-    ollToJSON: ollToJSON
+    ollToJSON: ollToJSON,
+    OLL2_FACES: OLL2_FACES, DEFAULT_OLL2: DEFAULT_OLL2,
+    oll2All: oll2All, cycleOll2: cycleOll2, buildOll2: buildOll2, toOll2Svg: toOll2Svg,
+    PBL2_SLOTS: PBL2_SLOTS, PBL2_LAYERS: PBL2_LAYERS, PBL2_CFG: PBL2_CFG, PBL2_SKEW: PBL2_SKEW,
+    pbl2Default: pbl2Default, pbl2Clone: pbl2Clone, pbl2IsHome: pbl2IsHome,
+    pbl2Swap: pbl2Swap, pbl2Arrows: pbl2Arrows,
+    buildPbl2: buildPbl2, toPbl2Svg: toPbl2Svg
   };
 });

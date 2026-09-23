@@ -1067,6 +1067,199 @@ console.log('\n[19b] 打印分页：表格接着排，标题不当孤儿');
 }
 
 
+console.log('\n[19d] 二阶 PBL 公式页（pbl2.html）');
+{
+  const h = fs.readFileSync(path.join(ROOT, 'pbl2.html'), 'utf8');
+  // 五条公式（用户给的原文，逐条钉死；换法和名称对不对由 tools/verify.py 算）
+  // 情况那格用短编号（和 F2L 的 01a / PLL 的 Aa 一个路数）：
+  // a = 邻角换、d = 对角换；两个字母是「上层 / 下层」，只写一个 = 另一层排好了
+  const ROWS = [
+    ['dd', 'R2 B2 R2'],
+    ['ad', "R' U R' B2 R U' R"],
+    ['aa', "R2 U' R2 U2 F2 U' R2"],
+    ['a', "R U2 R' U' R U2 L' U R' U' L"],
+    ['d', "R U' R' U' F2 U' R U R' U F2"]
+  ];
+  // 编号是图左上角的角标（和 PLL / OLL / 二阶 OLL 一个做法），所以按「图 + 公式」钉
+  const rows = [...h.matchAll(/<img data-pbl2="([\w-]+)"[\s\S]{0,400}?<code>([^<]+)<\/code>/g)];
+  ok('五行「图 + 公式」，顺序和公式都按给的来',
+    rows.length === 5 && rows.every((m, i) => m[1] === ROWS[i][0] && m[2] === ROWS[i][1]),
+    rows.map(m => m[1] + '=' + m[2]).join(' | '));
+  // 编号角标：图左上角那一块，大小写按给的写法（都是小写）
+  const badges = [...h.matchAll(/data-pbl2="[\w-]+"[\s\S]{0,200}?<span class="no">([^<]+)<\/span>/g)]
+    .map(m => m[1]);
+  ok('五个编号角标都在，大小写没写错（dd / ad / aa / a / d）',
+    JSON.stringify(badges) === JSON.stringify(['dd', 'ad', 'aa', 'a', 'd']), badges.join(','));
+  ok('角标是图左上角那一块（td.pic .no 绝对定位 + --badge 底，和 PLL 页同一套）',
+    /td\.pic \.no\{position:absolute;left:3px;top:1px/.test(h) &&
+    /td\.pic \.no\{[^}]*background:var\(--badge\)/.test(h) &&
+    /<td class="pic"><span class="box"><img data-pbl2="dd"/.test(h) &&
+    !/<td class="name"/.test(h));
+  ok('表只剩两列（图 / 公式）', /<colgroup><col class="pic"><col><\/colgroup>/.test(h) &&
+    /<thead><tr><th>图<\/th><th>公式<\/th><\/tr><\/thead>/.test(h));
+  // 编号缩写了，原来的说法不能丢：留在图的 alt / title 里（鼠标停一下还看得懂）
+  ok('编号只是缩写，全称还在（alt / title 里写着 Adj / Diag 那套说法）',
+    /data-pbl2="dd" alt="Diag \/ Diag：[^"]*"\s*\n?\s*title="Diag \/ Diag：/.test(h) &&
+    /data-pbl2="aa" alt="Adj \/ Adj：[^"]*"\s*\n?\s*title="Adj \/ Adj：/.test(h) &&
+    /data-pbl2="a" alt="Adj：[^"]*"\s*\n?\s*title="Adj：/.test(h) &&
+    /data-pbl2="d" alt="Diag：[^"]*"\s*\n?\s*title="Diag：/.test(h));
+
+  // 图：页面上只写 data-pbl2，昼夜两版都在（256x197）
+  const ids = [...new Set([...h.matchAll(/data-pbl2="([\w-]+)"/g)].map(m => m[1]))];
+  ok('五行各配一张图（data-pbl2）', ids.length === 5, ids.join(','));
+  const imgBad = [];
+  ids.forEach(id => {
+    ['day', 'night'].forEach(tone => {
+      const rel = '2x2pbl/' + id + '_' + tone + '-256x197.png';
+      const abs = path.join(ROOT, rel);
+      if (!fs.existsSync(abs)) { imgBad.push(rel + ' 不存在'); return; }
+      try {
+        const sz = require('child_process').execSync(
+          'python3 -c "from PIL import Image;print(Image.open(\'' + abs + '\').size)"',
+          { encoding: 'utf8' }).trim();
+        if (sz !== '(256, 197)') imgBad.push(rel + ' ' + sz);
+      } catch (e) { /* 没装 PIL 就只查存在性（verify.py 那边会查尺寸） */ }
+    });
+  });
+  ok('每张图的昼夜两版都在、都是 256x197', imgBad.length === 0, imgBad.join('; '));
+
+  ok('五条公式都带 ↗，且都指向 calc.html#',
+    (h.match(/class="tocalc"/g) || []).length === 5 &&
+    (h.match(/href="calc\.html#/g) || []).length === 5);
+  // 二阶公式要在二阶模式里播：跳计算器的链接都得带 @2:（计算器那边认这个前缀）
+  ok('五条 ↗ 都带 @2:（点进去就是二阶模式，不会拿三阶去播）',
+    (h.match(/href="calc\.html#@2:/g) || []).length === 5);
+  // 计算器得认识这个前缀：一进来先切二阶，再摆局面、再播
+  const calcSrc = fs.readFileSync(path.join(ROOT, 'calc.html'), 'utf8');
+  ok('计算器认 @2: 前缀（先 setMode(\'2\') 再播）',
+    /else if \(h\.indexOf\('@2:'\) === 0\) \{ hashCube2 = true/.test(calcSrc) &&
+    /if \(hashCube2\) setMode\('2'\)/.test(calcSrc));
+  ok('点公式能复制（code + copied + toast）',
+    /addEventListener\('click'/.test(h) && /closest\('code'\)/.test(h) &&
+    /classList\.add\('copied'\)/.test(h) && /id="toast"/.test(h));
+  ok('每张图都能点开看大图（data-zoom）',
+    (h.match(/<img[^>]*data-zoom/g) || []).length === 5);
+  ok('昼夜两版跟着主题换（syncPbl2Imgs 在 applyTheme 里再调一次）',
+    /function syncPbl2Imgs/.test(h) && /applyTheme[\s\S]{0,300}?syncPbl2Imgs\(\)/.test(h));
+  ok('打印时每张图都换回白天那版（纸上是白底）',
+    ids.every(id => new RegExp('img\\[data-pbl2="' + id +
+      '"\\]\\{content:url\\(2x2pbl/' + id + '_day-256x197\\.png\\)\\}').test(h)));
+  ok('导航条里有这一页（二阶 PBL）',
+    /'pbl2\.html'\s*,\s*'二阶 PBL'/.test(fs.readFileSync(path.join(ROOT, 'nav.js'), 'utf8')));
+
+  // 首页也留一张卡片：从主页两步之内能点到这页
+  const idx = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  const card = (idx.match(/<a class="card" href="pbl2\.html">[\s\S]{0,400}?<\/a>/) || [''])[0];
+  ok('首页有这张卡片（连到 pbl2.html，标着 5 个情况）',
+    /<h2>二阶 PBL<span class="n">5<\/span><\/h2>/.test(card));
+  ok('首页缩略图也是昼夜两版（pblthumb 交给 applyTheme 换）',
+    /<img src="2x2pbl\/ad_day-256x197\.png"[^>]*id="pblthumb"/.test(card) &&
+    /'2x2pbl\/ad_' \+ \(t === 'dark' \? 'night' : 'day'\) \+ '-256x197\.png'/.test(idx));
+}
+
+console.log('\n[19f] 二阶 OLL 公式页（oll2.html）');
+{
+  const h = fs.readFileSync(path.join(ROOT, 'oll2.html'), 'utf8');
+  // 七条公式（用户给的原文，逐条钉死；「图 ↔ 公式」由 tools/verify.py 读图核）
+  const ROWS = [
+    ['h', "R2 U2 R' U2 R'2"],
+    ['pi', "F R U R' U' R U R' U' F'"],
+    ['antisune', "R U2 R' U' R U' R'"],
+    ['sune', "R U R' U R U2 R'"],
+    ['l', "F R' F' R U R U' R'"],
+    ['t', "R U R' U' R' F R F'"],
+    ['u', "F R U R' U' F'"]
+  ];
+  // 行里没有单独的「情况」列：编号是图左上角那个角标（和 PLL / OLL 页一样），
+  // 所以这里按「图（data-oll2）+ 公式」逐个钉
+  const rows = [...h.matchAll(/<img data-oll2="([\w-]+)"[\s\S]{0,400}?<code>([^<]+)<\/code>/g)];
+  ok('七行「图 + 公式」，顺序和公式都按给的来',
+    rows.length === 7 && rows.every((m, i) => m[1] === ROWS[i][0] && m[2] === ROWS[i][1]),
+    rows.map(m => m[1] + '=' + m[2]).join(' | '));
+  // 编号角标：位置在图的左上角（和 PLL 页同一套 .no 样式），大小写按公式表写
+  const badges = [...h.matchAll(/data-oll2="[\w-]+"[\s\S]{0,200}?<span class="no">([^<]+)<\/span>/g)]
+    .map(m => m[1]);
+  ok('七个编号角标都在，大小写没写错（H / Pi / AntiSune / Sune / L / T / U）',
+    JSON.stringify(badges) === JSON.stringify(['H', 'Pi', 'AntiSune', 'Sune', 'L', 'T', 'U']),
+    badges.join(','));
+  ok('角标是图左上角那一块（td.pic .no 绝对定位 + --badge 底，和 PLL 页同一套）',
+    /td\.pic \.no\{position:absolute;left:3px;top:1px/.test(h) &&
+    /td\.pic \.no\{[^}]*background:var\(--badge\)/.test(h) &&
+    /<td class="pic"><span class="box"><img data-oll2="h"/.test(h) &&
+    !/<td class="name"/.test(h));
+  ok('表只剩两列（图 / 公式）', /<colgroup><col class="pic"><col><\/colgroup>/.test(h) &&
+    /<thead><tr><th>图<\/th><th>公式<\/th><\/tr><\/thead>/.test(h));
+
+  // 图：页面上只写 data-oll2，昼夜两版都在（256x256）
+  const ids = [...new Set([...h.matchAll(/<img data-oll2="([\w-]+)"/g)].map(m => m[1]))];
+  ok('七行各配一张图（data-oll2）', ids.length === 7, ids.join(','));
+  const imgBad = [];
+  ids.forEach(id => {
+    ['day', 'night'].forEach(tone => {
+      const rel = '2x2oll/' + id + '_' + tone + '-256x256.png';
+      const abs = path.join(ROOT, rel);
+      if (!fs.existsSync(abs)) { imgBad.push(rel + ' 不存在'); return; }
+      try {
+        const sz = require('child_process').execSync(
+          'python3 -c "from PIL import Image;print(Image.open(\'' + abs + '\').size)"',
+          { encoding: 'utf8' }).trim();
+        if (sz !== '(256, 256)') imgBad.push(rel + ' ' + sz);
+      } catch (e) { /* 没装 PIL 就只查存在性（verify.py 那边会读图核） */ }
+    });
+  });
+  ok('每张图的昼夜两版都在、都是 256x256', imgBad.length === 0, imgBad.join('; '));
+  ok('2x2oll/ 下正好 14 张图（7 种 × 昼夜两版，没有多余文件）',
+    fs.readdirSync(path.join(ROOT, '2x2oll')).filter(f => f.endsWith('.png')).length === 14,
+    String(fs.readdirSync(path.join(ROOT, '2x2oll')).length));
+
+  ok('七条公式都带 ↗，且都带 @2:（点过去就是二阶模式）',
+    (h.match(/class="tocalc"/g) || []).length === 7 &&
+    (h.match(/href="calc\.html#@2:/g) || []).length === 7);
+  ok('点公式能复制（code + copied + toast）',
+    /addEventListener\('click'/.test(h) && /closest\('code'\)/.test(h) &&
+    /classList\.add\('copied'\)/.test(h) && /id="toast"/.test(h));
+  ok('每张图都能点开看大图（data-zoom）',
+    (h.match(/<img[^>]*data-zoom/g) || []).length === 7);
+  ok('昼夜两版跟着主题换（syncOll2Imgs 在 applyTheme 里再调一次）',
+    /function syncOll2Imgs/.test(h) && /applyTheme[\s\S]{0,300}?syncOll2Imgs\(\)/.test(h));
+  ok('打印时每张图都换回白天那版（纸上是白底）',
+    ids.every(id => new RegExp('img\\[data-oll2="' + id +
+      '"\\]\\{content:url\\(2x2oll/' + id + '_day-256x256\\.png\\)\\}').test(h)));
+  ok('页头写缩写 + 英文全称（二阶 OLL / Orientation of the Last Layer）',
+    /<h1>二阶 OLL<\/h1>\s*<p>Orientation of the Last Layer<\/p>/.test(h));
+  ok('导航条里有这一页（二阶 OLL）',
+    /'oll2\.html'\s*,\s*'二阶 OLL'/.test(fs.readFileSync(path.join(ROOT, 'nav.js'), 'utf8')));
+
+  // 首页也留一张卡片
+  const idx = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  const card = (idx.match(/<a class="card" href="oll2\.html">[\s\S]{0,400}?<\/a>/) || [''])[0];
+  ok('首页有这张卡片（连到 oll2.html，标着 7 个情况）',
+    /<h2>二阶 OLL<span class="n">7<\/span><\/h2>/.test(card));
+  ok('首页缩略图也是昼夜两版（oll2thumb 交给 applyTheme 换）',
+    /<img src="2x2oll\/sune_day-256x256\.png"[^>]*id="oll2thumb"/.test(card) &&
+    /'2x2oll\/sune_' \+ \(t === 'dark' \? 'night' : 'day'\) \+ '-256x256\.png'/.test(idx));
+}
+
+console.log('\n[19e] 公式页页头：缩写 + 英文全称');
+{
+  // 四页的 h1 底下都跟一行英文全称：不熟缩写的人看得懂，搜索也搜得到
+  const EN = {
+    'f2l.html': 'First Two Layers',
+    'oll.html': 'Orientation of the Last Layer',
+    'pll.html': 'Permutation of the Last Layer',
+    'pbl2.html': 'Permutation of Both Layers'
+  };
+  Object.keys(EN).forEach(p => {
+    const h = fs.readFileSync(path.join(ROOT, p), 'utf8');
+    const m = h.match(/<h1>([^<]*)<\/h1>\s*<p>([^<]*)<\/p>/);
+    ok(p + ' 页头是「缩写 + ' + EN[p] + '」', !!m && m[2] === EN[p], m ? m[2] : '没找到');
+  });
+  // 原来 pbl2 底下那一长段说明（Adj/Diag、斜杠含义、两个视图、点公式复制…）整段删掉
+  const pb = fs.readFileSync(path.join(ROOT, 'pbl2.html'), 'utf8');
+  ok('pbl2 页那段长说明删干净了（.tip 连样式一起）',
+    !/class="tip"/.test(pb) && !/相邻两个角换/.test(pb) && !/\.tip\b/.test(pb));
+}
+
 console.log('\n[19c] 教程页：公式都能送进计算器，进阶页的 OLL 步骤图跟昼夜换');
 {
   ['tutorial-basic.html', 'tutorial-advanced.html'].forEach(p => {
@@ -1165,10 +1358,13 @@ console.log('\n[20] OLL 图的昼夜两版 + 图片尺寸/体积');
     days === 57 && nights === 57, days + ' / ' + nights);
   // 引用的文件都得在
   const refs = new Set();
-  ['f2l.html', 'oll.html', 'pll.html', 'practice.html', 'calc.html', 'index.html'].forEach(p => {
-    const h = fs.readFileSync(path.join(ROOT, p), 'utf8');
-    (h.match(/(?:f2l|oll|pll)\/[\w.-]+\.png/g) || []).forEach(m => refs.add(m));
-  });
+  ['f2l.html', 'oll.html', 'oll2.html', 'pll.html', 'practice.html', 'calc.html', 'index.html']
+    .forEach(p => {
+      const h = fs.readFileSync(path.join(ROOT, p), 'utf8');
+      // 目录名要整段匹配：写成 (?:f2l|oll|pll)\/ 的话，「2x2oll/…」会被当成「oll/…」
+      (h.match(/(?:^|[^\w])((?:2x2oll|2x2pbl|f2l|oll|pll)\/[\w.-]+\.png)/g) || [])
+        .forEach(m => refs.add(m.replace(/^[^\w]/, '')));
+    });
   const miss = [...refs].filter(r => !fs.existsSync(path.join(ROOT, r)));
   ok('页面里引用的图片都存在（' + refs.size + ' 个引用）', miss.length === 0, miss.slice(0, 3).join(' '));
 }
@@ -1350,11 +1546,11 @@ console.log('\n[21] PLL 页的「显示颜色」开关 + 无色图');
 
 console.log('\n[22] 计算器舞台：四周的按钮互不重叠');
 {
-  /* 舞台四角一共摆着 9 个浮动按钮：主题开关、拍照，四个方向的整体旋转折角
-     （n/s/w/e），两个滚转（z1/z2），右下角还有一摞放大缩小。
-     它们全是 position:absolute，谁跟谁叠上只能靠算 —— 拍照键最早摆在左上角,
-     正好压在「整体逆时针滚 z'」那个 56px 的大按键上。这里按 CSS 声明的
-     位置把矩形算出来，两两核一遍。 */
+  /* 舞台四周一共摆着 10 块浮动的东西：左上角「三阶 / 二阶 / 四阶」那一摞模式栏、
+     主题开关、拍照，四个方向的整体旋转折角（n/s/w/e），两个滚转（z1/z2），
+     右下角还有一摞放大缩小。它们全是 position:absolute，谁跟谁叠上只能靠算 ——
+     拍照键最早摆在左上角，正好压在「整体逆时针滚 z'」那个 56px 的大按键上；
+     模式栏占据左上角之后，z1/z2 又往右让了一段，这里一并核。 */
   const calc = fs.readFileSync(path.join(ROOT, 'calc.html'), 'utf8');
   // 抠出 <style>，再把 @media 整块和注释删掉（打印那块的 .snap{display:none}
   // 会盖住真正的定位规则，注释里也可能有花括号）
@@ -1417,6 +1613,10 @@ console.log('\n[22] 计算器舞台：四周的按钮互不重叠');
     .match(/<button/g) || [];
   const [zbW, zbH] = size('.zoom button');
   const items = [
+    // 左上角那一摞（和编辑器同一个 modebar）：min-width 88 + 内边距 6 + 边框 2，
+    // 高 = 三个按钮（4+4 内边距 + 11.5px 字 × 1.55 行高 ≈ 18）+ 两个 2px 间距
+    // + 内边距 6 + 边框 2 = 90，这里按 92 算（宁可算大一点）
+    ['.modebar', 88, 92],
     ['.themebtn', 56, 28],                       // nav.css: body .themebtn
     ['.snap', ...size('.snap')],
     ['.orbit .n', obW, obH], ['.orbit .s', obW, obH],
@@ -1426,8 +1626,8 @@ console.log('\n[22] 计算器舞台：四周的按钮互不重叠');
     ['.zoom', zbW, zoomBtns.length * zbH + Math.max(0, zoomBtns.length - 1) *
       parseFloat(decl('.zoom', 'gap'))],
   ];
-  ok('舞台上的浮动按钮都认得出来（主题开关/拍照/6 个整体旋转/缩放那摞）',
-    items.length === 9 && zoomBtns.length === 3, items.length + ' 个, 缩放 ' + zoomBtns.length + ' 个');
+  ok('舞台上的浮动按钮都认得出来（模式栏/主题开关/拍照/6 个整体旋转/缩放那摞）',
+    items.length === 10 && zoomBtns.length === 3, items.length + ' 个, 缩放 ' + zoomBtns.length + ' 个');
   const overlap = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w &&
                            a.y < b.y + b.h && b.y < a.y + a.h;
   // 舞台宽高：页面右侧固定 322px 面板，所以常见桌面是「窗口宽-322」；
@@ -1449,6 +1649,11 @@ console.log('\n[22] 计算器舞台：四周的按钮互不重叠');
       }
     }
   });
+  // 模式栏在左上角、z1/z2 往右让开了：这三块彼此不能叠，也不能压到中间的折角
+  ok('模式栏不和「整体滚 z / z\'」叠（两个滚转键已经往右挪）',
+    /<div class="modebar" id="modebar">/.test(calc) &&
+    /\.orbit \.z1\{left:118px;top:2px\}/.test(calc) &&
+    /\.orbit \.z2\{left:174px;top:2px\}/.test(calc));
   ok('常见舞台尺寸（' + sizes.length + ' 种）下四周按钮两两不叠',
     bad.length === 0, bad.slice(0, 3).join(' | '));
   // 这次报的就是这个：拍照键压在「整体逆时针滚 z'」上

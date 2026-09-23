@@ -1068,6 +1068,415 @@ console.log('\n[11f] 跳转过来的朝向：只有 @g:（F2L 的 b 版）才补
     plain.alg.value + ' / ' + green.alg.value);
 }
 
+console.log('\n[11g] 二阶模式：@2: 链接切到二阶、只画八个角、公式照样把角块解回来');
+{
+  // 二阶是「同一个模型里只画八个角块 + 不认中层转」，所以这一节钉三件事：
+  //   · @2: 让计算器一进来就是二阶（按钮高亮、舞台挂 m2、只画 8 个角块、格子放大 1.5 倍）
+  //   · 摆出来的局面就是那条公式要解的局面（角块逐张贴纸对得上）
+  //   · 公式真能把角块解回复原；M/E/S 这种二阶没有的转法会被挡下来
+  const vm = require('vm');
+  // 预置成四阶时页面要用 cubesim4（[11h] 里也有同名的一份，这里单独取）
+  const S4T = require(path.join(__dirname, '..', 'cubesim4.js'));
+  const calcSrc = fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')
+    .match(/<script>([\s\S]*?)<\/script>/g).map(x => x.replace(/<\/?script>/g, ''))
+    .filter(x => x.includes('M3'))[0];
+  const boot = (hash, seed) => {
+    const store = seed || {}, els = {};
+    const mkEl = (t, init) => {
+      const e = { tagName: t, children: [], dataset: {}, _h: '', _t: '',
+        // 页面靠 style.setProperty 写 --cs / --half，桩得支持
+        style: { setProperty(k, v) { this[k] = v; } }, offsetWidth: 1,
+        classList: { _s: new Set(), add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); },
+          toggle(c, v) { v ? this._s.add(c) : this._s.delete(c); }, contains(c) { return this._s.has(c); } },
+        _on: {}, addEventListener(ev, fn) { (this._on[ev] = this._on[ev] || []).push(fn); },
+        fire(ev, a) { (this._on[ev] || []).forEach(f => f(a || {})); },
+        appendChild(c) { this.children.push(c); c.parentNode = this; return c; },
+        querySelectorAll() { return []; }, querySelector() { return null; },
+        setPointerCapture() {}, closest() { return null; }, focus() { this._focused = true; },
+        setAttribute(k, v) { this['_a_' + k] = String(v); },
+        value: init || '',
+        set innerHTML(v) { this._h = v; }, get innerHTML() { return this._h; },
+        set textContent(v) { this._t = v; }, get textContent() { return this._t === undefined ? '' : this._t; },
+        set disabled(v) {}, get disabled() { return false; } };
+      return e;
+    };
+    // 舞台给个尺寸：fit() 才会算出 --cs（不然它一开头就 return，放大 1.5 倍那条没法比）
+    els.stage = mkEl('div');
+    els.stage.clientWidth = 600;
+    els.stage.clientHeight = 600;
+    const ctx = { console, navigator: {}, window: { addEventListener() {} },
+      // 动画的定时器不排：这一节只看「一进来摆成什么样」，不等它播
+      setTimeout: () => 0, clearTimeout() {},
+      CubeSim: S, CubeSim4: S4T, performance: { getEntriesByType: () => [] },
+      localStorage: { getItem: k => (k in store ? store[k] : null),
+                      setItem: (k, v) => { store[k] = String(v); }, removeItem: k => { delete store[k]; } },
+      location: { hash },
+      document: { getElementById: id => els[id] || (els[id] = mkEl('div')),
+                  querySelectorAll: () => [], documentElement: mkEl('html'),
+                  createElement: mkEl, body: { appendChild() {} }, addEventListener() {} } };
+    ctx.globalThis = ctx;
+    vm.createContext(ctx);
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'alglist.js'), 'utf8'), ctx);
+    vm.runInContext(calcSrc, ctx);
+    return { els, store };
+  };
+  // 画出来的贴纸 -> 「位置|法向 = 颜色字母」（和 [12] 的 readCube 同一套读法）
+  const C3 = {};
+  for (const x of fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')
+           .match(/var COLOR = \{([^}]+)\}/)[1].matchAll(/([UDFBRL]):\s*'(#[0-9A-Fa-f]{6})'/g)) {
+    C3[x[2].toUpperCase()] = x[1];
+  }
+  const N5 = { px: '1,0,0', nx: '-1,0,0', py: '0,1,0', ny: '0,-1,0', pz: '0,0,1', nz: '0,0,-1' };
+  const readCube = (html) => {
+    const out = {};
+    for (const m of html.matchAll(/data-pos="([^"]+)"[^>]*>([\s\S]*?)<\/div>/g)) {
+      for (const x of m[2].matchAll(/class="on (\w+)"[^>]*--c:(#[0-9A-Fa-f]{6})/g)) {
+        out[m[1] + '|' + N5[x[1]]] = C3[x[2].toUpperCase()];
+      }
+    }
+    return out;
+  };
+  const eqState = (a, b) => {
+    const ka = Object.keys(a).sort(), kb = Object.keys(b).sort();
+    return ka.length === kb.length && ka.every((k, i) => k === kb[i] && a[k] === b[k]);
+  };
+  const posOf = html => [...html.matchAll(/data-pos="([^"]+)"/g)].map(m => m[1]);
+  // 只留八个角块上的贴纸（二阶画出来的就是这些）
+  const cornerOnly = st => {
+    const out = {};
+    Object.keys(st).forEach(k => {
+      const p = k.split('|')[0].split(',').map(Number);
+      if (p[0] && p[1] && p[2]) out[k] = st[k];
+    });
+    return out;
+  };
+  const csOf = e => parseFloat(e.cube.style['--cs']);
+
+  const three = boot('');
+  ok('不带到阶数的链接还是三阶（26 个方块、位置是整数格、舞台上没有 m2）',
+    posOf(three.els.cube.innerHTML).length === 26 &&
+    /calc\(var\(--cs\) \* 1\)/.test(three.els.cube.innerHTML) &&
+    !three.els.stage.classList.contains('m2') &&
+    three.els.mode3.classList.contains('on') && !three.els.mode2.classList.contains('on'),
+    three.els.cube.innerHTML.slice(0, 60));
+  ok('三阶没切过就不写模式存档（默认不落盘）', !('calc-cube-v1' in three.store),
+    JSON.stringify(three.store));
+
+  const two = boot('#@2:R2 B2 R2');
+  ok('@2: 一进来就是二阶（按钮高亮、舞台挂 m2），并记进存档（下次打开还是二阶）',
+    two.els.mode2.classList.contains('on') && !two.els.mode3.classList.contains('on') &&
+    two.els.stage.classList.contains('m2') && two.store['calc-cube-v1'] === '2');
+  ok('@2: 只切画法，公式原样进输入框（前缀不漏进去）',
+    two.els.alg.value === 'R2 B2 R2', two.els.alg.value);
+  const p2 = posOf(two.els.cube.innerHTML);
+  ok('二阶只画八个角块，位置都落在半个格子上',
+    p2.length === 8 && p2.every(p => p.split(',').every(v => v === '1' || v === '-1')) &&
+    /calc\(var\(--cs\) \* 0\.5\)/.test(two.els.cube.innerHTML), p2.join(' '));
+  const on2 = (two.els.cube.innerHTML.match(/class="on /g) || []).length;
+  ok('二阶只画 24 张贴纸（8 个角 × 3 面）+ 同样多的投影面',
+    on2 === 24 && (two.els.cube.innerHTML.match(/<\/i>/g) || []).length === 8 * 6 + 24,
+    on2 + ' 张 / ' + (two.els.cube.innerHTML.match(/<\/i>/g) || []).length + ' 个 i');
+  ok('二阶的格子放大 1.5 倍（八个角块拼出的魔方和三阶一样大）',
+    Math.abs(csOf(two.els) / csOf(three.els) - 1.5) < 1e-6,
+    csOf(three.els) + ' -> ' + csOf(two.els));
+  // 二阶模式默认停在「二阶 OLL」那一栏（tab 顺序在前），缩略图在 2x2oll/ 下
+  ok('公式表跟着换成二阶那一套（默认二阶 OLL：2x2oll/ 下 7 条）',
+    (two.els.plist.innerHTML.match(/2x2oll\//g) || []).length === 7 &&
+    ['h', 'pi', 'antisune', 'sune', 'l', 't', 'u']
+      .every(id => two.els.plist.innerHTML.includes('2x2oll/' + id + '_')),
+    two.els.plist.innerHTML.slice(0, 70));
+
+  // 摆局面 + 解回来：拿一条不是自逆的公式（adj）走一遍完整流程
+  const ALG = "R U2 R' U' R U2 L' U R' U' L";
+  const invert = alg => S.steps(alg).slice().reverse().map(x => ({ mv: x.mv, times: -x.times }));
+  let setup = S.solved();
+  invert(ALG).forEach(x => { setup = S.turn(S.clone(setup), x.mv, x.times); });
+  const demo = boot('#@2:' + encodeURIComponent(ALG));
+  ok('摆出来的正是这条公式要解的局面（八个角块逐张贴纸都对得上）',
+    eqState(readCube(demo.els.cube.innerHTML), cornerOnly(setup)),
+    JSON.stringify(readCube(demo.els.cube.innerHTML)).slice(0, 70));
+  ok('公式作用在摆好的局面上，角块全回复原（点 ↗ 看到的就是这一遍）',
+    eqState(cornerOnly(S.apply(setup, ALG)), cornerOnly(S.solved())));
+
+  const bad2 = boot('#@2:M2 U');
+  ok('二阶模式下 M/E/S、宽转会被挡下来（红框 + 提示，只填输入框不播）',
+    bad2.els.alg.classList.contains('bad') && /二阶没有 M/.test(bad2.els.err.textContent),
+    bad2.els.err.textContent);
+
+  // 点按钮换阶数：不动局面，只换画法
+  const drawn2 = readCube(demo.els.cube.innerHTML);
+  demo.els.mode3.fire('click');
+  const drawn3 = readCube(demo.els.cube.innerHTML);
+  ok('点「三阶」切回去：26 个方块、m2 摘掉、aria-pressed 和存档一起变',
+    posOf(demo.els.cube.innerHTML).length === 26 &&
+    !demo.els.stage.classList.contains('m2') && demo.store['calc-cube-v1'] === '3' &&
+    demo.els.mode3.classList.contains('on') &&
+    demo.els.mode3['_a_aria-pressed'] === 'true' &&
+    demo.els.mode2['_a_aria-pressed'] === 'false');
+  ok('换阶数不动局面：八个角块上的贴纸和刚才一模一样',
+    eqState(cornerOnly(drawn3), drawn2),
+    JSON.stringify(cornerOnly(drawn3)).slice(0, 70));
+  demo.els.mode2.fire('click');
+  ok('再点「二阶」切回来（舞台 class、按钮高亮、存档一起回）',
+    posOf(demo.els.cube.innerHTML).length === 8 &&
+    demo.els.stage.classList.contains('m2') &&
+    demo.els.mode2.classList.contains('on') && demo.store['calc-cube-v1'] === '2');
+
+  // 再打开一次：用存档里那一阶（不是每次都回到三阶）
+  const reopened = boot('', { 'calc-cube-v1': '4' });
+  ok('带存档打开：直接用上次离开时那一阶（这里是四阶，56 个块、舞台挂 m4）',
+    reopened.els.mode4.classList.contains('on') && !reopened.els.mode3.classList.contains('on') &&
+    posOf(reopened.els.cube.innerHTML).length === 56 &&
+    reopened.els.stage.classList.contains('m4'));
+  const again2 = boot('', { 'calc-cube-v1': '2' });
+  ok('带存档打开：二阶也一样（8 个角块、公式表是二阶那一套）',
+    again2.els.mode2.classList.contains('on') && posOf(again2.els.cube.innerHTML).length === 8 &&
+    /2x2oll\//.test(again2.els.plist.innerHTML));
+}
+
+console.log('\n[11h] 四阶模式：64 块只画 56 个有贴纸的、公式走四阶模型、换阶数就重置');
+{
+  // 四阶是另一份模型（cubesim4.js），所以这一节盯三件事：
+  //   · 切过去以后画的是四阶（56 个有贴纸的小方块、格子是 3×3 的 3/4、舞台挂 m4）
+  //   · 打进去的公式真的走四阶模型算（跳到末尾的画面 = 模型算出来的局面）
+  //   · 四阶和三阶/二阶不是一份状态：切回来要重置，别把两种阶数的局面混着用
+  const vm = require('vm');
+  const S4b = require(path.join(__dirname, '..', 'cubesim4.js'));
+  const calcSrc = fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')
+    .match(/<script>([\s\S]*?)<\/script>/g).map(x => x.replace(/<\/?script>/g, ''))
+    .filter(x => x.includes('M3'))[0];
+  const store = {}, els = {};
+  const mkEl = (t, init) => {
+    const e = { tagName: t, children: [], dataset: {}, _h: '', _t: '',
+      style: { setProperty(k, v) { this[k] = v; } }, offsetWidth: 1,
+      classList: { _s: new Set(), add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); },
+        toggle(c, v) { v ? this._s.add(c) : this._s.delete(c); }, contains(c) { return this._s.has(c); } },
+      _on: {}, addEventListener(ev, fn) { (this._on[ev] = this._on[ev] || []).push(fn); },
+      fire(ev, a) { (this._on[ev] || []).forEach(f => f(a || {})); },
+      appendChild(c) { this.children.push(c); c.parentNode = this; return c; },
+      querySelectorAll() { return []; }, querySelector() { return null; },
+      setPointerCapture() {}, closest() { return null; }, focus() { this._focused = true; },
+      setAttribute(k, v) { this['_a_' + k] = String(v); },
+      value: init || '',
+      set innerHTML(v) { this._h = v; }, get innerHTML() { return this._h; },
+      set textContent(v) { this._t = v; }, get textContent() { return this._t === undefined ? '' : this._t; },
+      set disabled(v) {}, get disabled() { return false; } };
+    return e;
+  };
+  els.stage = mkEl('div');
+  els.stage.clientWidth = 600;
+  els.stage.clientHeight = 600;
+  /* 动画的定时器攒起来，测试里手动「放完」：这样每一步都真的演完了
+     （playing 会落回 false，后面的提交才不会被「先暂停再点一次」挡住），
+     又不用等真时间。 */
+  const pending = [];
+  const flush = () => { let k = 0; while (pending.length && k++ < 800) pending.shift()(); };
+  const ctx = { console, navigator: {}, window: { addEventListener() {} },
+    setTimeout: fn => { pending.push(fn); return 0; }, clearTimeout() {},
+    CubeSim: S, CubeSim4: S4b, performance: { getEntriesByType: () => [] },
+    localStorage: { getItem: k => (k in store ? store[k] : null),
+                    setItem: (k, v) => { store[k] = String(v); }, removeItem: k => { delete store[k]; } },
+    location: { hash: '' },
+    document: { getElementById: id => els[id] || (els[id] = mkEl('div')),
+                querySelectorAll: () => [], documentElement: mkEl('html'),
+                createElement: mkEl, body: { appendChild() {} }, addEventListener() {} } };
+  ctx.globalThis = ctx;
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'alglist.js'), 'utf8'), ctx);
+  vm.runInContext(calcSrc, ctx);
+
+  const C4 = {};
+  for (const x of fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')
+           .match(/var COLOR = \{([^}]+)\}/)[1].matchAll(/([UDFBRL]):\s*'(#[0-9A-Fa-f]{6})'/g)) {
+    C4[x[2].toUpperCase()] = x[1];
+  }
+  const N6 = { px: '1,0,0', nx: '-1,0,0', py: '0,1,0', ny: '0,-1,0', pz: '0,0,1', nz: '0,0,-1' };
+  const readCube4 = () => {
+    const out = {};
+    for (const m of els.cube.innerHTML.matchAll(/data-pos="([^"]+)"[^>]*>([\s\S]*?)<\/div>/g)) {
+      for (const x of m[2].matchAll(/class="on (\w+)"[^>]*--c:(#[0-9A-Fa-f]{6})/g)) {
+        out[m[1] + '|' + N6[x[1]]] = C4[x[2].toUpperCase()];
+      }
+    }
+    return out;
+  };
+  const eqState = (a, b) => {
+    const ka = Object.keys(a).sort(), kb = Object.keys(b).sort();
+    return ka.length === kb.length && ka.every((k, i) => k === kb[i] && a[k] === b[k]);
+  };
+  const posOf = () => [...els.cube.innerHTML.matchAll(/data-pos="([^"]+)"/g)].map(m => m[1]);
+  const steps = () => (els.moves.innerHTML.match(/data-k="/g) || []).length;
+  const cs = () => parseFloat(els.cube.style['--cs']);
+
+  const cs3 = cs();                       // 三阶时的格子边长
+  // 按钮按 二阶 / 三阶 / 四阶 排，打开时默认高亮三阶；老版本存在存档里的阶数不再理它
+  {
+    // 按钮在 HTML 里（calcSrc 只是那段内联脚本），所以另读一遍整页
+    const calcPage = fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8');
+    const i2 = calcPage.indexOf('id="mode2"'), i3 = calcPage.indexOf('id="mode3"');
+    const i4 = calcPage.indexOf('id="mode4"');
+    ok('阶数按钮按 二阶 / 三阶 / 四阶 排，默认高亮三阶',
+      i2 >= 0 && i2 < i3 && i3 < i4 && /id="mode3"[^>]*class="on"/.test(calcPage) &&
+      els.mode3.classList.contains('on'), String(els.mode3.classList.contains('on')));
+  }
+  els.mode4.fire('click');
+  ok('点「四阶」：舞台挂 m4、格子缩到 3/4（三层变四层，魔方一样大）、阶数进存档',
+    els.stage.classList.contains('m4') && store['calc-cube-v1'] === '4' &&
+    Math.abs(cs() / cs3 - 0.75) < 1e-6, cs3 + ' -> ' + cs());
+  const p4 = posOf();
+  ok('四阶画 56 个小方块（64 减去里面那 8 个没有贴纸的）', p4.length === 56, String(p4.length));
+  ok('位置是 ±0.5 / ±1.5 那种（四层）',
+    p4.every(p => p.split(',').every(v => Math.abs(Number(v)) === 0.5 || Math.abs(Number(v)) === 1.5)),
+    p4.slice(0, 3).join(' '));
+  ok('换四阶就是换一套模型：局面重来（复原态、历史清空）',
+    eqState(readCube4(), S4b.solved()) && String(els.hcount.textContent) === '0',
+    String(els.hcount.textContent) + ' 条历史');
+  ok('公式表说明四阶还没有公式表（别让人以为坏了）',
+    /四阶还没有公式表/.test(els.plist.innerHTML), els.plist.innerHTML.slice(0, 40));
+
+  // 打一条四阶公式：步骤条走模型、跳到末尾的画面必须等于模型算出来的局面
+  els.alg.value = "Rw U2 Rw' F2";
+  els.fwd.fire('click');
+  ok('四阶公式一样进步骤条（4 步）', steps() === 4, String(steps()));
+  flush();                                  // 把动画演完（playing 落回 false）
+  els.last.fire('click');
+  ok('跳到末尾的画面 = cubesim4 算出来的局面（公式真的走了四阶模型）',
+    eqState(readCube4(), S4b.apply(S4b.solved(), "Rw U2 Rw' F2")),
+    JSON.stringify(readCube4()).slice(0, 50));
+  els.first.fire('click');
+  ok('回到开头还是复原态', eqState(readCube4(), S4b.solved()));
+
+  // 打乱：四阶是 40 步（外层 + 宽转），二阶 / 三阶各是 11 / 22
+  els.scramble.fire('click');
+  flush();
+  ok('四阶打乱是 40 步', steps() === 40, String(steps()));
+  ok('四阶打乱只写外层和宽转（Rw 这类），没有二阶 / 三阶那种 22 步',
+    /Rw|Uw|Fw|Lw|Dw|Bw/.test(els.alg.value), els.alg.value.slice(0, 40));
+
+  // 没有的转法：M / E / S 在四阶上要报错（不过宽转是有的）
+  els.alg.value = 'M2 U';
+  els.fwd.fire('click');
+  flush();
+  ok('四阶转 M 会报错（没有正中间那一层），提示写清楚',
+    els.alg.classList.contains('bad') && /四阶没有 M/.test(els.err.textContent),
+    els.err.textContent);
+  els.alg.value = '2R Uw';
+  els.alg.classList.remove('bad');
+  els.err.textContent = '';
+  els.fwd.fire('click');
+  flush();
+  ok('四阶认得 2R（里面那层）和 Uw（宽转）', !els.alg.classList.contains('bad'),
+    els.err.textContent);
+
+  // 切回三阶：局面重置（四阶那份状态不能接着用）
+  els.mode3.fire('click');
+  ok('切回三阶：26 个方块、m4 摘掉、局面和历史都重来',
+    posOf().length === 26 && !els.stage.classList.contains('m4') &&
+    eqState(readCube4(), S.solved()) && String(els.hcount.textContent) === '0',
+    posOf().length + ' 块 / ' + String(els.hcount.textContent) + ' 条历史');
+  ok('切回三阶：格子尺寸回到原来那个（四阶那 3/4 收回去）',
+    Math.abs(cs() - cs3) < 1e-6, cs3 + ' -> ' + cs());
+}
+
+console.log('\n[11i] 计时器过来的打乱：@2s: / @4s:（先切阶数，再当打乱播）');
+{
+  // 计时器的打乱条 ↗ 会带上阶数：三阶 @s:、二阶 @2s:、四阶 @4s:。
+  // 这一节真跑一遍计算器，确认「一进来就是那一阶」并且「打乱真的被执行了」。
+  const vm = require('vm');
+  const S4c = require(path.join(__dirname, '..', 'cubesim4.js'));
+  const calcSrc = fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')
+    .match(/<script>([\s\S]*?)<\/script>/g).map(x => x.replace(/<\/?script>/g, ''))
+    .filter(x => x.includes('M3'))[0];
+  const boot = (hash) => {
+    const store = {}, els = {}, pending = [];
+    const flush = () => { let k = 0; while (pending.length && k++ < 800) pending.shift()(); };
+    const mkEl = (t, init) => {
+      const e = { tagName: t, children: [], dataset: {}, _h: '', _t: '',
+        style: { setProperty(k, v) { this[k] = v; } }, offsetWidth: 1,
+        classList: { _s: new Set(), add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); },
+          toggle(c, v) { v ? this._s.add(c) : this._s.delete(c); }, contains(c) { return this._s.has(c); } },
+        _on: {}, addEventListener(ev, fn) { (this._on[ev] = this._on[ev] || []).push(fn); },
+        fire(ev, a) { (this._on[ev] || []).forEach(f => f(a || {})); },
+        appendChild(c) { this.children.push(c); c.parentNode = this; return c; },
+        querySelectorAll() { return []; }, querySelector() { return null; },
+        setPointerCapture() {}, closest() { return null; }, focus() {},
+        setAttribute(k, v) { this['_a_' + k] = String(v); }, value: init || '',
+        set innerHTML(v) { this._h = v; }, get innerHTML() { return this._h; },
+        set textContent(v) { this._t = v; }, get textContent() { return this._t === undefined ? '' : this._t; },
+        set disabled(v) {}, get disabled() { return false; } };
+      return e;
+    };
+    els.stage = mkEl('div');
+    els.stage.clientWidth = 600;
+    els.stage.clientHeight = 600;
+    const ctx = { console, navigator: {}, window: { addEventListener() {} },
+      setTimeout: fn => { pending.push(fn); return 0; }, clearTimeout() {},
+      CubeSim: S, CubeSim4: S4c, performance: { getEntriesByType: () => [] },
+      localStorage: { getItem: k => (k in store ? store[k] : null),
+                      setItem: (k, v) => { store[k] = String(v); }, removeItem: k => { delete store[k]; } },
+      location: { hash },
+      document: { getElementById: id => els[id] || (els[id] = mkEl('div')),
+                  querySelectorAll: () => [], documentElement: mkEl('html'),
+                  createElement: mkEl, body: { appendChild() {} }, addEventListener() {} } };
+    ctx.globalThis = ctx;
+    vm.createContext(ctx);
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'alglist.js'), 'utf8'), ctx);
+    vm.runInContext(calcSrc, ctx);
+    return { els, store, flush };
+  };
+  const posOf = e => [...e.els.cube.innerHTML.matchAll(/data-pos="([^"]+)"/g)].map(m => m[1]);
+  const stepsOf = e => (e.els.moves.innerHTML.match(/data-k="/g) || []).length;
+  const readCube = e => {
+    const C = {};
+    for (const x of fs.readFileSync(path.join(__dirname, '..', 'calc.html'), 'utf8')
+             .match(/var COLOR = \{([^}]+)\}/)[1].matchAll(/([UDFBRL]):\s*'(#[0-9A-Fa-f]{6})'/g)) {
+      C[x[2].toUpperCase()] = x[1];
+    }
+    const N7 = { px: '1,0,0', nx: '-1,0,0', py: '0,1,0', ny: '0,-1,0', pz: '0,0,1', nz: '0,0,-1' };
+    const out = {};
+    for (const m of e.els.cube.innerHTML.matchAll(/data-pos="([^"]+)"[^>]*>([\s\S]*?)<\/div>/g)) {
+      for (const x of m[2].matchAll(/class="on (\w+)"[^>]*--c:(#[0-9A-Fa-f]{6})/g)) {
+        out[m[1] + '|' + N7[x[1]]] = C[x[2].toUpperCase()];
+      }
+    }
+    return out;
+  };
+  const eqState = (a, b) => {
+    const ka = Object.keys(a).sort(), kb = Object.keys(b).sort();
+    return ka.length === kb.length && ka.every((k, i) => k === kb[i] && a[k] === b[k]);
+  };
+  // 二阶画面上只有八个角块，比对时也要只取角块那部分
+  const cornerOnly = st => {
+    const out = {};
+    Object.keys(st).forEach(k => {
+      const p = k.split('|')[0].split(',').map(Number);
+      if (p[0] && p[1] && p[2]) out[k] = st[k];
+    });
+    return out;
+  };
+
+  // 二阶打乱
+  const two = boot('#@2s:' + encodeURIComponent("U R F' U2 R"));
+  two.flush();
+  ok('@2s: 一进来就是二阶（8 个角块），打乱原样进输入框',
+    two.els.mode2.classList.contains('on') && posOf(two).length === 8 &&
+    two.els.alg.value === "U R F' U2 R" && stepsOf(two) === 5,
+    posOf(two).length + ' 块 / ' + stepsOf(two) + ' 步 / ' + two.els.alg.value);
+  ok('@2s: 打乱真的执行了（画面 = 三阶模型里做一遍这条打乱）',
+    eqState(readCube(two), cornerOnly(S.apply(S.solved(), "U R F' U2 R"))));
+
+  // 四阶打乱（带宽转）
+  const four = boot('#@4s:' + encodeURIComponent("Rw U2 Rw' F2"));
+  four.flush();
+  ok('@4s: 一进来就是四阶（56 个有贴纸的块），打乱原样进输入框',
+    four.els.mode4.classList.contains('on') && posOf(four).length === 56 &&
+    four.els.alg.value === "Rw U2 Rw' F2" && stepsOf(four) === 4,
+    posOf(four).length + ' 块 / ' + stepsOf(four) + ' 步');
+  ok('@4s: 打乱真的走了四阶模型（画面 = cubesim4 做一遍这条打乱）',
+    eqState(readCube(four), S4c.apply(S4c.solved(), "Rw U2 Rw' F2")));
+  ok('@4s: 阶数记进存档（下次打开还是四阶）', four.store['calc-cube-v1'] === '4');
+}
+
 console.log('\n[11d] 教程页：主题开关能切、写进存档（真跑一遍进阶页脚本）');
 {
   const vm = require('vm');
@@ -1925,6 +2334,9 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
         const open = body.indexOf('<div class="' + k + '">');
         spans[k] = open < 0 ? [-1, -1] : [open, body.indexOf('</div>', open)];
       });
+      // 模式栏（三阶 / 二阶）的 class 后面还跟着 id，所以不能用上面那条 indexOf
+      const mb = body.search(/<div class="modebar"/);
+      spans.modebar = mb < 0 ? [-1, -1] : [mb, body.indexOf('</div>', mb)];
       return (body.match(/<button[^>]*>/g) || []).map(tag => {
         const at = body.indexOf(tag);
         const cls = (tag.match(/class="([^"]*)"/) || [])[1] || '';
@@ -1932,6 +2344,7 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
         const region = Object.keys(spans).find(k => at > spans[k][0] && at < spans[k][1]) || 'self';
         const need = region === 'orbit' ? '.orbit button'
                    : region === 'zoom' ? '.zoom button'
+                   : region === 'modebar' ? '.modebar button'
                    : /\bsnap\b/.test(cls) ? '.snap'
                    : (/\bthemebtn\b/.test(cls) || id === 'themebtn') ? '.themebtn' : null;
         return { tag: tag.slice(0, 40), need };
@@ -2002,7 +2415,15 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
     ok('计算器认识 @s: 前缀（打乱：直接正向执行，不先摆局面）',
       /h\.indexOf\('@s:'\) === 0/.test(src2) &&
       /setTimeout\(function \(\) \{ run\(fwd, hashAlg, 'scramble', false\); \}, SCRAMBLE_HOLD_MS\)/.test(src2) &&
-      /@s:' \+ encodeURIComponent\(scramble\)/.test(fs.readFileSync(path.join(__dirname, '..', 'timer.html'), 'utf8')));
+      // 计时器那边按阶数给前缀：三阶 @s:、二阶 @2s:、四阶 @4s:
+      /function scrPrefix\(\) \{ return mode === '2' \? '@2s:' : mode === '4' \? '@4s:' : '@s:'; \}/
+        .test(fs.readFileSync(path.join(__dirname, '..', 'timer.html'), 'utf8')));
+    // 二阶 / 四阶的打乱：先切阶数，再当打乱执行（两个标记一起带上）
+    ok('计算器认识 @2s: / @4s:（计时器的二阶 / 四阶打乱）',
+      /h\.indexOf\('@2s:'\) === 0\) \{ hashCube2 = true; hashScramble = true; h = h\.slice\(4\)/.test(src2) &&
+      /h\.indexOf\('@4s:'\) === 0\) \{ hashCube4 = true; hashScramble = true; h = h\.slice\(4\)/.test(src2) &&
+      /if \(hashCube4\) setMode\('4'\);/.test(src2) &&
+      /if \(hashCube2\) setMode\('2'\);/.test(src2));
     ok('计算器认识 @g: 前缀',
       /indexOf\('@g:'\) === 0/.test(src2));
     // 必须先解码再判断 —— 浏览器会把 @ 编码成 %40，否则前缀留在框里，
@@ -2015,18 +2436,18 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
       /algEl\.value = hashAlg;/.test(src2) &&
       !/algEl\.value = hashGreen \?/.test(src2));
     ok('@g: 时先无动画地执行一个 y',
-      /if \(hashGreen\) \{[\s\S]{0,200}?CubeSim\.apply\(cur, 'y'\)/.test(src2));
+      /if \(hashGreen\) \{[\s\S]{0,200}?sim\(\)\.apply\(cur, 'y'\)/.test(src2));
     // 执行 y 之后视角要补同样的角度，画面才保持不变（红面在左、绿面在右）
     ok('@g: 时视角跟着补 +90（画面不变）',
       /view\.y = view\.y \+ 90;/.test(src2));
     // 点击公式跳过来：先无动画做逆（把魔方摆到要解的局面），再正向播动画
     ok('点击公式先执行逆（无动画）',
       /invert\(fwd\)\.forEach\(function \(x\) \{/.test(src2) &&
-      /cur = CubeSim\.turn\(cur, x\.mv, x\.times\);/.test(src2));
+      /cur = sim\(\)\.turn\(cur, x\.mv, x\.times\);/.test(src2));
     // 带整体旋转的公式（Aa 的 x'）要先把净旋转补上，摆出的局面才和图同朝向
     ok('读取公式净旋转并补上（局面与图同朝向）',
-      /var r = CubeSim\.netRotation\(hashAlg\);/.test(src2) &&
-      /if \(r\) cur = CubeSim\.apply\(cur, r\);/.test(src2));
+      /var r = sim\(\)\.netRotation\(hashAlg\);/.test(src2) &&
+      /if \(r\) cur = sim\(\)\.apply\(cur, r\);/.test(src2));
     // 动画里只允许有公式本身写明的动作 —— 不能自己追加净旋转的补偿
     ok('动画里只播公式本身（不追加净旋转补偿）',
       /run\(fwd, hashAlg, 'alg', false\)/.test(src2) &&
@@ -2052,6 +2473,8 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
                     body: { appendChild() {} }, addEventListener() {} } };
       ctx2.globalThis = ctx2;
       vm2.createContext(ctx2);
+      // 页面启动时就会画一次公式表（模式栏那边的 syncMode），所以 alglist 也得给
+      vm2.runInContext(fs.readFileSync(path.join(__dirname, '..', 'alglist.js'), 'utf8'), ctx2);
       vm2.runInContext(src, ctx2);
       ok('带 hash 打开时输入框已填好', els2.alg.value === "R U R' U' F", els2.alg.value);
     }
@@ -2145,7 +2568,10 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
     ok('面板里只有一个「选公式」按钮',
       /id="openpick"/.test(src2) && !/class="pick"/.test(src2));
     ok('来源按钮在展开栏里（F2L/OLL/PLL）',
-      /\.tabs button/.test(src2) && ['f2l', 'oll', 'pll'].every(k => src2.includes('data-pick="' + k + '"')));
+      /\.tabs button/.test(src2) &&
+      ['f2l', 'oll', 'pll', 'oll2', 'pbl2'].every(k => src2.includes('data-pick="' + k + '"')) &&
+      // 二阶那两栏只在二阶模式显示
+      /\.tabs button\.hide\{display:none\}/.test(src2));
     ok('切来源时不收起整栏',
       /function syncTabs/.test(src2) && !/pickerEl\.classList\.toggle\('on', !!pickKind\)/.test(src2));
     ok('选公式是右侧独立一列（不是挤在面板下面）',
@@ -2487,6 +2913,11 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
     ok('内容宽度固定，收起时靠外层裁剪（不会被挤扁）',
       /overflow:hidden/.test(src2) && /\.picker > \.inner\{width:300px/.test(src2));
     ok('列表项带缩略图', /function thumb\(kind, id\)/.test(src2) && /<img src="' \+ thumb/.test(src2));
+    // 缩略图是透明底 PNG（OLL / PBL 还分昼夜两版）：垫写死的白底的话，
+    // 夜晚那几版浅色线稿就糊在纸上了 —— 必须垫主题变量，跟着主题一起暗下去
+    ok('缩略图垫的是主题变量（不是写死的白底，否则夜晚那几版看不清）',
+      /\.plist \.p img\{[^}]*background:var\(--(field|chip)\)/.test(src2) &&
+      !/#fff8/.test(src2));
     // 只填入、不执行 —— 让用户自己确认方向再按
     // F2L 的 b 版要以绿面为 F —— 选到它时视角也要跟着转
     ok('公式行带编号（才能区分 a/b）', /data-id="' \+ esc\(r\[0\]\)/.test(src2));

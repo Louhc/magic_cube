@@ -20,7 +20,8 @@
   /* ---------- 画布 ---------- */
   .stage{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--stage);position:relative}
   /* 面板色：这条浮在舞台上，用 --chip 会和舞台同色糊掉 */
-  .modebar{position:absolute;left:16px;top:14px;z-index:5;display:flex;gap:2px;
+  .modebar{position:absolute;left:16px;top:14px;z-index:5;display:flex;flex-direction:column;
+           gap:2px;min-width:88px;
            background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:3px}
   /* 选中态的底由 .mpill 提供（和导航栏同一个做法）：一个会滑过去的小方块，
      按钮自己不再画背景，免得盖在药丸上、看着发灰 */
@@ -29,6 +30,7 @@
   /* 字色晚一步再变（延迟 = 药丸滑过来的时间）：不然新选中的那个会先压在白底上
      「闪」一下才亮 —— 导航栏当初就是这个问题。失去选中态那一边不延迟，立刻变灰。 */
   .modebar button{position:relative;z-index:1;background:none;border:none;color:var(--muted);
+                  text-align:center;
                   font:inherit;font-size:11.5px;font-weight:600;letter-spacing:.09em;
                   padding:4px 13px;border-radius:6px;cursor:pointer;
                   transition:color .18s ease .18s}
@@ -215,6 +217,8 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
       <button data-mode="f2l" class="on">F2L</button>
       <button data-mode="oll">OLL</button>
       <button data-mode="pll">PLL</button>
+      <button data-mode="oll2">2×2 OLL</button>
+      <button data-mode="pbl2">2×2 PBL</button>
     </div>
     <div class="stage-inner"><div id="host"></div>
       <div class="zoom">
@@ -249,12 +253,24 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     </section>
 
     <section class="sec" id="sec-pll">
-      <h2>PLL 显示</h2>
-      <div class="toggles">
+      <h2 id="h-pllcolor">PLL 显示</h2>
+      <div class="toggles" id="pllcolor-row">
         <label class="tg on" id="tg-pllcolor"><input type="checkbox" id="pllcolor" checked> 显示颜色</label>
       </div>
       <h2 style="margin-top:14px">箭头颜色</h2>
       <div class="schemes" id="arrowcolors"></div>
+      <h2 id="h-pblskew" style="margin-top:14px">2×2 PBL<button class="mini" id="rst-pbl"
+        title="倾斜 / 间距恢复默认（按 2×2 教程那张参考图：倾斜 1.00、间距 0.14 格）">恢复默认</button></h2>
+      <div class="row" id="pblskew-row">
+        <label for="pblskew">倾斜</label>
+        <input type="range" id="pblskew" min="0" max="1.4" step="0.05">
+        <span class="val" id="pblskew-v"></span>
+      </div>
+      <div class="row" id="pblgap-row">
+        <label for="pblgap">间距</label>
+        <input type="range" id="pblgap" min="0" max="1.5" step="0.02">
+        <span class="val" id="pblgap-v"></span>
+      </div>
     </section>
 
     <section class="sec" id="sec-oll">
@@ -318,8 +334,9 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   var history = [], future = [];    // 撤销 / 重做
 
   // 模式：目前只有 F2L（三维涂色）。OLL / PLL 待实现。
-  var MODES = { f2l: 'F2L', oll: 'OLL', pll: 'PLL' };
-  var MODE_ZH = { f2l: 'F2L（前两层）', oll: 'OLL（顶面朝向）', pll: 'PLL（顶层排序）' };
+  var MODES = { f2l: 'F2L', oll: 'OLL', pll: 'PLL', oll2: '2×2 OLL', pbl2: '2×2 PBL' };
+  var MODE_ZH = { f2l: 'F2L（前两层）', oll: 'OLL（顶面朝向）', pll: 'PLL（顶层排序）',
+                  oll2: '2×2 OLL（二阶顶面朝向）', pbl2: '2×2 PBL（二阶上下两层排序）' };
   var mode = 'f2l';
   // 开屏的明暗由 <head> 里的预设脚本按存档定好，这里保持一致：
   // 本页默认白天（和别的页一样），存档是夜晚才用夜晚。
@@ -327,10 +344,21 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   try { if (localStorage.getItem('cube-theme') === 'dark') theme = 'dark'; } catch (e) {}
   var oll = Cube.cloneOll(Cube.DEFAULT_OLL);
   var pll = Cube.pllDefault();               // 8 个顶层块各在哪个槽位（置换）
+  var oll2 = Cube.cloneOll(Cube.DEFAULT_OLL2);   // 2x2：四个角各自朝哪
+  var pbl2 = Cube.pbl2Default();                 // 2x2 PBL：上下两层各 4 个角怎么换
+  var pbl2Skew = Cube.PBL2_CFG.skew;             // 2x2 PBL 的倾斜度（0 = 正上方俯视）
+  var pbl2Gap = Cube.PBL2_CFG.layerGap;          // 上下两层的间距（单位：格子宽）
   var pllShowColors = true;                  // 颜色+箭头 / 仅箭头
   var pllArrowKey = Cube.PLL_DEFAULT_ARROW;  // 箭头颜色预设，默认深紫
 
   function pllArrowColor() { return Cube.pllArrowColorOf(pllArrowKey); }
+  // 2x2 PBL 的外观：只有箭头颜色（不做配色），墨色同样跟主题走
+  function pbl2Opts(forceLight) {
+    var dark = Cube.ollIsDark(forceLight ? 'light' : theme);
+    return { skew: pbl2Skew, layerGap: pbl2Gap,
+             paint: { line: dark ? '#C8D0DC' : '#1A1A1A', ghost: dark ? '#6E7A8A' : '#B9C0CA',
+                      text: '#FFFFFF', accent: '#C8D0DC', head: pllArrowColor() } };
+  }
   var scheme = Cube.OLL_DEFAULT_SCHEME;   // OLL 实心格配色方案（固定色，不随主题变）
   var showOllBars = Cube.OLL_CFG.showBars;  // 边框划线默认透明
   // 存档键：编辑器的状态是自己的；缩放另外有一个键，三页共用
@@ -376,11 +404,18 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
         cellIndex['pll-' + c.row + '-' + c.col] = { pll: true, slot: si, row: c.row, col: c.col };
       });
       host.innerHTML = Cube.toPllSvg(pll, pllOpts());
-    } else if (mode === 'oll') {
-      Cube.buildOll(oll, ollOpts()).cells.forEach(function (c) {
-        cellIndex[c.id] = { oll: true, row: c.row, col: c.col };
+    } else if (mode === 'oll' || mode === 'oll2') {
+      var isOll2 = mode === 'oll2';
+      (isOll2 ? Cube.buildOll2(oll2, ollOpts()) : Cube.buildOll(oll, ollOpts())).cells
+        .forEach(function (c) {
+          cellIndex[c.id] = { oll: true, oll2: isOll2, row: c.row, col: c.col };
+        });
+      host.innerHTML = isOll2 ? Cube.toOll2Svg(oll2, ollOpts()) : Cube.toOllSvg(oll, ollOpts());
+    } else if (mode === 'pbl2') {
+      Cube.buildPbl2(pbl2, pbl2Opts()).cells.forEach(function (c) {
+        cellIndex[c.id] = { pbl2: true, layer: c.layer, slot: c.slot, row: c.row, col: c.col };
       });
-      host.innerHTML = Cube.toOllSvg(oll, ollOpts());
+      host.innerHTML = Cube.toPbl2Svg(pbl2, pbl2Opts());
     } else {
       Cube.buildStickers(state, cfg).cells.forEach(function (c) {
         cellIndex[c.id] = { face: c.face, row: c.row, col: c.col };
@@ -399,6 +434,8 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   // 当前模式的画面尺寸（导出算高度要用）
   function currentSize() {
     if (mode === 'oll') return Cube.buildOll(oll, ollOpts()).size;
+    if (mode === 'oll2') return Cube.buildOll2(oll2, ollOpts()).size;
+    if (mode === 'pbl2') return Cube.buildPbl2(pbl2, pbl2Opts()).size;
     if (mode === 'pll') return Cube.buildPll(pll, pllOpts()).size;
     return Cube.buildStickers(state, cfg).size;
   }
@@ -465,12 +502,15 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
 
   /* ---------------- 改色 ---------------- */
   function snapshot() {
-    return { f2l: Cube.cloneState(state), oll: Cube.cloneOll(oll), pll: Cube.clonePll(pll) };
+    return { f2l: Cube.cloneState(state), oll: Cube.cloneOll(oll), pll: Cube.clonePll(pll),
+             oll2: Cube.cloneOll(oll2), pbl2: Cube.pbl2Clone(pbl2) };
   }
   function restore(snap) {
     state = Cube.cloneState(snap.f2l);
     oll = Cube.cloneOll(snap.oll);
     pll = Cube.clonePll(snap.pll || Cube.pllDefault());
+    oll2 = Cube.cloneOll(snap.oll2 || Cube.DEFAULT_OLL2);
+    pbl2 = Cube.pbl2Clone(snap.pbl2 || Cube.pbl2Default());
   }
   function pushHistory() {
     history.push(snapshot());
@@ -499,16 +539,20 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
 
   /* ---------------- 画布交互 ---------------- */
   host.addEventListener('click', function (e) {
-    if (mode === 'pll') return;          // PLL 用拖拽，没有点击动作
+    if (mode === 'pll' || mode === 'pbl2') return;   // 这两个模式用拖拽，没有点击动作
     var g = e.target.closest('.cell');
     if (!g) return;
     var id = g.dataset.id;
 
-    if (mode === 'oll') {                 // OLL：点格子循环朝向
+    if (mode === 'oll' || mode === 'oll2') {   // OLL：点格子循环朝向
       var c = cellIndex[id];
-      if (!c || (c.row === 1 && c.col === 1)) { toast('中心块永远朝上，不用改'); return; }
+      if (!c || (c.row === 1 && c.col === 1 && mode === 'oll')) {
+        toast(mode === 'oll' ? '中心块永远朝上，不用改' : '这一格没有内容');
+        return;
+      }
       pushHistory();
-      Cube.cycleOll(oll, c.row, c.col);
+      if (mode === 'oll2') Cube.cycleOll2(oll2, c.row, c.col);
+      else Cube.cycleOll(oll, c.row, c.col);
       render();
       return;
     }
@@ -519,15 +563,16 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
 
   // 右键 = 直接清除，省掉开圈那一步
   host.addEventListener('contextmenu', function (e) {
-    if (mode === 'pll') return;
+    if (mode === 'pll' || mode === 'pbl2') return;
     var g = e.target.closest('.cell');
     if (!g) return;
     var c0 = cellIndex[g.dataset.id];
     if (!c0) return;
-    if (mode === 'oll') {                 // OLL：右键 = 直接设成没朝上
+    if (mode === 'oll' || mode === 'oll2') {   // OLL：右键 = 直接设成没朝上
       e.preventDefault();
-      if (Cube.ollIsCenter(c0.row, c0.col)) return;
-      if (oll[c0.row][c0.col] !== 0) { pushHistory(); oll[c0.row][c0.col] = 0; render(); }
+      if (mode === 'oll' && Cube.ollIsCenter(c0.row, c0.col)) return;
+      var arr = mode === 'oll2' ? oll2 : oll;
+      if (arr[c0.row][c0.col] !== 0) { pushHistory(); arr[c0.row][c0.col] = 0; render(); }
       return;
     }
     e.preventDefault();
@@ -596,6 +641,7 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
         snap: snapshot(),
         opts: { cfg: cfg, scheme: scheme, showOllBars: showOllBars,
                 pllShowColors: pllShowColors, pllArrowKey: pllArrowKey,
+                pbl2Skew: pbl2Skew, pbl2Gap: pbl2Gap,
                 export: exportOpts() }
       }));
     } catch (e) {}
@@ -620,6 +666,12 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     if (typeof o.pllShowColors === 'boolean') pllShowColors = o.pllShowColors;
     if (o.pllArrowKey && Cube.PLL_ARROW_COLORS.some(function (a) { return a.key === o.pllArrowKey; })) {
       pllArrowKey = o.pllArrowKey;
+    }
+    if (typeof o.pbl2Skew === 'number' && isFinite(o.pbl2Skew)) {
+      pbl2Skew = Math.max(0, Math.min(1.4, o.pbl2Skew));
+    }
+    if (typeof o.pbl2Gap === 'number' && isFinite(o.pbl2Gap)) {
+      pbl2Gap = Math.max(0, Math.min(1.5, o.pbl2Gap));
     }
   }
   function savedMode(d) { return (d && MODES[d.mode]) ? d.mode : 'f2l'; }
@@ -653,19 +705,32 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     return [g.vb[0] + (clientX - g.ox) / g.k, g.vb[1] + (clientY - g.oy) / g.k];
   }
 
+  /* 指针下面是哪个槽位？
+     三阶 PLL 返回槽位下标（数字）；2x2 PBL 返回 "u2"/"d3" 这种（层 + 层内下标），
+     因为同一个下标在上下两层各有一个格子。 */
   function slotAtPoint(x, y) {
     if (!document.elementFromPoint) return -1;
     var el = document.elementFromPoint(x, y);
     while (el && !(el.dataset && el.dataset.slot)) el = el.parentNode;
     if (!el || el.dataset.slot === 'center') return -1;
+    if (mode === 'pbl2') return el.dataset.slot;
     var i = Cube.PLL_SLOT_BY_ID[el.dataset.slot];
     return (i === undefined) ? -1 : i;
   }
   function markDrop(to) {
     if (dropEl && dropEl.classList) dropEl.classList.remove('dropok');
     dropEl = null;
-    if (!drag || to < 0 || !Cube.pllSameKind(drag.from, to)) return;
-    var el = host.querySelector('[data-slot="' + Cube.PLL_SLOTS[to].id + '"]');
+    if (!drag || to < 0) return;
+    var sel;
+    if (mode === 'pbl2') {
+      // 只能落在同一层里
+      if (String(to).charAt(0) !== drag.layer) return;
+      sel = '[data-slot="' + to + '"]';
+    } else {
+      if (!Cube.pllSameKind(drag.from, to)) return;
+      sel = '[data-slot="' + Cube.PLL_SLOTS[to].id + '"]';
+    }
+    var el = host.querySelector(sel);
     if (el && el.classList) { el.classList.add('dropok'); dropEl = el; }
   }
   function endDragVisual() {
@@ -679,19 +744,27 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   }
 
   host.addEventListener('pointerdown', function (e) {
-    if (mode !== 'pll' || !e.target.closest) return;
+    if ((mode !== 'pll' && mode !== 'pbl2') || !e.target.closest) return;
     // 只拖方块。交换可以生成任意置换，所以拖箭头没有额外能力，
     // 还多一层"我到底抓到的是哪个"的困惑 —— 去掉了。
     var cellEl = e.target.closest('.cell');
     if (!cellEl || !cellEl.dataset.slot || cellEl.dataset.slot === 'center') return;
-    var from = Cube.PLL_SLOT_BY_ID[cellEl.dataset.slot];
-    if (from === undefined) return;
+    var from, layer = null;
+    if (mode === 'pbl2') {
+      layer = cellEl.dataset.layer;
+      from = +String(cellEl.dataset.slot).slice(1);
+      if (layer !== 'u' && layer !== 'd') return;
+      if (!(from >= 0 && from < Cube.PBL2_SLOTS.length)) return;
+    } else {
+      from = Cube.PLL_SLOT_BY_ID[cellEl.dataset.slot];
+      if (from === undefined) return;
+    }
     var kind = 'piece';
     if (e.preventDefault) e.preventDefault();
     if (host.setPointerCapture && e.pointerId !== undefined) {
       try { host.setPointerCapture(e.pointerId); } catch (err) {}
     }
-    drag = { kind: kind, from: from, el: cellEl,
+    drag = { kind: kind, from: from, layer: layer, el: cellEl,
              start: toUser(e.clientX, e.clientY) };
 
     // 提到最上层，拖的时候才不会被别的格子压住
@@ -712,11 +785,22 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   });
 
   host.addEventListener('pointerup', function (e) {
-    if (mode !== 'pll' || !drag) return;
+    if ((mode !== 'pll' && mode !== 'pbl2') || !drag) return;
     var d = drag, to = slotAtPoint(e.clientX, e.clientY);
     endDragVisual();
     drag = null;
-    if (to < 0 || !Cube.pllSameKind(d.from, to)) { render(); return; }
+    if (to < 0) { render(); return; }
+    if (mode === 'pbl2') {
+      if (String(to).charAt(0) !== d.layer) { render(); return; }
+      var toIdx = +String(to).slice(1);
+      if (!(toIdx >= 0 && toIdx < Cube.PBL2_SLOTS.length)) { render(); return; }
+      pushHistory();
+      var ok2 = Cube.pbl2Swap(pbl2, d.layer, d.from, toIdx);
+      if (ok2) render();
+      else { history.pop(); syncHistoryButtons(); render(); }
+      return;
+    }
+    if (!Cube.pllSameKind(d.from, to)) { render(); return; }
     pushHistory();
     var ok = Cube.pllSwap(pll, d.from, to);
     if (ok) render();
@@ -793,6 +877,39 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   bindRange('dist', 'dist', function (v) { return v.toFixed(1); });
   bindRange('gap', 'gap', function (v) { return (v * 100).toFixed(0) + '%'; });
   bindRange('radius', 'radius', function (v) { return (v * 100).toFixed(0) + '%'; });
+
+  /* 2x2 PBL 的倾斜度：单独一个变量（不属于 F2L 的 cfg），所以不挂进 ranges */
+  var pblSkewEl = document.getElementById('pblskew'), pblSkewOut = document.getElementById('pblskew-v');
+  function syncPblSkew() {
+    pblSkewEl.value = pbl2Skew;
+    pblSkewOut.textContent = pbl2Skew.toFixed(2);
+  }
+  pblSkewEl.addEventListener('input', function () {
+    pbl2Skew = parseFloat(pblSkewEl.value);
+    pblSkewOut.textContent = pbl2Skew.toFixed(2);
+    closeRing(); render();
+  });
+  syncPblSkew();
+  // 恢复默认：倾斜 / 间距回到参考图那套（Cube.PBL2_CFG 里的默认值）
+  document.getElementById('rst-pbl').addEventListener('click', function () {
+    pbl2Skew = Cube.PBL2_CFG.skew;
+    pbl2Gap = Cube.PBL2_CFG.layerGap;
+    syncPblSkew();
+    syncPblGap();
+    closeRing(); render();
+    toast('2×2 PBL 视图已恢复默认');
+  });
+  var pblGapEl = document.getElementById('pblgap'), pblGapOut = document.getElementById('pblgap-v');
+  function syncPblGap() {
+    pblGapEl.value = pbl2Gap;
+    pblGapOut.textContent = pbl2Gap.toFixed(2);
+  }
+  pblGapEl.addEventListener('input', function () {
+    pbl2Gap = parseFloat(pblGapEl.value);
+    pblGapOut.textContent = pbl2Gap.toFixed(2);
+    closeRing(); render();
+  });
+  syncPblGap();
 
   var shEl = document.getElementById('shading'), tgSh = document.getElementById('tg-shading');
   shEl.addEventListener('change', function () {
@@ -957,6 +1074,8 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     var w = px, h = Math.round(px * size.h / size.w);
     var bg = withBg ? { background: '#ffffff' } : null;
     var svg = mode === 'oll' ? Cube.toOllSvg(oll, ollOpts(!!withBg), bg)
+            : mode === 'oll2' ? Cube.toOll2Svg(oll2, ollOpts(!!withBg), bg)
+            : mode === 'pbl2' ? Cube.toPbl2Svg(pbl2, pbl2Opts(!!withBg), bg)
             : mode === 'pll' ? Cube.toPllSvg(pll, pllOpts(!!withBg), bg)
             : Cube.toSvg(state, cfg, bg);
     svg = svg.replace(/<svg[^>]*>/, function (tag) {
@@ -1063,6 +1182,16 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
       render(); toast('已还原为已复原状态');
       return;
     }
+    if (mode === 'pbl2') {
+      pbl2 = Cube.pbl2Default();
+      render(); toast('已还原为已复原状态');
+      return;
+    }
+    if (mode === 'oll2') {
+      oll2 = Cube.cloneOll(Cube.DEFAULT_OLL2);
+      render(); toast('已恢复默认朝向');
+      return;
+    }
     if (mode === 'oll') {
       oll = Cube.cloneOll(Cube.DEFAULT_OLL);
       render(); toast('已恢复默认朝向');
@@ -1073,8 +1202,9 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   });
   document.getElementById('btn-clear').addEventListener('click', function () {
     pushHistory();
-    if (mode === 'oll') {
-      oll = Cube.ollAll(false);            // 中心块仍是朝上
+    if (mode === 'oll' || mode === 'oll2') {
+      if (mode === 'oll2') oll2 = Cube.oll2All(false);
+      else oll = Cube.ollAll(false);       // 中心块仍是朝上
       render(); toast('已全部设为未朝向');
     } else {
       Object.keys(state).forEach(function (f) {
@@ -1141,19 +1271,31 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   // 两种模式能做的事不一样，按钮文案和可见性跟着切
   function syncModeUI() {
     var isF2l = mode === 'f2l', isOll = mode === 'oll', isPll = mode === 'pll';
+    var isOll2 = mode === 'oll2', isPbl2 = mode === 'pbl2';
+    var isOllAny = isOll || isOll2, isSwapAny = isPll || isPbl2;
     document.getElementById('btn-reset').textContent =
-      isOll ? '恢复默认朝向' : (isPll ? '还原为已复原' : '恢复默认配色');
+      isOllAny ? '恢复默认朝向' : (isSwapAny ? '还原为已复原' : '恢复默认配色');
     document.getElementById('btn-clear').textContent =
-      isOll ? '全部设为未朝向' : '全部清除为灰色';
-    document.getElementById('btn-clear').style.display = isPll ? 'none' : '';
-    document.getElementById('sec-pll').style.display = isPll ? '' : 'none';
-    document.getElementById('sec-oll').style.display = isOll ? '' : 'none';
-    // 相机 / 样式 只作用于 F2L 的三维渲染，二维那两个图用的是各自那套参数
+      isOllAny ? '全部设为未朝向' : '全部清除为灰色';
+    document.getElementById('btn-clear').style.display = isSwapAny ? 'none' : '';
+    // 「PLL 显示」这一节：置换类模式（PLL / 2×2 PBL）都要箭头颜色；
+    // 2×2 PBL 不做配色，所以把"显示颜色"那一行和标题藏起来
+    document.getElementById('sec-pll').style.display = isSwapAny ? '' : 'none';
+    document.getElementById('h-pllcolor').style.display = isPbl2 ? 'none' : '';
+    document.getElementById('pllcolor-row').style.display = isPbl2 ? 'none' : '';
+    // 「倾斜」只有 2x2 PBL 用得上（PLL 是正上方俯视的正方形网格）
+    document.getElementById('h-pblskew').style.display = isPbl2 ? '' : 'none';
+    document.getElementById('pblskew-row').style.display = isPbl2 ? '' : 'none';
+    document.getElementById('pblgap-row').style.display = isPbl2 ? '' : 'none';
+    document.getElementById('sec-oll').style.display = isOllAny ? '' : 'none';
+    // 相机 / 样式 只作用于 F2L 的三维渲染，那几个二维图用的是各自那套参数
     document.getElementById('sec-cam').style.display = isF2l ? '' : 'none';
     document.getElementById('sec-style').style.display = isF2l ? '' : 'none';
 
     document.getElementById('hint').innerHTML =
       isOll ? '点格子循环<b>黄色朝向</b>（实心 = 朝上）· 边框线只是显示：深色 = 黄色正从那一面露出，浅灰 = 该块其他可选的面 · 右键设回朝上'
+      : isOll2 ? '2×2 只有角块：点格子循环<b>黄色朝向</b>（实心 = 朝上）· 边框线只是显示：深色 = 黄色正从那一面露出，浅灰 = 该块其他可选的面 · 右键设回朝上'
+      : isPbl2 ? '<b>拖动方块</b>可把<b>同一层</b>的两块对调；上下两层各一块 2×2 图 · 箭头表示「这块该去哪」（互换成环的画成双向箭头）· <kbd>Ctrl</kbd>+<kbd>Z</kbd> 撤销'
       : isPll ? '<b>拖动方块</b>可把两块对调（交换能拼出任意排列）· 箭头会自动更新，表示「这块该去哪」· <kbd>Ctrl</kbd>+<kbd>Z</kbd> 撤销'
       : '点任意贴纸 → <b>就地弹出取色圈</b>，选完即走 · 右键直接清除 · <kbd>Ctrl</kbd>+<kbd>Z</kbd> 撤销';
   }
@@ -1171,6 +1313,10 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     showOllBars = Cube.OLL_CFG.showBars;
     pllShowColors = true;
     pllArrowKey = Cube.PLL_DEFAULT_ARROW;
+    pbl2Skew = Cube.PBL2_CFG.skew;
+    pbl2Gap = Cube.PBL2_CFG.layerGap;
+    syncPblSkew();
+    syncPblGap();
     resetExportOpts();
     // 控件跟着回写（不然状态是默认的、面板还显示旧值）
     syncControls();

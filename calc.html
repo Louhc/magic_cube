@@ -26,6 +26,25 @@
   /* 只管位置 —— 开关本身的样式（尺寸/底色/滑块）在 nav.css 里，七页共用 */
   .themebtn{position:absolute;right:16px;top:14px;z-index:5}
 
+  /* 三阶 / 二阶：和编辑器那个模式栏一模一样的做法（连尺寸都对齐）——
+     一块面板底 + 竖着两三个按钮，选中的底由会滑过去的 .mpill 给，
+     按钮自己只负责字色（晚一步变色，不然新选中的那个会先压在白底上闪一下）。
+     摆在左上角，原来是「整体滚 z / z'」的位置，那两个键因此往右让开。 */
+  .modebar{position:absolute;left:16px;top:14px;z-index:5;display:flex;flex-direction:column;
+           gap:2px;min-width:88px;
+           background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:3px}
+  .mpill{position:absolute;left:0;top:0;border-radius:6px;background:var(--accent);
+         transition:transform .18s ease,width .18s ease,height .18s ease;pointer-events:none}
+  .modebar button{position:relative;z-index:1;background:none;border:none;color:var(--muted);
+                  text-align:center;
+                  font:inherit;font-size:11.5px;font-weight:600;letter-spacing:.09em;
+                  padding:4px 13px;border-radius:6px;cursor:pointer;
+                  transition:color .18s ease .18s}
+  .modebar button:not(.on){transition-delay:0s}
+  .modebar button:hover{color:var(--text)}
+  .modebar button.on{color:var(--on-accent, #fff)}
+  @media (prefers-reduced-motion: reduce){ .mpill{transition:none} }
+
 
   /* 四周的整体旋转按钮：不参与 3D，所以不会跟着魔方一起转。
      做成「无边框的大按键」—— 只有一条折线（へ / く）或一段圆弧，
@@ -50,8 +69,9 @@
   .orbit .s{left:50%;bottom:2px;transform:translateX(-50%)}
   .orbit .w{left:2px;top:50%;transform:translateY(-50%)}
   .orbit .e{right:2px;top:50%;transform:translateY(-50%)}
-  .orbit .z1{left:2px;top:2px}
-  .orbit .z2{left:58px;top:2px}
+  /* 滚动那两个键往右让开，给左上角的「三阶 / 二阶」模式栏腾地方 */
+  .orbit .z1{left:118px;top:2px}
+  .orbit .z2{left:174px;top:2px}
   /* 右下角的放大缩小：和四周的折角按钮同一套（无边框、平时淡、指上去染色放大） */
   .zoom{position:absolute;right:14px;bottom:14px;display:grid;gap:6px;z-index:4}
   /* 拍照键：和缩放那三个同一套外观。摆在主题开关左边（和公式页的打印键同一个位置，
@@ -80,6 +100,25 @@
           margin:calc(var(--cs) * 1.5) 0 0 calc(var(--cs) * -1.85);
           border-radius:50%;
           background:radial-gradient(closest-side, var(--btn-drop), transparent 78%)}
+  /* 二阶（.stage.m2）：--cs 是「一个角块」的边长，八个角块中心在 ±0.5 格上 ——
+     整块魔方只有三阶的 2/3 大，所以 fit() 把格子放大 1.5 倍补回来。
+     阴影和 F 标牌是照 3×3 的比例写死的，这里按 1/1.5 缩一档
+     （缩完的魔方和三阶一样大，地上那块椭圆才不会被撑得比魔方还宽）。 */
+  .stage.m2 .shadow{width:calc(var(--cs) * 2.47);height:calc(var(--cs) * .55);
+                    margin:calc(var(--cs) * 1) 0 0 calc(var(--cs) * -1.235)}
+  .stage.m2 .fmark{width:calc(var(--cs) * .347);height:calc(var(--cs) * .347);
+                   margin:calc(var(--cs) * -.173) 0 0 calc(var(--cs) * -.173);
+                   border-radius:calc(var(--cs) * .093);
+                   font:700 calc(var(--cs) * .2)/1 system-ui,-apple-system,sans-serif;
+                   transform:translate3d(0, 0, calc(var(--cs) * 1.02))}
+  /* 四阶：格子是 3×3 的 3/4（四层撑出同样大的魔方），阴影和 F 标牌按 4/3 放大 */
+  .stage.m4 .shadow{width:calc(var(--cs) * 4.93);height:calc(var(--cs) * 1.09);
+                    margin:calc(var(--cs) * 2) 0 0 calc(var(--cs) * -2.47)}
+  .stage.m4 .fmark{width:calc(var(--cs) * .693);height:calc(var(--cs) * .693);
+                   margin:calc(var(--cs) * -.347) 0 0 calc(var(--cs) * -.347);
+                   border-radius:calc(var(--cs) * .187);
+                   font:700 calc(var(--cs) * .4)/1 system-ui,-apple-system,sans-serif;
+                   transform:translate3d(0, 0, calc(var(--cs) * 2.03))}
   .cube{position:relative;width:0;height:0;transform-style:preserve-3d}
   /* F 面标牌：贴在前面的中心方块上，跟着魔方一起转，
      所以做了 x/y/z 之后它仍然指着当前的前面。
@@ -434,6 +473,8 @@
   .tabs button:hover:not(:disabled){color:var(--text);border-color:var(--line-strong)}
   .tabs button.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent, #fff)}
   .tabs button:disabled{opacity:.4;cursor:default}
+  /* 二阶模式下三阶那三套（F2L/OLL/PLL）收起来，只剩「二阶 PBL」一栏 */
+  .tabs button.hide{display:none}
   /* 选公式列：缓慢展开。
      不能用 display:none 切换 —— 那样没法过渡，只能"蹦"出来。
      改成外层宽度 0 -> 300px + overflow:hidden，内层宽度固定，所以内容不会被挤扁。
@@ -465,8 +506,14 @@
   .plist .p{display:flex;align-items:center;gap:8px;padding:4px 5px;border-radius:6px;
             cursor:pointer;transition:.1s}
   .plist .p:hover{background:var(--field-hover)}
-  .plist .p img{flex:none;width:30px;height:30px;border-radius:4px;background:#fff8}
-  .plist .p b{flex:none;width:22px;font:600 11px/1 ui-monospace,Menlo,monospace;
+  /* 缩略图底下垫一层「纸」：这些 PNG 都是透明底的（OLL / PBL 还分昼夜两版）。
+     垫写死的白底，夜晚那几版（浅色线稿 + 黄箭头）糊在纸上就看不清了 ——
+     所以垫主题自己的 --field：白天近白、夜晚是暗灰，两套主题都看得清，
+     而且切主题时它跟着一起淡过去（theme.css 里 --field 有过渡）。 */
+  .plist .p img{flex:none;width:30px;height:30px;border-radius:4px;background:var(--field)}
+  /* 编号列：二阶 OLL 的情况名长（antisune 有 8 个字符），这一列得留够 ——
+     写死 22px 的话字会溢出去压到右边的公式上。短名字（01a / T / 21）只是多留点白。 */
+  .plist .p b{flex:none;width:58px;font:600 11px/1 ui-monospace,Menlo,monospace;
               color:var(--muted2);font-variant-numeric:tabular-nums}
   .plist .p code{font:11.5px/1.4 ui-monospace,Menlo,Consolas,monospace;
                  word-break:break-all;color:var(--text)}
@@ -504,6 +551,18 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
 <div class="app">
   <main class="stage" id="stage">
     <button class="themebtn" id="themebtn" type="button" title="切到夜晚"></button>
+    <!-- 三阶 / 二阶：和编辑器那个模式栏是同一套 —— 竖着一摞按钮，
+         选中的底由一块会滑过去的药丸（.mpill）给，按钮自己只负责字色。
+         摆在原来「整体滚 z / z'」的位置上，那两个键因此往右让开一段。 -->
+    <div class="modebar" id="modebar">
+      <span class="mpill" id="mpill"></span>
+      <button id="mode2" type="button" data-mode="2" aria-pressed="false"
+              title="二阶（2×2×2）：只有八个角块，没有中层和宽转">二阶</button>
+      <button id="mode3" type="button" data-mode="3" class="on" aria-pressed="true"
+              title="三阶（3×3×3）：六面都能转，还有中层">三阶</button>
+      <button id="mode4" type="button" data-mode="4" aria-pressed="false"
+              title="四阶（4×4×4）：四个面各四层，有宽转（Rw）和里面的层（2R）">四阶</button>
+    </div>
     <!-- 拍照：把当前局面渲染成一张 PNG 存下来（走编辑器那套 SVG 渲染，不是截屏） -->
     <button class="snap" id="snap" type="button" title="拍照：把当前魔方存成 PNG"
             aria-label="拍照"><svg viewBox="0 0 24 24"><path
@@ -639,9 +698,11 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
       viewBox="0 0 24 24"><polyline points="9 5 16 12 9 19"/></svg></button>
     <div class="inner">
       <div class="tabs">
-        <button data-pick="f2l" type="button">F2L</button>
-        <button data-pick="oll" type="button">OLL</button>
-        <button data-pick="pll" type="button">PLL</button>
+        <button data-pick="f2l" data-for="3" type="button">F2L</button>
+        <button data-pick="oll" data-for="3" type="button">OLL</button>
+        <button data-pick="pll" data-for="3" type="button">PLL</button>
+        <button data-pick="oll2" data-for="2" type="button">二阶 OLL</button>
+        <button data-pick="pbl2" data-for="2" type="button">二阶 PBL</button>
       </div>
       <div class="plist" id="plist"></div>
     </div>
@@ -649,6 +710,7 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
 </div>
 
 <script src="cubesim.js"></script>
+<script src="cubesim4.js"></script>
 <script src="alglist.js"></script>
 <script>
 (function () {
@@ -692,6 +754,40 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     z: ['Z',  90, function () { return true; }]
   };
 
+  /* 四阶那张转动表：轴和角度跟三阶同一套（都是「模型坐标 -> CSS 坐标」那一步
+     推出来的），只有「哪一层」不一样 —— 外层是 ±1.5，宽转是外面两层，
+     2R / 3L 这种是里面那两层。层的判据必须和 cubesim4.js 里的一致，
+     test/cubesim4.js 会拿模型逐个核对（哪些位置动了必须一模一样）。 */
+  var M4 = {
+    'U': ['Y', -90, function (p) { return p[1] === 1.5; }],
+    'D': ['Y',  90, function (p) { return p[1] === -1.5; }],
+    'R': ['X',  90, function (p) { return p[0] === 1.5; }],
+    'L': ['X', -90, function (p) { return p[0] === -1.5; }],
+    'F': ['Z',  90, function (p) { return p[2] === 1.5; }],
+    'B': ['Z', -90, function (p) { return p[2] === -1.5; }],
+    'r': ['X',  90, function (p) { return p[0] > 0; }],
+    'l': ['X', -90, function (p) { return p[0] < 0; }],
+    'u': ['Y', -90, function (p) { return p[1] > 0; }],
+    'd': ['Y',  90, function (p) { return p[1] < 0; }],
+    'f': ['Z',  90, function (p) { return p[2] > 0; }],
+    'b': ['Z', -90, function (p) { return p[2] < 0; }],
+    '2R': ['X',  90, function (p) { return p[0] === 0.5; }],
+    '3R': ['X',  90, function (p) { return p[0] === -0.5; }],
+    '2L': ['X', -90, function (p) { return p[0] === -0.5; }],
+    '3L': ['X', -90, function (p) { return p[0] === 0.5; }],
+    '2U': ['Y', -90, function (p) { return p[1] === 0.5; }],
+    '3U': ['Y', -90, function (p) { return p[1] === -0.5; }],
+    '2D': ['Y',  90, function (p) { return p[1] === -0.5; }],
+    '3D': ['Y',  90, function (p) { return p[1] === 0.5; }],
+    '2F': ['Z',  90, function (p) { return p[2] === 0.5; }],
+    '3F': ['Z',  90, function (p) { return p[2] === -0.5; }],
+    '2B': ['Z', -90, function (p) { return p[2] === -0.5; }],
+    '3B': ['Z', -90, function (p) { return p[2] === 0.5; }],
+    'x': ['X',  90, function () { return true; }],
+    'y': ['Y', -90, function () { return true; }],
+    'z': ['Z',  90, function () { return true; }]
+  };
+
   var algEl = document.getElementById('alg');
   var movesEl = document.getElementById('moves');
   var cubeEl = document.getElementById('cube');
@@ -707,7 +803,8 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
 
   var steps = [], frames = [], at = 0;   // 最近一次提交的步骤与各阶段局面
   var pillInstant = true;                // 下一块高亮直接落位（不做滑动过渡）
-  var cur = CubeSim.solved();            // 当前局面（累积的）
+  // 当前局面（累积的）。三阶 / 二阶共用这份模型；切到四阶时 setMode 会重置局面
+  var cur = CubeSim.solved();
   var hist = [];                         // 历史：{kind:'alg'|'scramble'|'rotate'|'move', alg}
   var histAt = -1;                       // 当前停在历史里的哪一条（-1 = 空）
   var queue = [];                        // 单步排队：动画没转完就接着点的那些步子
@@ -724,6 +821,13 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
 
   // 公式缩略图：和公式表用同一套文件命名
   function thumb(kind, id) {
+    // 二阶那两套的图各在自己的目录里，命名是 <情况>_<昼夜>-<尺寸>.png
+    // （PBL 是两个 2×2 视图叠着 256x197；OLL 是一张 2×2 俯视图 256x256）
+    if (kind === 'pbl2' || kind === 'oll2') {
+      var t2 = document.documentElement.dataset.theme === 'dark' ? 'night' : 'day';
+      var size2 = kind === 'pbl2' ? '256x197' : '256x256';
+      return '2x2' + (kind === 'pbl2' ? 'pbl' : 'oll') + '/' + id + '_' + t2 + '-' + size2 + '.png';
+    }
     var f = kind === 'f2l' ? id
           : (/^\d+$/.test(id) && id.length < 2 ? '0' + id : id);
     var size = kind === 'f2l' ? '256x258' : '256x256';
@@ -734,12 +838,144 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
 
   var pickKind = null;
   var openBtn = document.getElementById('openpick');
+
+  /* ---------- 三阶 / 二阶 ----------
+     二阶不用第二套模拟器：三阶的面转对八个角块的搬运和二阶完全一样
+     （角块的置换/朝向和有没有棱、中心无关 —— PBL 这类公式里也没有中层转），
+     所以只改三件事：
+       · 只画八个角块（|x|=|y|=|z|=1 那些位置），角块中心落在 ±0.5 格上
+       · 格子放大 1.5 倍 —— 八个角块拼出的魔方和三阶一样大（见 fit()）
+       · 不认 M/E/S 和 r/l/u/d/f/b（二阶没有中层和宽转）
+     局面本身是同一份数据：切阶数不会把魔方弄乱，只是换个画法看，
+     三阶历史里的公式在二阶模式下也能接着播。 */
+  /* 阶数存进 localStorage：**下次打开就是你上次离开时那一阶**；
+     第一次打开（还没有这个键）默认三阶。点带标记的链接（@2: / @4: / @2s: / @4s:）
+     进来的那一次也会切过去、并记下来。 */
+  var MODE_KEY = 'calc-cube-v1';
+  var mode = '3';
+  (function () {
+    var v = null;
+    try { v = localStorage.getItem(MODE_KEY); } catch (e) {}
+    mode = (v === '2' || v === '4') ? v : '3';
+  })();
+  // 三阶和二阶共用同一份模型（角块是一回事），四阶是另一份
+  function sim() { return mode === '4' ? CubeSim4 : CubeSim; }
+  /* 一个公式里用了哪些「这一阶没有的」动作：
+       二阶 —— 没有中层（M/E/S）、没有宽转（Rw 或小写 r/l/u/d/f/b）、没有里面的层（2R/3L）
+       四阶 —— 有宽转和 2R/3L，但没有「正中间那一层」（M/E/S）
+     先按字面挑出来，再交给对应模型解析 —— 模型压根不认识它们，直接报出来是
+     「不认识的动作: M」，用户看不懂。
+     x/y/z 是整体转，三种阶数都有，不算在内。 */
+  var WIDE3 = 'rludfb';
+  function badMoves(alg) {
+    var s = String(alg || '').replace(/[\s()]/g, ''), i = 0, bad = [];
+    while (i < s.length) {
+      var d = /[2-9]/.test(s[i]) ? s[i++] : '';
+      if (!/[A-Za-z]/.test(s[i] || '')) { i++; continue; }   // 别的字符交给模型去报错
+      var c = s[i];
+      var w = (s[i + 1] === 'w' || s[i + 1] === 'W') ? 1 : 0;
+      i += 1 + w;
+      var mv = d ? d + c : (w ? c + 'w' : c);
+      var no = d ? false : 'MES'.indexOf(c.toUpperCase()) >= 0;
+      if (mode === '2') no = no || !!d || !!w || WIDE3.indexOf(c) >= 0;
+      if (mode === '4' && d && d > '3') no = true;           // 四阶每个方向只有 2R / 3R
+      if (no && bad.indexOf(mv) < 0) bad.push(mv);
+      while (s[i] === '2' || s[i] === "'") i++;
+    }
+    return bad;
+  }
+  function isCorner(pos) {
+    if (mode !== '2') return true;          // 三阶二十六个块、四阶五十六个块都画
+    var p = pos.split(',');
+    return p[0] !== '0' && p[1] !== '0' && p[2] !== '0';
+  }
+  // 解析公式：和 CubeSim.steps 一样，只是二阶 / 四阶模式下挡掉那些「没有的转法」
+  function parseAlg(alg) {
+    var bad = badMoves(alg);
+    if (bad.length) {
+      throw new Error(mode === '2'
+        ? '二阶没有 ' + bad.join(' / ') + ' 这种转法（没有中层和宽转），' +
+          '只能转 U D L R F B 或整体转 x y z'
+        : '四阶没有 ' + bad.join(' / ') + ' 这种转法（没有正中间那一层）；' +
+          '要转里面那层写 2R / 3L 这种');
+    }
+    return sim().steps(alg);
+  }
+
+  var modeBtns = { '3': document.getElementById('mode3'), '2': document.getElementById('mode2'),
+                   '4': document.getElementById('mode4') };
+  /* 选中态那块药丸：和编辑器 / 导航条同一个做法 —— 切模式时滑过去，不是跳过去。
+     位置用按钮的 offsetLeft/offsetTop（绝对定位的子元素正好也是相对内边距边算的，
+     所以药丸和按钮对得上 —— 模式栏自己有 3px 内边距）。 */
+  var mpill = document.getElementById('mpill');
+  function placeMPill(el, animate) {
+    if (!mpill || !el) return;
+    if (!animate) mpill.style.transition = 'none';
+    mpill.style.width = el.offsetWidth + 'px';
+    mpill.style.height = el.offsetHeight + 'px';
+    mpill.style.transform = 'translate(' + el.offsetLeft + 'px,' + el.offsetTop + 'px)';
+    if (!animate) {
+      void mpill.offsetWidth;      // 逼一次重排，免得初始定位也被当成动画
+      mpill.style.transition = '';
+    }
+  }
+  function syncMode(animate) {
+    var active = null;
+    Object.keys(modeBtns).forEach(function (k) {
+      var b = modeBtns[k];
+      b.classList.toggle('on', k === mode);
+      // 桩里没有 setAttribute（真 DOM 有）；读屏靠 aria-pressed 知道选的是哪个
+      if (b.setAttribute) b.setAttribute('aria-pressed', k === mode ? 'true' : 'false');
+      if (k === mode) active = b;
+    });
+    placeMPill(active, animate !== false);
+    stageEl.classList.toggle('m2', mode === '2');
+    stageEl.classList.toggle('m4', mode === '4');
+    algEl.placeholder = mode === '2' ? "输入二阶公式，例如 R U R' U'"
+                                     : "输入公式，例如 R U R' U'";
+    // 公式表跟着换一套：F2L / OLL / PLL 是给三阶写的，二阶只有 PBL，
+    // 四阶暂时没有现成的公式表（面板里给一行说明，公式直接打进输入框）
+    if (mode === '4') pickKind = null;
+    else if (mode === '2' && pickKind !== 'pbl2' && pickKind !== 'oll2') pickKind = 'oll2';
+    else if (mode === '3' && (pickKind === 'pbl2' || pickKind === 'oll2' || !pickKind)) pickKind = 'oll';
+    syncTabs();
+    renderPick();
+  }
+  /* 换阶数是「换一套画法」，不算改动局面（局面本来就是同一份），
+     所以不像提交 / 打乱那样要点第二下：直接换。
+     只是正在演的那一步得作废 —— 重画会把正在转的 .layer 一起换掉。
+     画面上停在当前那一步（steps / at 都不动），接着按播放还能往下演。 */
+  function setMode(m) {
+    var nm = (m === '4') ? '4' : (m === '2' ? '2' : '3');
+    if (nm !== mode) {
+      epoch++;
+      playing = false;
+      busy = false;
+      queue.length = 0;
+      // 三阶 / 二阶是同一份模型（角块完全一样），换过去局面留着；
+      // 四阶是另一份模型，局面 / 历史 / 存档都不是一回事 —— 从头来
+      var switchModel = (mode === '4') !== (nm === '4');
+      mode = nm;
+      if (switchModel) reset();
+    }
+    syncMode(true);             // 切模式时药丸滑过去
+    try { localStorage.setItem(MODE_KEY, mode); } catch (e) {}   // 记住这一阶，下次打开还是它
+    fit();                      // 二阶格子大一圈 + 只画八个角：尺寸重算并重画
+  }
+  modeBtns['3'].addEventListener('click', function () { setMode('3'); });
+  modeBtns['2'].addEventListener('click', function () { setMode('2'); });
+  modeBtns['4'].addEventListener('click', function () { setMode('4'); });
+
   function renderPick() {
-    pickEl.innerHTML = pickKind ? (ALG_LIST[pickKind] || []).map(function (r) {
+    var rows = pickKind ? (ALG_LIST[pickKind] || []) : [];
+    pickEl.innerHTML = rows.length ? rows.map(function (r) {
       return '<div class="p" data-alg="' + esc(r[1]) + '" data-id="' + esc(r[0]) + '">' +
              '<img src="' + thumb(pickKind, r[0]) + '" alt="" loading="lazy" data-zoom>' +
              '<b>' + esc(r[0]) + '</b><code>' + esc(r[1]) + '</code></div>';
-    }).join('') : '';
+    }).join('')
+    // 四阶还没有现成的公式表（三阶那三套是给三阶写的）—— 说清楚，别让人以为坏了
+    : (mode === '4' ? '<div class="none">四阶还没有公式表：公式直接打进输入框就行' +
+                      '（Rw / Uw 这类宽转、2R / 3L 这类里面那层都认得）</div>' : '');
   }
 
   /* 离开页面再回来（导航点是普通链接，会重新加载）时保住现场：
@@ -751,6 +987,7 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
       localStorage.setItem(STORE, JSON.stringify({
         cur: cur, hist: hist, histAt: histAt, alg: algEl.value,
         steps: steps, base: frames[0] || cur,
+        mode: mode,                    // 四阶是另一份模型，恢复前先看是不是同一阶
         dur: DUR, skip: skipAnim
       }));
     } catch (e) {}
@@ -762,6 +999,8 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     try {
       var d = JSON.parse(raw);
       if (!d || !d.cur || typeof d.cur !== 'object') return null;
+      // 三阶 / 二阶的局面是同一份，四阶那份不能混着用
+      if (d.mode && (d.mode === '4') !== (mode === '4')) return null;
       return d;
     } catch (e) { return null; }
   }
@@ -777,6 +1016,9 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   }
 
   /* ---------- 尺寸自适应：让魔方在舞台里撑满 ---------- */
+  // 画面上现在该显示哪一帧：有步骤就停在当前那一步，没步骤就是累积局面。
+  // （换阶数 / 改窗口尺寸都会重画，重画时要停在用户正在看的那一步上）
+  function shown() { return steps.length ? frames[at] : cur; }
   function fit() {
     var w = stageEl.clientWidth, h = stageEl.clientHeight;
     if (!w || !h) return;
@@ -785,10 +1027,14 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     // 开了投影要更大：背面那三面各往外推 0.9 个方块，整体跨度从 3 变成 4.8 个方块，
     // 除数按比例放大；同时把留白收一点 —— 投影是半透明的，可以离舞台边近些。
     var divisor = ghostOn ? 7.7 : 6.15;
+    // 三阶是 3 格宽，二阶 2 格、四阶 4 格 —— 按 3/N 换算格子大小，
+    // 三种阶数在屏幕上就一样大（阴影 / F 标牌按同样比例缩，见 .stage.m2 / .m4）
+    var cells = mode === '2' ? 2 : mode === '4' ? 4 : 3;
+    if (cells !== 3) divisor = divisor / (3 / cells);
     CS = Math.max(12, Math.min(w, h) / divisor);
     applyZoom();
     syncZoom();
-    paint(cur);
+    paint(shown());
   }
 
   /* ---------- 放大缩小（右下角按钮 + 舞台上滚轮）----------
@@ -941,11 +1187,16 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
 
   function paint(state) {
     var map = byPos(state);
-    cubeEl.innerHTML = Object.keys(map).map(function (pos) {
-      var p = pos.split(',').map(Number);
+    // 二阶只画八个角块，而且角块中心在 ±0.5 格上（一格 = --cs = 一个角块）——
+    // 位置仍然用 calc(var(--cs) * n) 表达（n 允许是小数），缩放照样只改 --cs。
+    // data-pos 写的是模型坐标（±1），转动动画的「哪些块属于这一层」要靠它。
+    var half = mode === '2' ? 2 : 1;
+    cubeEl.innerHTML = Object.keys(map).filter(isCorner).map(function (pos) {
+      var p = pos.split(',').map(Number).map(function (v) { return v / half; });
       // CSS 的 y 朝下，模型的 y 朝上 -> 取负
       // 位置必须用 calc(var(--cs) * n) 表达，不能写成 CS 的像素值 ——
-      // 缩放只改 --cs，写死像素的话方块尺寸变了、间距没变，整块会散开
+      // 缩放只改 --cs，写死像素的话方块尺寸变了、间距没变，整块会散开。
+      // 二阶的 n 是 0.5 那种小数（角块中心在半个格子上），一样成立。
       return '<div class="cubie" data-pos="' + pos + '" style="transform:translate3d(' +
              'calc(var(--cs) * ' + p[0] + '),calc(var(--cs) * ' + (-p[1]) + '),' +
              'calc(var(--cs) * ' + p[2] + '))">' +
@@ -966,7 +1217,7 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   // 把这一层的 9 个小方块挪进一个临时的 .layer，整体转 90°，转完再落位重画。
   // 转完的位置正好等于新局面的位置，所以看不出接缝。
   function animate(step, done) {
-    var cfg = M3[step.mv];
+    var cfg = (mode === '4' ? M4 : M3)[step.mv];
     if (!cfg) { done(); return; }
     // 跳过动画：不建 .layer、不等 transition，调用方拿到的 done 是同步的
     if (skipAnim) { done(); return; }
@@ -1132,16 +1383,16 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   /* ---------- 历史回溯 ---------- */
   // 一条历史 = {alg, rev}；rev 表示当时是取逆执行的
   function histMoves(h) {
-    var mv = CubeSim.steps(h.alg);
+    var mv = sim().steps(h.alg);
     return h.rev ? invert(mv) : mv;
   }
   // 第 i 条执行完时的局面：从复原态把 0..i 条重做一遍
   function stateAfter(i) {
-    var st = CubeSim.solved();
+    var st = sim().solved();
     try {
       for (var k = 0; k <= i; k++) {
         histMoves(hist[k]).forEach(function (x) {
-          st = CubeSim.turn(CubeSim.clone(st), x.mv, x.times);
+          st = sim().turn(sim().clone(st), x.mv, x.times);
         });
       }
     } catch (e) { return null; }
@@ -1153,7 +1404,7 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     steps = list;
     frames = [from];
     list.forEach(function (x) {
-      frames.push(CubeSim.turn(CubeSim.clone(frames[frames.length - 1]), x.mv, x.times));
+      frames.push(sim().turn(sim().clone(frames[frames.length - 1]), x.mv, x.times));
     });
     at = frames.length - 1;
     pillInstant = true;          // 换了一串步骤：这一串的高亮直接落位
@@ -1250,7 +1501,7 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     if (!alg) return;
     var list;
     try {
-      list = CubeSim.steps(alg);
+      list = parseAlg(alg);        // 二阶模式下会挡掉 M/E/S 和宽转
     } catch (e) {
       algEl.classList.add('bad');
       errEl.classList.remove('hint');       // 真报错要用红色，别留着粘贴提示的灰
@@ -1406,38 +1657,41 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
       return { x: q.x / w, y: oy + (q.y - oy) / w, z: q.z };
     }
     var out = [];
-    for (var x = -1; x <= 1; x++) {
-      for (var y = -1; y <= 1; y++) {
-        for (var z = -1; z <= 1; z++) {
-          NALL.forEach(function (nk) {
-            var col = cur[x + ',' + y + ',' + z + '|' + nk];
-            if (!col) return;
-            var n = nk.split(',').map(Number), uv = SNAP_UV[nk];
-            var c = [x + n[0] / 2, y + n[1] / 2, z + n[2] / 2];      // 贴纸中心
-            // 背面剔除看法向（不是看中心点）—— 和 CSS 的 backface-visibility:hidden 同一条判据
-            if (at(n).z <= 0) return;
-            // 面内的 (x, y) -> 三维：中心 + x·u + y·v
-            function spot(lx, ly) {
-              var q = at([0, 1, 2].map(function (k) {
-                return c[k] + lx * uv[0][k] + ly * uv[1][k];
-              }));
-              return [q.x, q.y];
-            }
-            /* 塑料壳用「整格的直角四边形」—— 不能跟着贴纸一起倒角：
-               四个格子都倒角之后，格角上会留下一个小洞，舞台上洞后面是方块内部
-               （深色，看不出来），照片后面是白底，就会变成一个个白点、看着镂空。
-               所以这里保持直角，塑料面是严丝合缝的实心。 */
-            var quad = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(function (s) {
-              return spot(s[0] / 2, s[1] / 2);
-            });
-            var stick = stickerOutline(SNAP_GAP, SNAP_RADIUS).map(function (l) {
-              return spot(l[0], l[1]);
-            });
-            out.push({ col: col, quad: quad, sticker: stick, d: at(c).z });
-          });
+    /* 直接按局面里的位置走：三阶 26 块、二阶 8 块、四阶 56 块都是这一套，
+       不用给每种阶数写一圈循环。二阶的角块中心在 ±0.5 格上（模型给的是 ±1），
+       所以位置要乘 0.5 —— 和 paint() 里那一步是同一个换算。 */
+    var sc = mode === '2' ? 0.5 : 1;
+    var map = byPos(cur);
+    Object.keys(map).forEach(function (pos) {
+      var q = pos.split(',').map(Number);
+      NALL.forEach(function (nk) {
+        var col = map[pos][nk];
+        if (!col) return;
+        var n = nk.split(',').map(Number), uv = SNAP_UV[nk];
+        // 贴纸中心（单位：格）
+        var c = [q[0] * sc + n[0] / 2, q[1] * sc + n[1] / 2, q[2] * sc + n[2] / 2];
+        // 背面剔除看法向（不是看中心点）—— 和 CSS 的 backface-visibility:hidden 同一条判据
+        if (at(n).z <= 0) return;
+        // 面内的 (x, y) -> 三维：中心 + x·u + y·v
+        function spot(lx, ly) {
+          var q = at([0, 1, 2].map(function (k) {
+            return c[k] + lx * uv[0][k] + ly * uv[1][k];
+          }));
+          return [q.x, q.y];
         }
-      }
-    }
+        /* 塑料壳用「整格的直角四边形」—— 不能跟着贴纸一起倒角：
+           四个格子都倒角之后，格角上会留下一个小洞，舞台上洞后面是方块内部
+           （深色，看不出来），照片后面是白底，就会变成一个个白点、看着镂空。
+           所以这里保持直角，塑料面是严丝合缝的实心。 */
+        var quad = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(function (s) {
+          return spot(s[0] / 2, s[1] / 2);
+        });
+        var stick = stickerOutline(SNAP_GAP, SNAP_RADIUS).map(function (l) {
+          return spot(l[0], l[1]);
+        });
+        out.push({ col: col, quad: quad, sticker: stick, d: at(c).z });
+      });
+    });
     out.sort(function (a, b) { return a.d - b.d; });     // 远的先画
     return out;
   }
@@ -1529,13 +1783,13 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   function drainQueue() {
     if (!queue.length) return;
     var mv = queue.shift();
-    run(CubeSim.steps(mv), mv, 'move', false);
+    run(sim().steps(mv), mv, 'move', false);
   }
   function doMove(mv, kind) {
     // 连播中点动作按钮：先停下（和别的操作一致，要点第二下才真的执行）
     if (pausedFirst()) return;
     if (busy) { if (queue.length < 16) queue.push(mv); return; }
-    run(CubeSim.steps(mv), mv, kind || 'move', false);
+    run(sim().steps(mv), mv, kind || 'move', false);
   }
 
   /* ---------- 打乱 / 复原 ---------- */
@@ -1544,11 +1798,16 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     if (busy) return;
     var faces = ['U', 'D', 'R', 'L', 'F', 'B'], suff = ['', "'", '2'];
     var out = [], last = '';
-    for (var i = 0; i < 22; i++) {
+    // 二阶只要八个角块，11 步就够乱；三阶 22 步；四阶按 WCA 那套 40 步，
+    // 而且一半左右是宽转（光转外层搅不动里面那两层）
+    var n = mode === '2' ? 11 : mode === '4' ? 40 : 22;
+    for (var i = 0; i < n; i++) {
       var f;
       do { f = faces[Math.floor(Math.random() * 6)]; } while (f === last);
       last = f;
-      out.push(f + suff[Math.floor(Math.random() * 3)]);
+      // 四阶：一半的步子带宽转（Rw 这种，等于外面两层一起转）
+      out.push(f + (mode === '4' && Math.random() < 0.5 ? 'w' : '') +
+               suff[Math.floor(Math.random() * 3)]);
     }
     algEl.value = out.join(' ');
     submit('scramble', false);
@@ -1573,9 +1832,9 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     hist = [];
     histAt = -1;
     steps = [];
-    frames = [CubeSim.solved()];
+    frames = [sim().solved()];
     at = 0;
-    cur = CubeSim.solved();
+    cur = sim().solved();
     algEl.value = '';
     algEl.classList.remove('bad');
     errEl.textContent = '';
@@ -1693,7 +1952,7 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   // 开合统一走 setPicker —— 展开键、栏里的 × 、Esc 三个入口共用一套状态，
   // 不会出现「aria-expanded 说开着、其实已经收了」这种不同步。
   function setPicker(open) {
-    if (open && !pickKind) pickKind = 'oll';
+    if (open && !pickKind) pickKind = mode === '2' ? 'pbl2' : 'oll';
     pickerEl.classList.toggle('on', open);
     openBtn.classList.toggle('on', open);
     openBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
@@ -1713,6 +1972,8 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   function syncTabs() {
     Array.prototype.forEach.call(document.querySelectorAll('.tabs button'), function (o) {
       o.classList.toggle('on', o.dataset.pick === pickKind);
+      // 换阶数时把不属于这一阶的那几栏收起来（三阶：F2L/OLL/PLL，二阶：二阶 PBL）
+      o.classList.toggle('hide', (o.dataset.for || '3') !== mode);
     });
   }
   Array.prototype.forEach.call(document.querySelectorAll('.tabs button'), function (b) {
@@ -1832,7 +2093,8 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     // 舞台上的按钮都不能触发拖拽 —— 一旦 setPointerCapture，
     // 后续指针事件会被重定向到舞台，click 就落不到按钮上了。
     // 新加按钮（拍照就是这么栽的）记得补进这个清单：漏一个 = 点了没反应。
-    if (e.target.closest && e.target.closest('.orbit button, .zoom button, .snap, .themebtn')) return;
+    if (e.target.closest &&
+        e.target.closest('.orbit button, .zoom button, .snap, .themebtn, .modebar button')) return;
     drag = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y };
     stageEl.classList.add('drag');
     if (stageEl.setPointerCapture) stageEl.setPointerCapture(e.pointerId);
@@ -1866,12 +2128,13 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     applyTheme(root.dataset.theme === 'dark' ? 'light' : 'dark');
   });
 
+  syncMode(false);  // 三阶 / 二阶：药丸直接落位（开机不做滑动）、舞台 class、公式表那一栏
   fit();
 
   // 从公式表点「↗」跳过来时会带 hash。这时要从干净状态开始：
   // 复原魔方 + 清空历史，只把公式填进输入框 —— 否则会接着上次那个
   // 不相干的局面往下做，公式也就不是从复原态执行了。
-  var hashAlg = '', hashGreen = false, hashScramble = false;
+  var hashAlg = '', hashGreen = false, hashScramble = false, hashCube2 = false, hashCube4 = false;
   (function () {
     var h = location.hash || '';
     if (h.length <= 1) return;
@@ -1881,8 +2144,13 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     try { h = decodeURIComponent(h); } catch (e) {}
     // F2L 的 b 版公式按「绿色为 F 面」写，链接会带 @g: 前缀
     if (h.indexOf('@g:') === 0) { hashGreen = true; h = h.slice(3); }
-    // 计时器那边 ↗ 过来的是【打乱】，不是要解的公式：带 @s: 前缀
+    // 计时器那边 ↗ 过来的是【打乱】，不是要解的公式：带 @s: 前缀；
+    // 二阶 / 四阶的打乱是 @2s: / @4s:（先切阶数，再当打乱执行）
+    else if (h.indexOf('@2s:') === 0) { hashCube2 = true; hashScramble = true; h = h.slice(4); }
+    else if (h.indexOf('@4s:') === 0) { hashCube4 = true; hashScramble = true; h = h.slice(4); }
     else if (h.indexOf('@s:') === 0) { hashScramble = true; h = h.slice(3); }
+    // 二阶公式页（PBL）的 ↗：带 @2: 前缀 = 先把计算器切到二阶再播
+    else if (h.indexOf('@2:') === 0) { hashCube2 = true; h = h.slice(3); }
     hashAlg = h;
   })();
   // 刷新 ≠ 点链接过来。刷新时 hash 还在地址栏里，但用户要的是
@@ -1905,6 +2173,11 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
       }
     } catch (e) {}
     try { localStorage.removeItem(STORE); } catch (e) {}
+    // 二阶公式（PBL 页那些 ↗）带 @2:、计时器的二阶 / 四阶打乱带 @2s: / @4s:：
+    // 先切到对应阶数，再摆局面、再播 —— 切阶数不动局面（换模型那一步会自己重置），
+    // 所以放在 reset() 前后都一样，这里跟 reset 一起做完
+    if (hashCube4) setMode('4');
+    if (hashCube2) setMode('2');
     reset();                 // 复原 + 清空历史（reset 里也会清存档）
     if (keepDur !== null) DUR = keepDur;
     if (keepSkip !== null) skipAnim = keepSkip;
@@ -1919,7 +2192,7 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     // F2L 的 b 版按「绿色为 F 面」写，先无动画地做一个 y 把绿面转到前面，
     // 视角跟着补同样角度（y 在 CSS 是 rotateY(-90)，视角补 +90），画面看着不变。
     try {
-      var fwd = CubeSim.steps(hashAlg);
+      var fwd = parseAlg(hashAlg);       // 二阶模式下 M/E/S / 宽转会报错，只填输入框
       // 公式可能带整体旋转（如 Aa 的 x'）：先把净旋转 r 作用到复原态上，
       // 再做公式的逆 —— 这样摆出来的局面和图片同一朝向
       // （普通公式黄朝上、绿面公式绿朝前）。
@@ -1932,14 +2205,14 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
         setTimeout(function () { run(fwd, hashAlg, 'scramble', false); }, SCRAMBLE_HOLD_MS);
         throw { __done: true };                 // 交给下面的 catch 收尾（只跳过后面那半段）
       }
-      var r = CubeSim.netRotation(hashAlg);
+      var r = sim().netRotation(hashAlg);
       if (hashGreen) {
-        cur = CubeSim.apply(cur, 'y');        // 绿面转到前面
+        cur = sim().apply(cur, 'y');        // 绿面转到前面
         view.y = view.y + 90;
       }
-      if (r) cur = CubeSim.apply(cur, r);
+      if (r) cur = sim().apply(cur, r);
       invert(fwd).forEach(function (x) {
-        cur = CubeSim.turn(cur, x.mv, x.times);
+        cur = sim().turn(cur, x.mv, x.times);
       });
       // 先让用户看清「公式要解的局面」，停 1 秒再正向播公式（和播完再播同一个节奏）
       paint(cur);

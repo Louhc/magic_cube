@@ -159,6 +159,20 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
         <h2>PLL<span class="n">21</span></h2>
       </span>
     </a>
+    <a class="card" href="oll2.html">
+      <span class="thumb"><img src="2x2oll/sune_day-256x256.png" alt="二阶 OLL"
+        id="oll2thumb"></span>
+      <span>
+        <h2>二阶 OLL<span class="n">7</span></h2>
+      </span>
+    </a>
+    <a class="card" href="pbl2.html">
+      <span class="thumb"><img src="2x2pbl/ad_day-256x197.png" alt="二阶 PBL"
+        id="pblthumb"></span>
+      <span>
+        <h2>二阶 PBL<span class="n">5</span></h2>
+      </span>
+    </a>
   </div>
 </main>
 
@@ -169,9 +183,15 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   function applyTheme(t) {
     root.dataset.theme = t;
     btn.title = t === 'dark' ? '切到白天' : '切到夜晚';
-    // 首页那张 OLL 卡片也是 OLL 图，跟着主题换紫/黄顶（别的地方是 SVG/单版图）
+    // 首页那张 OLL 卡片也是 OLL 图，跟着主题换紫/黄顶（别的地方是 SVG/单版图）。
+    // 二阶 PBL 那张是线稿图（白天深线、夜晚浅线），也得跟着换，不然夜底上看不见。
     var ot = document.getElementById('ollthumb');
     if (ot) ot.src = 'oll/oll-01-' + (t === 'dark' ? 'night' : 'day') + '-256x256.png';
+    // 二阶 OLL 那张也是线稿（白天深线、夜晚浅线），跟着一起换
+    var o2 = document.getElementById('oll2thumb');
+    if (o2) o2.src = '2x2oll/sune_' + (t === 'dark' ? 'night' : 'day') + '-256x256.png';
+    var pt = document.getElementById('pblthumb');
+    if (pt) pt.src = '2x2pbl/ad_' + (t === 'dark' ? 'night' : 'day') + '-256x197.png';
     try { localStorage.setItem('cube-theme', t); } catch (e) {}
   }
   var saved = null;

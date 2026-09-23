@@ -29,6 +29,11 @@ import signature as S
 # 24 种"复原态"预算好，判定就是一次集合查询
 _SOLVED_FORMS = {tuple(sorted(sim.apply(sim.solved(), r).items())) for r in sim.ROTS}
 
+# 跳计算器的链接会在公式前面带一个标记（计算器据此决定怎么摆）：
+#   @g: F2L 的 b 版（绿面朝前）  @s: 计时器过来的打乱  @2: 二阶公式（切到二阶模式）
+# 校验公式本身时先把标记摘掉。
+_PREFIX = re.compile(r'^@[a-z0-9]+:')
+
 
 def solved_rot(st):
     """是否复原（允许整体旋转）—— 含 y/x 的公式做完会留下旋转"""
@@ -492,12 +497,9 @@ def check_tutorial(page, tmpdir):
 
     # 1) 公式：教程里能送进计算器的就是公式，逐个解析
     algs = []
+    import urllib.parse
     for m in re.finditer(r'href="calc\.html#([^"]+)"', html):
-        text = m.group(1)
-        if text.startswith('@g:'):
-            text = text[3:]
-        import urllib.parse
-        algs.append(urllib.parse.unquote(text))
+        algs.append(_PREFIX.sub('', urllib.parse.unquote(m.group(1))))
     uniq = sorted(set(algs))
     broken = []
     for a in uniq:
@@ -588,6 +590,313 @@ def check_tutorial(page, tmpdir):
     return bad
 
 
+# ---------- 二阶 OLL：读图 ----------
+# 图是 2×2 的俯视图：四个菱形小格拼成一个大菱形（前面在下边）。每格里「有彩色的
+# 那一块」就是那个角的 U 贴纸 —— 白天是紫 #7E6FC7、夜晚是黄 #FFE600：
+#   · 整块填满  = 这个角已经朝上（u）
+#   · 靠某一边的一小条 = U 贴纸贴在那一侧的面：上 b / 下 f / 左 l / 右 r
+# 判据只看「有没有彩色」（通道极差），所以昼夜两版读出来一样；
+# 四格的顺序是 左上 / 右上 / 左下 / 右下。
+_OLL2_TILE = [(0, 0), (1, 0), (0, 1), (1, 1)]
+_OLL2_DIR = {0: 'u', 1: '?', 2: '?', 3: 'f', 4: 'l', 5: 'r'}
+# 每个角「允许」的朝向：朝上，或者它自己那两张侧面（用来核对图/模型的读法没错位）
+_OLL2_ALLOW = [('u', 'b', 'l'), ('u', 'b', 'r'), ('u', 'f', 'l'), ('u', 'f', 'r')]
+
+
+def _oll2_img_sig(path):
+    from PIL import Image
+
+    im = Image.open(path).convert('RGBA')
+    w, h = im.size
+    px = im.load()
+
+    def opaque(x, y):
+        return px[x, y][3] > 60
+
+    def colorful(x, y):
+        r, g, b, a = px[x, y]
+        return a > 60 and max(r, g, b) - min(r, g, b) > 60
+
+    xs = [x for x in range(w) if any(opaque(x, y) for y in range(0, h, 2))]
+    ys = [y for y in range(h) if any(opaque(x, y) for x in range(0, w, 2))]
+    if not xs or not ys:
+        return None
+    x0, x1, y0, y1 = xs[0], xs[-1], ys[0], ys[-1]
+    mx, my = (x0 + x1) / 2.0, (y0 + y1) / 2.0
+    boxes = [(x0, y0, mx, my), (mx, y0, x1, my), (x0, my, mx, y1), (mx, my, x1, y1)]
+    out = []
+    for (bx0, by0, bx1, by1) in boxes:
+        n = sx = sy = 0
+        for y in range(int(by0), int(by1) + 1):
+            for x in range(int(bx0), int(bx1) + 1):
+                if colorful(x, y):
+                    n += 1
+                    sx += x
+                    sy += y
+        if not n:
+            return None
+        cx = (sx / n - bx0) / max(1.0, bx1 - bx0)
+        cy = (sy / n - by0) / max(1.0, by1 - by0)
+        if n > 3000:                       # 整块填满 = 朝上
+            out.append('u')
+        elif cy < 0.25:
+            out.append('b')
+        elif cy > 0.75:
+            out.append('f')
+        elif cx < 0.25:
+            out.append('l')
+        elif cx > 0.75:
+            out.append('r')
+        else:
+            out.append('?')
+    return out
+
+
+def _oll2_model_sig(alg):
+    """把公式「倒着做一遍」得到它要解的局面，再读四个角各自的 U 贴纸朝哪边。
+
+    朝向用的就是模型里的法向：朝上 u / 指后 b（俯视图的上边）/ 指前 f / 指左 l / 指右 r。
+    四格的顺序和读图那边一致（左上 = 左后那个角，前面画在下边）。
+    """
+    st = sim.apply_inverse(sim.solved(), alg)
+    out = []
+    for (x, z) in _OLL2_MODEL_TILE:
+        p = (x, 1, z)
+        face = None
+        for f in 'UDFBRL':
+            if st.get((p, sim.FACES[f])) == 'U':
+                face = f
+                break
+        if face is None:
+            return None
+        out.append({'U': 'u', 'B': 'b', 'F': 'f', 'L': 'l', 'R': 'r'}[face])
+    return out
+
+
+# 俯视图里前面画在下边：左后 / 右后 / 左前 / 右前
+_OLL2_MODEL_TILE = [(-1, -1), (1, -1), (-1, 1), (1, 1)]
+# 视角顺时针转 90°：块跟着转，朝后的贴纸变成朝右
+_OLL2_CW = {'u': 'u', 'b': 'r', 'r': 'f', 'f': 'l', 'l': 'b'}
+
+
+def _oll2_rot(sig):
+    return [_OLL2_CW[d] for d in [sig[2], sig[0], sig[3], sig[1]]]
+
+
+def check_oll2(page):
+    """二阶 OLL 页：7 条公式和 7 张图必须指的是同一个情况。
+
+    判据和别的公式页一样，是**算出来**的：把公式倒着做一遍得到它要解的局面，
+    读四个角的 U 贴纸朝哪边；图上也读同样四格。两边只允许差一个 AUF（整体转
+    0/90/180/270 度）—— 差的要是别的，就说明「照图摆好做这条公式」是错的。
+    """
+    from PIL import Image
+
+    html = open(page, encoding='utf-8').read()
+    bad = 0
+
+    # 1) 表里的「图 + 公式」（编号是图左上角的角标，不进表格文本）
+    rows = re.findall(r'<img data-oll2="([\w-]+)"[\s\S]{0,400}?<code>([^<]+)</code>', html)
+    ids = re.findall(r'<img data-oll2="([\w-]+)"', html)   # 打印规则里也有一份
+    badges = re.findall(r'<span class="no">([^<]+)</span>', html)
+    if len(rows) != 7 or len(ids) != 7 or len(badges) != 7:
+        print('  ✗ 表里应有 7 行（图 + 公式 + 角标），实际 %d 行 / %d 张图 / %d 个角标'
+              % (len(rows), len(ids), len(badges)))
+        return bad + 1
+    print('  表里 %d 行：%s' % (len(rows), ' '.join(c for c, _ in rows)))
+    print('  编号角标：%s' % ' '.join(badges))
+
+    # 2) 每个情况：昼夜两版图都在、尺寸 256x256，而且图上的朝向和公式算出来的一致
+    want_oriented = {'h': 0, 'pi': 0, 'antisune': 1, 'sune': 1, 'l': 2, 't': 2, 'u': 2}
+    sigs = {}
+    for cid, alg in rows:
+        day = os.path.join(ROOT, '2x2oll', '%s_day-256x256.png' % cid)
+        night = os.path.join(ROOT, '2x2oll', '%s_night-256x256.png' % cid)
+        miss = [os.path.basename(x) for x in (day, night) if not os.path.exists(x)]
+        if miss:
+            print('  ✗ %-9s 缺图：%s' % (cid, '、'.join(miss)))
+            bad += 1
+            continue
+        with Image.open(day) as im:
+            if im.size != (256, 256):
+                print('  ✗ %-9s 白天那版不是 256x256（%s）' % (cid, im.size))
+                bad += 1
+                continue
+        try:
+            sim.parse(alg)
+        except Exception as e:                     # noqa: BLE001
+            print('  ✗ %-9s 公式解析失败：%s' % (cid, e))
+            bad += 1
+            continue
+
+        got_img = _oll2_img_sig(day)
+        got_mod = _oll2_model_sig(alg)
+        if got_img is None or got_mod is None:
+            print('  ✗ %-9s 图或局面读不出来（图 %s / 模型 %s）' % (cid, got_img, got_mod))
+            bad += 1
+            continue
+        sigs[cid] = got_mod
+
+        # 每个角只能是「朝上」或者它自己那两张侧面 —— 读错位置的话这条会先炸
+        wrong_faces = [i for i in range(4)
+                       if got_img[i] not in _OLL2_ALLOW[i] or got_mod[i] not in _OLL2_ALLOW[i]]
+        # 图上和算出来的，只允许差一个整体转（AUF）
+        rots = [got_mod]
+        for _ in range(3):
+            rots.append(_oll2_rot(rots[-1]))
+        auf = rots.index(got_img) if got_img in rots else -1
+        n_up = got_mod.count('u')
+        okrow = (not wrong_faces) and auf >= 0 and n_up == want_oriented.get(cid, n_up)
+        print('  %-9s %-28s 公式 %s  图 %s  AUF %s  %s' %
+              (cid, alg, ''.join(got_mod), ''.join(got_img),
+               ('%d×90°' % auf) if auf >= 0 else '对不上',
+               '✓' if okrow else '✗' +
+               ('，贴纸落在了不该在的面上：%s' % wrong_faces if wrong_faces else '') +
+               ('，朝上的角应有 %d 个' % want_oriented[cid] if n_up != want_oriented.get(cid) else '')))
+        if not okrow:
+            bad += 1
+
+    # 3) 7 个情况两两不同（差一个 AUF 也算同一个）—— 同一个情况抄了两遍会在这儿露出来
+    canon = {}
+    for cid, sig in sigs.items():
+        rots = [sig]
+        for _ in range(3):
+            rots.append(_oll2_rot(rots[-1]))
+        canon[cid] = min(''.join(r) for r in rots)
+    dup = len(set(canon.values())) != len(canon)
+    print('  7 个情况的朝向（按 AUF 归一）：%s %s'
+          % (' '.join('%s=%s' % (k, v) for k, v in sorted(canon.items())),
+             '✗ 有重复' if dup else '✓'))
+    if dup:
+        bad += 1
+
+    # 4) 图：7 种 × 昼夜两版都在（白天那版上面逐张核过，这里只数夜晚那版）
+    missing_night = [cid for cid, _ in rows
+                     if not os.path.exists(os.path.join(ROOT, '2x2oll', '%s_night-256x256.png' % cid))]
+    print('  图：7 种 × 昼夜两版 %s' % ('都在 ✓' if not missing_night else '✗ ' + '、'.join(missing_night)))
+    bad += len(missing_night)
+    return bad
+
+
+def check_pbl2(page):
+    """二阶 PBL 页：公式能解析 + 每条公式的「换法」和它标的名称对得上 + 昼夜两版图都在。
+
+    图上画的是箭头，读图反推换法要另写一套识别（还得容忍画法），所以换个判据：
+    **把公式作用在复原的魔方上，直接读上下两层角块的置换**。
+    三阶和二阶的角块行为完全一样，所以拿三阶模拟器算就行（这几条公式里没有 M/S/E）。
+
+    情况那格是短编号：a = 换相邻两个角（Adj）、d = 换对角两个角（Diag）；
+    两个字母是「上层 / 下层」，只写一个（a / d）表示另一层已经排好。
+    图上怎么摆是画的时候定的（可能差一个 AUF），
+    所以只核对**两层的换法组合**和**角块有没有被翻**，不核对谁上谁下。
+    """
+    import urllib.parse
+
+    html = open(page, encoding='utf-8').read()
+    bad = 0
+
+    # 1) 公式：页面里送进计算器的那些链接（都该带 @2: —— 二阶公式要在二阶模式里播）
+    links = [urllib.parse.unquote(m.group(1))
+             for m in re.finditer(r'href="calc\.html#([^"]+)"', html)]
+    noflag = [x for x in links if not x.startswith('@2:')]
+    print('  跳计算器的链接：%d 条，带 @2: 的 %d 条 %s'
+          % (len(links), len(links) - len(noflag), '✓' if not noflag else '✗ ' + '; '.join(noflag)))
+    bad += len(noflag)
+    algs = [_PREFIX.sub('', x) for x in links]
+    broken = []
+    for a in sorted(set(algs)):
+        try:
+            sim.parse(a)
+        except Exception as e:                       # noqa: BLE001
+            broken.append('%s (%s)' % (a, e))
+    print('  %d 条公式（%d 个不同），解析失败 %d 条 %s'
+          % (len(algs), len(set(algs)), len(broken), '✓' if not broken else '✗ ' + '; '.join(broken)))
+    bad += len(broken)
+
+    # 2) 图：data-pbl2 的图是脚本按主题拼的，昼夜两版都要在（大小 256x197）
+    ids = sorted(set(re.findall(r'data-pbl2="([\w-]+)"', html)))
+    missing = []
+    for i in ids:
+        for tone in ('day', 'night'):
+            r = '2x2pbl/%s_%s-256x197.png' % (i, tone)
+            if not os.path.exists(os.path.join(ROOT, r)):
+                missing.append(r + ' 不存在')
+    print('  图：%d 种 × 昼夜两版 %s' % (len(ids), '都在 ✓' if not missing else '✗ ' + '; '.join(missing)))
+    bad += len(missing)
+
+    # 3) 语义：公式的换法要和名称对得上
+    # 编号是图左上角的角标（dd / ad / aa / a / d），所以按「图 + 公式」解析，
+    # 角标那一份也数一遍：两者必须一一对应，别漏画或画错
+    rows = re.findall(r'<img data-pbl2="([\w-]+)"[\s\S]{0,400}?<code>([^<]+)</code>', html)
+    badges = re.findall(r'<span class="no">([^<]+)</span>', html)
+    if len(rows) != 5 or badges != [c for c, _ in rows]:
+        print('  ✗ 表里应有 5 行（图 + 公式 + 角标），实际 %d 行，角标 %s'
+              % (len(rows), ' '.join(badges) or '（没有）'))
+        return bad + 1
+    print('  编号角标：%s' % ' '.join(badges))
+
+    solved = sim.solved()
+    faces = [sim.FACES[f] for f in 'UDFBRL']
+
+    def stickers(st, p):
+        return ''.join(sorted(st[(p, n)] for n in faces if (p, n) in st))
+
+    # 复原态里每个角位上的三张贴纸 -> 「这块是谁」
+    home = {}
+    for y in (1, -1):
+        for x in (1, -1):
+            for z in (1, -1):
+                home[stickers(solved, (x, y, z))] = (x, y, z)
+
+    # 情况那一格写的是短编号：a = 相邻两个角换、d = 对角两个角换。
+    # 两个字母就是「上层 / 下层」，只写一个 = 另一层已经排好了。
+    LETTER = {'a': 'adjacent', 'd': 'diagonal'}
+    checks = 0
+    for name, alg in rows:
+        label = name.strip().lower()
+        expect = [LETTER[c] for c in label if c in LETTER]
+        if not expect or len(expect) > 2 or len(label) != len(expect):
+            print('  ✗ 情况那格认不出来：%r（只认 a / d，最多两个字母）' % name)
+            bad += 1
+            continue
+        if len(expect) == 1:                     # 只写一个 = 有一面已经排好
+            expect.append('solved')
+        expect = sorted(expect)
+        st = sim.apply(sim.solved(), alg)
+        got, twisted = {}, []
+        for y in (1, -1):
+            key = 'U' if y == 1 else 'D'
+            ref = [(x, y, z) for x in (1, -1) for z in (1, -1)]
+            perm = []
+            for p in ref:
+                perm.append(ref.index(home[stickers(st, p)]))
+                # 角块朝向：顶层那块的 U 贴纸必须朝上、底层朝下（AUF 不影响这条）
+                want = sim.FACES['U'] if y == 1 else sim.FACES['D']
+                if st.get((p, want)) != ('U' if y == 1 else 'D'):
+                    twisted.append('%s%s' % (key, p))
+            moved = [i for i in range(4) if perm[i] != i]
+            if not moved:
+                got[key] = 'solved'
+            elif len(moved) == 2:
+                a, b = moved
+                shared = sum(1 for i in (0, 2) if ref[a][i] == ref[b][i])
+                got[key] = 'adjacent' if shared == 1 else 'diagonal'
+            else:
+                got[key] = '%d 个角动了' % len(moved)
+
+        pair = sorted(got.values())
+        okrow = pair == expect and not twisted
+        print('  %-12s %-36s 上层 %-9s 下层 %-9s %s'
+              % (label, alg, got['U'], got['D'],
+                 '✓' if okrow else '✗ 期望 ' + ' + '.join(expect) +
+                 ('' if not twisted else '，角块被翻了：' + ', '.join(twisted))))
+        if not okrow:
+            bad += 1
+        checks += 1
+    print('  %d 条公式：换法、角块朝向和名称%s' % (checks, '都对得上 ✓' if bad == 0 else '有对不上的 ✗'))
+    return bad
+
+
 def main(argv):
     kind = None
     if '--find' in argv:
@@ -608,6 +917,11 @@ def main(argv):
         print('=== %s ===' % page)
         bad += check_tutorial(os.path.join(ROOT, page), None)
         print()
+    print('=== pbl2.html（二阶 PBL） ===')
+    bad += check_pbl2(os.path.join(ROOT, 'pbl2.html'))
+    print()
+    bad += check_oll2(os.path.join(ROOT, 'oll2.html'))
+    print()
     print('总计：%s' % ('全部通过 ✓' if bad == 0 else '%d 条需要处理' % bad))
     return 1 if bad else 0
 

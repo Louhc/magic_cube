@@ -854,6 +854,137 @@ mb[0]._ev.click[0]({});
 }
 
 
+/* ---------------- 二阶模式（2×2 OLL / 2×2 PBL） ---------------- */
+{
+  check('模式条有五个按钮（F2L / OLL / PLL / 2×2 OLL / 2×2 PBL）',
+    mb.length === 5 && mb.map(b => b.dataset.mode).join() === 'f2l,oll,pll,oll2,pbl2',
+    mb.map(b => b.dataset.mode).join());
+  check('模式条竖排（五个按钮一列）',
+    /\.modebar\{[^}]*flex-direction:column/.test(html));
+
+  // 切到 2×2 OLL：4 格 + 8 条划线，点格子循环朝向
+  mb[3]._ev.click[0]({});
+  const count = (re) => (svg().match(re) || []).length;
+  check('2×2 OLL：画 4 格', count(/class="cell"/g) === 4, count(/class="cell"/g));
+  check('2×2 OLL：8 条侧面划线', count(/<line class="bar"/g) === 8, count(/<line class="bar"/g));
+  check('2×2 OLL：这一节显示 OLL 的配色 / 划线选项',
+    reg['sec-oll'].style.display !== 'none' && reg['sec-pll'].style.display === 'none');
+  {
+    // 这里不能直接用 fillOf：空心格的 fill 是 "none"，那个正则找不到就会
+    // 顺着往下匹配到**下一格**的色值。按 </g> 截出这一格再看它的 fill。
+    const cellFill = id => {
+      const m = svg().match(new RegExp('<g class="cell" data-id="' + id + '">([\\s\\S]*?)</g>'));
+      const f = m && m[1].match(/<polygon class="sticker"[^>]*fill="([^"]+)"/);
+      return f ? f[1] : null;
+    };
+    const before = cellFill('oll-0-0');
+    fireClick('oll-0-0');
+    check('2×2 OLL：点格子把这一角翻到侧面（实心 -> 空心）',
+      cellFill('oll-0-0') === 'none' && before !== 'none',
+      before + ' -> ' + cellFill('oll-0-0'));
+    fireCtx('oll-0-0');
+    check('2×2 OLL：右键设回朝上', cellFill('oll-0-0') === before, cellFill('oll-0-0'));
+  }
+
+  // 切到 2×2 PBL：上下两层各 4 格；拖同一层的两块 = 对调
+  mb[4]._ev.click[0]({});
+  check('2×2 PBL：画两层共 8 格',
+    count(/<g class="cell"/g) === 8 &&
+    count(/<g class="cell"[^>]*data-layer="u"/g) === 4 &&
+    count(/<g class="cell"[^>]*data-layer="d"/g) === 4,
+    count(/<g class="cell"/g));
+  check('2×2 PBL：复原态没有箭头', count(/class="pllarrow"/g) === 0);
+  check('2×2 PBL：这一节只留"箭头颜色"（不做配色）',
+    reg['sec-pll'].style.display !== 'none' &&
+    reg['h-pllcolor'].style.display === 'none' &&
+    reg['pllcolor-row'].style.display === 'none' &&
+    reg['sec-oll'].style.display === 'none');
+  check('2×2 PBL：提示改成拖同一层的两块',
+    /同一层/.test(reg['hint']._html || ''), reg['hint']._html);
+  check('2×2 PBL：清除键藏起来（清理不了"换位"）', reg['btn-clear'].style.display === 'none');
+  // 同一层换两块 -> 一根双头箭头
+  fireDown({ cell: { dataset: { slot: 'u0', layer: 'u' }, classList: mkClass() }, at: { x: 0, y: 0 } });
+  fireUp('u1');
+  check('2×2 PBL：拖同一层的两块 -> 对调（一根双头箭头）',
+    count(/class="pllarrow"/g) === 1 && /data-both="1"/.test(svg()), count(/class="pllarrow"/g));
+  // 跨层不给落
+  fireDown({ cell: { dataset: { slot: 'u1', layer: 'u' }, classList: mkClass() }, at: { x: 0, y: 0 } });
+  fireUp('d1');
+  check('2×2 PBL：跨层不换（还是只有那根箭头）',
+    count(/class="pllarrow"/g) === 1, count(/class="pllarrow"/g));
+  reg['btn-reset']._ev.click[0]({});
+  check('2×2 PBL：还原为已复原 -> 箭头清空', count(/class="pllarrow"/g) === 0);
+
+  // 倾斜度可调：滑条只在 2×2 PBL 里出现，拖动会立刻反映到图上并存档
+  check('2×2 PBL：面板里有「倾斜」滑条（默认 1）',
+    reg['h-pblskew'].style.display !== 'none' && reg['pblskew-row'].style.display !== 'none' &&
+    String(reg['pblskew'].value) === '1', String(reg['pblskew'].value));
+  const sizeOf = () => {
+    const m = svg().match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/);
+    return m ? [ +m[1], +m[2] ] : null;
+  };
+  const tall = sizeOf();
+  reg['pblskew'].value = '0';
+  reg['pblskew']._ev.input[0]({});
+  const flat = sizeOf();
+  check('2×2 PBL：倾斜调到 0 -> 变成正上方俯视（更窄更高）',
+    flat && tall && flat[0] < tall[0] && flat[1] > tall[1],
+    JSON.stringify([tall, flat]));
+  check('2×2 PBL：倾斜值写进存档',
+    JSON.parse(store['cube-editor-v1'] || '{}').opts.pbl2Skew === 0,
+    String(JSON.parse(store['cube-editor-v1'] || '{}').opts.pbl2Skew));
+  reg['pblskew'].value = '1';
+  reg['pblskew']._ev.input[0]({});
+
+  // 间距滑条：上层的下边到下层上边的距离（单位 = 格子宽）
+  check('2×2 PBL：面板里有「间距」滑条（默认 0.14 格）',
+    reg['pblgap-row'].style.display !== 'none' && String(reg['pblgap'].value) === '0.14',
+    String(reg['pblgap'].value));
+  const heights = () => {
+    const m = svg().match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/);
+    return m ? +m[2] : null;
+  };
+  const h0 = heights();
+  reg['pblgap'].value = '0.9';
+  reg['pblgap']._ev.input[0]({});
+  check('2×2 PBL：间距调大 -> 整张图变高',
+    heights() > h0 + 0.3, h0 + ' -> ' + heights());
+  check('2×2 PBL：间距写进存档',
+    JSON.parse(store['cube-editor-v1'] || '{}').opts.pbl2Gap === 0.9,
+    String(JSON.parse(store['cube-editor-v1'] || '{}').opts.pbl2Gap));
+  reg['pblgap'].value = '0.14';
+  reg['pblgap']._ev.input[0]({});
+
+  // 箭头色预设：最后一个是"黄"（夜里那套无色图的箭头色）
+  check('箭头色预设六选一，最后一个是黄 #FFE600',
+    /PLL_ARROW_COLORS = \[[\s\S]*?key: 'yellow'[\s\S]*?HEX\.yellow[\s\S]*?\];/.test(
+      fs.readFileSync(path.join(__dirname, '..', 'cube.js'), 'utf8')) &&
+    Cube.PLL_ARROW_COLORS.length === 6 &&
+    Cube.PLL_ARROW_COLORS[5].on === Cube.HEX.yellow, Cube.PLL_ARROW_COLORS[5].key);
+  // 恢复默认：倾斜 / 间距回到参考图那套
+  check('2×2 PBL：有「恢复默认」按钮（默认就是参考图那套）',
+    /<h2 id="h-pblskew"[^>]*>2×2 PBL<button class="mini" id="rst-pbl"/.test(html) &&
+    Cube.PBL2_CFG.skew === 1 && Cube.PBL2_CFG.layerGap === 0.14);
+  reg['pblskew'].value = '0.3'; reg['pblskew']._ev.input[0]({});
+  reg['pblgap'].value = '1.10'; reg['pblgap']._ev.input[0]({});
+  reg['rst-pbl']._ev.click[0]({});
+  check('2×2 PBL：点恢复默认 -> 倾斜 1.00 / 间距 0.14',
+    String(reg['pblskew'].value) === '1' && String(reg['pblgap'].value) === '0.14',
+    reg['pblskew'].value + ' / ' + reg['pblgap'].value);
+  check('2×2 PBL：恢复默认也写进存档',
+    JSON.parse(store['cube-editor-v1'] || '{}').opts.pbl2Skew === 1 &&
+    JSON.parse(store['cube-editor-v1'] || '{}').opts.pbl2Gap === 0.14);
+  check('2×2 PBL：切走之后倾斜滑条收起来',
+    (mb[0]._ev.click[0]({}), reg['pblskew-row'].style.display === 'none'));
+
+  // 存档：两个新模式的编辑内容都要存下来
+  const saved2 = JSON.parse(store['cube-editor-v1'] || 'null');
+  check('存档里有 2×2 的 oll2 / pbl2 快照',
+    !!(saved2 && saved2.snap && saved2.snap.oll2 && saved2.snap.pbl2),
+    JSON.stringify(saved2 && saved2.snap && Object.keys(saved2.snap)));
+  mb[0]._ev.click[0]({});
+}
+
 /* ---------------- 模式栏的滑动药丸（和导航栏同款） ---------------- */
 {
   check('模式栏里有一个滑动的小方块（不是按钮自己画的底色）',

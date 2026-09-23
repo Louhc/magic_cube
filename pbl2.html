@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>六面 · 二阶 PBL 公式合集</title>
+<link rel="icon" type="image/x-icon" href="cube-64x64.ico">
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="nav.css">
+<script>/* 主题必须在首次绘制前定好，否则会先用浅色画一遍再翻深色（闪一下） */
+try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.dataset.theme='dark'}catch(e){}</script>
+<style>
+  /* 默认浅色（白底）；点右上角按钮切夜晚。两套主题的颜色变量都在 theme.css 里。 */
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+       font:14px/1.5 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+  header{position:relative;padding:22px 20px 8px;text-align:center}
+  h1{margin:0;font-size:20px;letter-spacing:.02em}
+  header p{margin:6px 0 0;color:var(--muted);font-size:12.5px}
+  /* 只管位置 —— 开关本身的样式（尺寸/底色/滑块）在 nav.css 里，各页共用 */
+  .themebtn{position:absolute;right:16px;top:16px}
+  .printbtn{position:absolute;right:80px;top:16px;width:28px;height:28px;padding:0;
+            border-radius:8px;background:var(--field);border:1px solid var(--line);
+            color:var(--muted);cursor:pointer;display:grid;place-items:center;
+            transition:color .12s,border-color .12s}
+  .printbtn:hover{color:var(--accent-text);border-color:var(--accent-text)}
+  .printbtn svg{width:15px;height:15px;display:block;fill:none;stroke:currentColor;
+                stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+
+  main{max-width:880px;margin:0 auto;padding:10px 16px 60px}
+
+  section{margin:22px 0 0;background:var(--card);border:1px solid var(--line);
+          border-radius:12px;overflow:hidden}
+  section > h2{margin:0;padding:11px 16px;font-size:14px;font-weight:600;
+               background:var(--head-band);border-bottom:1px solid var(--line)}
+  section > h2 .cnt{float:right;color:var(--muted);font-weight:400;font-size:12.5px}
+  table{width:100%;border-collapse:collapse;table-layout:fixed}
+  col.pic{width:176px}
+  th{padding:9px 12px;font-size:12.5px;font-weight:600;text-align:left;
+     border-bottom:1px solid var(--line);border-right:1px solid var(--line);background:var(--chip)}
+  th:last-child{border-right:none}
+  td{border-bottom:1px solid var(--line);border-right:1px solid var(--line);vertical-align:middle}
+  td:last-child{border-right:none}
+  tr:last-child td{border-bottom:none}
+  /* 编号（dd / ad / aa / a / d）贴在图的左上角 —— 和 PLL / OLL 那几页一个做法：
+     位置相对 .box，底用 --badge（两套主题各一档） */
+  td.pic .no{position:absolute;left:3px;top:1px;font-size:11px;font-weight:600;
+             color:var(--muted);line-height:1;background:var(--badge);padding:1px 3px;
+             border-radius:4px}
+  /* 图是透明底 PNG（256x197，两个 2x2 视图叠着），这一格不铺底色 */
+  td.pic{padding:6px;text-align:center}
+  td.pic .box{position:relative;display:inline-block;line-height:0}
+  /* 预留高度：图是懒加载的，不写 aspect-ratio 加载完会把行撑高 */
+  td.pic img{width:148px;height:auto;aspect-ratio:256/197;display:block;border-radius:6px}
+  td.f{padding:11px 14px}
+  td.f .cs{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+
+  code{font:13.5px/1.75 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+       cursor:pointer;word-break:break-word;border-radius:5px;padding:2px 5px;margin:-2px -5px}
+  code:hover{background:var(--chip)}
+  code.copied{background:var(--accent);color:var(--on-accent, #fff)}
+  /* 「在计算器里打开」：把公式带过去，省得手抄 */
+  a.tocalc{flex:none;display:inline-flex;align-items:center;justify-content:center;
+           width:20px;height:20px;margin-left:8px;border-radius:50%;
+           color:var(--muted);background:transparent;border:1px solid transparent;
+           opacity:.55;text-decoration:none;
+           transition:opacity .14s,color .14s,background .14s,border-color .14s,
+                      transform .14s,box-shadow .14s}
+  a.tocalc svg{width:13px;height:13px;display:block}
+  tr:hover a.tocalc,a.tocalc:hover,a.tocalc:focus-visible{opacity:1}
+  a.tocalc:hover,a.tocalc:focus-visible{color:var(--on-accent, #fff);background:var(--accent);
+           border-color:var(--accent);transform:translateY(-1px);box-shadow:0 2px 7px #00000026}
+  @media (hover:none){a.tocalc{opacity:1}}
+  /* 注意：别在 td 上用 display:flex —— 单元格会不再是 table-cell，列宽全乱 */
+  td.f code{vertical-align:middle}
+  td.f a.tocalc{vertical-align:middle}
+
+  #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(12px);
+         background:#111c;color:#fff;padding:8px 16px;border-radius:8px;font-size:13px;
+         opacity:0;pointer-events:none;transition:.18s}
+  #toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  @media (max-width:720px){
+    col.pic{width:128px}
+    td.pic img{width:108px}
+    td.f{padding:8px 10px}
+    code{font-size:12.5px}
+  }
+  @media print{
+    body{background:#fff;color:#000}
+    main{padding:0}
+    header{padding:0 0 6px;break-after:avoid}
+    section{break-inside:auto;overflow:visible;border-radius:0;border-color:#999;margin:10px 0 0}
+    section > h2{break-after:avoid;border-radius:0}
+    tr{break-inside:avoid}
+    table{border:2px solid #333}
+    th,td{border:1px solid #333}
+    th{border-bottom-width:2px}
+    code{font-size:15px;font-weight:600}
+    .themebtn,.printbtn{display:none}
+    a.tocalc{display:none}
+    code:hover{background:none}
+    #toast{display:none}
+    /* 纸上是白底：按主题现挑的图在打印时统统用白天那版
+       （夜晚版是配深色卡片的，印在白纸上几乎看不见） */
+    img[data-pbl2="dd"]{content:url(2x2pbl/dd_day-256x197.png)}
+    img[data-pbl2="ad"]{content:url(2x2pbl/ad_day-256x197.png)}
+    img[data-pbl2="aa"]{content:url(2x2pbl/aa_day-256x197.png)}
+    img[data-pbl2="a"]{content:url(2x2pbl/a_day-256x197.png)}
+    img[data-pbl2="d"]{content:url(2x2pbl/d_day-256x197.png)}
+  }
+</style>
+</head>
+<body>
+<script src="nav.js"></script>
+<header>
+  <h1>二阶 PBL</h1>
+  <p>Permutation of Both Layers</p>
+  <button class="themebtn" id="themebtn" type="button" title="切到夜晚"></button>
+  <button class="printbtn" id="printbtn" type="button" title="打印 / 存成 PDF"
+          aria-label="打印"><svg viewBox="0 0 24 24"><path d="M7 10.5V4h10v6.5"/><path
+    d="M7 18.5H5.2A2.2 2.2 0 0 1 3 16.3v-3.6a2.2 2.2 0 0 1 2.2-2.2h13.6A2.2 2.2 0 0 1 21 12.7v3.6a2.2 2.2 0 0 1-2.2 2.2H17"/><path
+    d="M7 14.5h10v6H7z"/></svg></button>
+</header>
+
+<main>
+  <section>
+    <h2>5 种情况<span class="cnt">5</span></h2>
+    <table>
+      <colgroup><col class="pic"><col></colgroup>
+      <thead><tr><th>图</th><th>公式</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="pic"><span class="box"><img data-pbl2="dd" alt="Diag / Diag：上下两层都是对角换"
+            title="Diag / Diag：上下两层都是对角换"
+            loading="lazy" data-zoom><span class="no">dd</span></span></td>
+          <td class="f"><div class="cs"><code>R2 B2 R2</code><a class="tocalc"
+            href="calc.html#@2:R2%20B2%20R2" target="_blank" rel="noopener"></a></div></td>
+        </tr>
+        <tr>
+          <td class="pic"><span class="box"><img data-pbl2="ad" alt="Adj / Diag：上层邻角换、下层对角换"
+            title="Adj / Diag：上层邻角换、下层对角换"
+            loading="lazy" data-zoom><span class="no">ad</span></span></td>
+          <td class="f"><div class="cs"><code>R' U R' B2 R U' R</code><a class="tocalc"
+            href="calc.html#@2:R%27%20U%20R%27%20B2%20R%20U%27%20R" target="_blank" rel="noopener"></a></div></td>
+        </tr>
+        <tr>
+          <td class="pic"><span class="box"><img data-pbl2="aa" alt="Adj / Adj：上下两层都是邻角换"
+            title="Adj / Adj：上下两层都是邻角换"
+            loading="lazy" data-zoom><span class="no">aa</span></span></td>
+          <td class="f"><div class="cs"><code>R2 U' R2 U2 F2 U' R2</code><a class="tocalc"
+            href="calc.html#@2:R2%20U%27%20R2%20U2%20F2%20U%27%20R2" target="_blank" rel="noopener"></a></div></td>
+        </tr>
+        <tr>
+          <td class="pic"><span class="box"><img data-pbl2="a" alt="Adj：一面已经完成，另一面邻角换"
+            title="Adj：一面已经完成，另一面邻角换"
+            loading="lazy" data-zoom><span class="no">a</span></span></td>
+          <td class="f"><div class="cs"><code>R U2 R' U' R U2 L' U R' U' L</code><a class="tocalc"
+            href="calc.html#@2:R%20U2%20R%27%20U%27%20R%20U2%20L%27%20U%20R%27%20U%27%20L" target="_blank" rel="noopener"></a></div></td>
+        </tr>
+        <tr>
+          <td class="pic"><span class="box"><img data-pbl2="d" alt="Diag：一面已经完成，另一面对角换"
+            title="Diag：一面已经完成，另一面对角换"
+            loading="lazy" data-zoom><span class="no">d</span></span></td>
+          <td class="f"><div class="cs"><code>R U' R' U' F2 U' R U R' U F2</code><a class="tocalc"
+            href="calc.html#@2:R%20U%27%20R%27%20U%27%20F2%20U%27%20R%20U%20R%27%20U%20F2" target="_blank" rel="noopener"></a></div></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+</main>
+
+<div id="toast"></div>
+<script>
+(function () {
+  'use strict';
+
+  /* ---------- 昼夜两版的图 ----------
+     图在 2x2pbl/ 下，名字是 <情况>_day|night-256x197.png；
+     页面上只写 data-pbl2="<情况>"，src 按当前主题拼出来。 */
+  function syncPbl2Imgs() {
+    var tone = document.documentElement.dataset.theme === 'dark' ? 'night' : 'day';
+    Array.prototype.forEach.call(document.querySelectorAll('img[data-pbl2]'), function (im) {
+      im.src = '2x2pbl/' + im.getAttribute('data-pbl2') + '_' + tone + '-256x197.png';
+    });
+  }
+  syncPbl2Imgs();
+
+  /* ---------- 点公式复制（和公式页一套做法：去掉空格，粘进计时器就能用） ---------- */
+  var toastEl = document.getElementById('toast'), toastTimer = 0;
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('on');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.classList.remove('on'); }, 1400);
+  }
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+  document.addEventListener('click', function (e) {
+    var el = e.target.closest ? e.target.closest('code') : null;
+    if (!el) return;
+    var text = el.textContent.replace(/\s+/g, '');
+    function done() {
+      el.classList.add('copied');
+      setTimeout(function () { el.classList.remove('copied'); }, 600);
+    }
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(function () { done(); toast(text); }, function () {
+        fallbackCopy(text); done(); toast(text);
+      });
+    } else {
+      fallbackCopy(text); done(); toast(text);
+    }
+  });
+
+  /* ---------- 计算器图标（内联 SVG，跟着 currentColor 走） ---------- */
+  var CALC_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+    '<rect x="4.4" y="2.8" width="15.2" height="18.4" rx="3.2" fill="none" ' +
+    'stroke="currentColor" stroke-width="2.1"/>' +
+    '<path d="M8.1 7.4h7.8" fill="none" stroke="currentColor" stroke-width="2.1" ' +
+    'stroke-linecap="round"/>' +
+    '<circle cx="9.4" cy="12.3" r="1.35" fill="currentColor"/>' +
+    '<circle cx="14.6" cy="12.3" r="1.35" fill="currentColor"/>' +
+    '<circle cx="9.4" cy="16.6" r="1.35" fill="currentColor"/>' +
+    '<circle cx="14.6" cy="16.6" r="1.35" fill="currentColor"/></svg>';
+  Array.prototype.forEach.call(document.querySelectorAll('a.tocalc'), function (a) {
+    a.innerHTML = CALC_ICON;
+    // 图标是 aria-hidden 的，链接自己得有个名字（读屏和悬停提示都用它）
+    if (!a.getAttribute('title')) {
+      a.setAttribute('title', '在计算器里打开这条公式');
+      a.setAttribute('aria-label', '在计算器里打开这条公式');
+    }
+  });
+
+  document.getElementById('printbtn').addEventListener('click', function () { window.print(); });
+
+  /* ---------- 白天 / 夜晚 ---------- */
+  var root = document.documentElement, btn = document.getElementById('themebtn');
+  function applyTheme(t) {
+    root.dataset.theme = t;
+    btn.title = t === 'dark' ? '切到白天' : '切到夜晚';
+    syncPbl2Imgs();                       // 图跟着换昼夜版
+    try { localStorage.setItem('cube-theme', t); } catch (e) {}
+  }
+  var saved = null;
+  try { saved = localStorage.getItem('cube-theme'); } catch (e) {}
+  applyTheme(saved === 'dark' ? 'dark' : 'light');
+  btn.addEventListener('click', function () {
+    applyTheme(root.dataset.theme === 'dark' ? 'light' : 'dark');
+  });
+})();
+</script>
+</body>
+</html>
