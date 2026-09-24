@@ -87,6 +87,17 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
          opacity:0;pointer-events:none;transition:.18s}
   #toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
 
+  /* 左边这条「三阶公式」目录：和教程页 / 二阶那两页那条同一套做法 ——
+     固定在正文左侧（导航条底下），窄屏收起；当前这一页那条高亮 */
+  nav.side{position:fixed;width:152px;display:flex;flex-direction:column;gap:2px;z-index:3;
+        top:calc(var(--nav-h, 63px) + 16px);left:max(14px, calc(50% - 616px));
+        align-items:flex-start}
+  nav.side a{color:var(--muted);text-decoration:none;font-size:12.5px;line-height:1.5;
+          padding:4px 9px;border-radius:7px;border-left:2px solid transparent;white-space:nowrap}
+  nav.side a:hover{color:var(--accent-text);background:var(--chip)}
+  nav.side a.on{color:var(--text);border-left-color:var(--accent);background:var(--chip)}
+  @media (max-width:1240px){ nav.side{display:none} }
+
   @media (max-width:720px){
     col.pic{width:86px}
     td.pic img{width:72px}
@@ -108,7 +119,7 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     th,td{border:1px solid #333}
     th{border-bottom-width:2px}
     code{font-size:15px;font-weight:600}
-    .themebtn,.printbtn{display:none}
+    .themebtn,.printbtn,nav.side{display:none}
     a.tocalc{display:none}
     code:hover{background:none}
     #toast{display:none}
@@ -116,6 +127,12 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
 </style>
 </head>
 <body>
+  <nav class="side" aria-label="三阶公式目录">
+    <a href="f2l.html">F2L · 39 种</a>
+    <a class="on" href="oll.html">OLL · 57 种</a>
+    <a href="pll.html">PLL · 21 种</a>
+  </nav>
+
 <script src="nav.js"></script>
 <header>
   <h1>OLL</h1>
@@ -262,6 +279,9 @@ SECTIONS.forEach(function (sec) {
 });
 document.getElementById('app').innerHTML = html;
 
+/* 下次从导航条 / 首页点「三阶公式」要回到这一次看的那一页（nav.js 读这个键）——
+   和教程那两页、二阶那两页一个做法：键名是这一组的第一个页面 */
+try { localStorage.setItem('cube-last:f2l.html', 'oll.html'); } catch (e) {}
 /* 夜晚模式 */
 var root = document.documentElement, themeBtn = document.getElementById('themebtn');
 function applyTheme(t) {

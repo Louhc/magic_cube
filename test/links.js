@@ -44,7 +44,8 @@ console.log('\n[3] 导航条覆盖全部页面');
   const nav = fs.readFileSync(path.join(ROOT, 'nav.js'), 'utf8');
   // 只从 PAGES 那张表里取（表里除了入口页，还有「同一个入口管的其它页」）
   const table = nav.slice(nav.indexOf('var PAGES = ['), nav.indexOf('];', nav.indexOf('var PAGES = [')));
-  const listed = [...table.matchAll(/'([\w-]+\.html)'/g)].map(m => m[1]);
+  // 第四项那种「一项管好几页」的写法会把第一页再写一遍，所以按不重复的算
+  const listed = [...new Set([...table.matchAll(/'([\w-]+\.html)'/g)].map(m => m[1]))];
   ok('nav.js 列了 ' + listed.length + ' 个页面', listed.length === PAGES.length, listed.join(','));
   ok('nav.js 与磁盘上的页面完全一致',
     PAGES.every(p => listed.includes(p)) && listed.every(p => PAGES.includes(p)),
@@ -119,9 +120,9 @@ console.log('\n[6] 回到顶部按钮');
   ok('滚动事件驱动显隐', /\.totop\.on/.test(css) && /classList\.toggle\('on'/.test(js));
   // 第三项是 1 表示要「回到顶部」；后面还可能跟「同一个入口管的其它页」
   const withBtn = [...js.matchAll(/\['([^']+)',\s*'[^']*',\s*1[,\]]/g)].map(m => m[1]);
-  ok('长页才需要它：三个公式页 + 教程（' + withBtn.slice().sort().join(',') + '）',
-    withBtn.slice().sort().join(',') ===
-      'f2l.html,oll.html,pll.html,tutorial-basic.html', withBtn.join(','));
+  ok('长页才需要它：两个「一项管几页」的入口（教程 + 三阶公式）（' +
+     withBtn.slice().sort().join(',') + '）',
+    withBtn.slice().sort().join(',') === 'f2l.html,tutorial-basic.html', withBtn.join(','));
 }
 
 console.log('\n[7] 三个公式页都有分节计数与编号角标');
@@ -298,7 +299,9 @@ console.log('\n[14] 导航高亮框：会滑动的 .pill');
       addEventListener(t, fn) { (this._e = this._e || {});
                               (this._e[t] = this._e[t] || []).push(fn); },
       querySelectorAll() { return []; }, querySelector() { return null; },
-      closest() { return null; }
+      closest() { return null; },
+      // 测试里要能触发这个元素自己身上的监听（nav.js 给导航项挂了 mouseenter 等）
+      fire(t, a) { ((this._e || {})[t] || []).forEach(f => f(a || {})); }
     };
     return e;
   }
@@ -314,13 +317,19 @@ console.log('\n[14] 导航高亮框：会滑动的 .pill');
     const logoSlot = el('span');
     const lastSlot = el('a');
     lastSlot.setAttribute('data-last', 'tutorial-basic.html');
+    // 首页那张「二阶」卡片也铺了一个 data-last（和教程卡片同一套写法）
+    const lastSlot2 = el('a');
+    lastSlot2.setAttribute('data-last', 'oll2.html');
+    // 还有「三阶」那张（F2L / OLL / PLL 共用一个入口）
+    const lastSlot3 = el('a');
+    lastSlot3.setAttribute('data-last', 'f2l.html');
     let parsed = false;
     const doc = {
       body, documentElement: el('html'), createElement: el,
       getElementById: () => null,
       querySelectorAll: sel => (!parsed ? []
         : sel === '[data-logo]' ? [logoSlot]
-        : sel === '[data-last]' ? [lastSlot] : []),
+        : sel === '[data-last]' ? [lastSlot, lastSlot2, lastSlot3] : []),
       readyState: 'loading',          // 让 nav.js 走 DOMContentLoaded 那条路
       addEventListener(t, fn) { (this._e = this._e || {});
                               (this._e[t] = this._e[t] || []).push(fn); }
@@ -351,7 +360,7 @@ console.log('\n[14] 导航高亮框：会滑动的 .pill');
     const links = navEl.children[1];            // [0] 是 brand
     return {
       ctx, body, links, store, pill: links.children[0], pending, observers,
-      logo: logoSlot, last: lastSlot, navEl,
+      logo: logoSlot, last: lastSlot, last2: lastSlot2, last3: lastSlot3, navEl,
       linkAt: i => links.children[i + 1],       // [0] 是 .pill
       // 导航项会变多，测试里一律按文字找，别写下标
       linkTo: t => links.children.find(c => String(c.textContent).indexOf(t) >= 0),
@@ -391,6 +400,8 @@ console.log('\n[14] 导航高亮框：会滑动的 .pill');
     const has = r => r.body.children.some(c => c.className === 'totop');
     ok('教程进阶页也有「回到顶部」（它和初级共用一个导航入口）', has(run('tutorial-advanced.html')));
     ok('教程初级页有', has(run('tutorial-basic.html')));
+    ok('三阶那三页（F2L / OLL / PLL）共用一个入口，每页都有「回到顶部」',
+      has(run('f2l.html')) && has(run('oll.html')) && has(run('pll.html')));
     ok('计算器这种非长页没有', !has(run('calc.html')));
     const css = fs.readFileSync(path.join(ROOT, 'nav.css'), 'utf8');
     const totopBox = css.slice(css.indexOf('.totop{'), css.indexOf('}', css.indexOf('.totop{')));
@@ -426,19 +437,19 @@ console.log('\n[14] 导航高亮框：会滑动的 .pill');
   {
     const r = run('oll.html');
     const before = r.pill.style.transform;
-    const c = fire(r.linkTo('PLL'));              // 当前页是 OLL，点 PLL
+    const c = fire(r.linkTo('计算器'));            // 当前页是 OLL，点「计算器」
     r.click(c.e);
     ok('点别的导航项：蓝框滑过去（transform 变了）',
       c.got() && r.pill.style.transform !== before,
       before + ' -> ' + r.pill.style.transform);
-    ok('点别的导航项：滑完才跳页', r.ctx.location.href === 'pll.html',
+    ok('点别的导航项：滑完才跳页', r.ctx.location.href === 'calc.html',
       r.ctx.location.href);
   }
   // 文字颜色必须和蓝框同步 —— 否则蓝框一走，旧项的白字留在浅底上就看不见了，
   // 看着就像「框先滑过去、字过一会儿才冒出来」
   {
     const r = run('oll.html', { defer: true });
-    const from = r.active, to = r.linkTo('PLL');
+    const from = r.active, to = r.linkTo('练习');
     const c = fire(to);
     r.click(c.e);
     ok('点下去：旧项立刻褪回灰字',
@@ -448,14 +459,16 @@ console.log('\n[14] 导航高亮框：会滑动的 .pill');
     r.pending.forEach(fn => fn());
     ok('蓝框到位后：新项才变白字',
       to.classList.contains('on'), [...to.classList._s].join(','));
-    ok('蓝框到位后才跳页', r.ctx.location.href === 'pll.html', r.ctx.location.href);
+    ok('蓝框到位后才跳页', r.ctx.location.href === 'practice.html', r.ctx.location.href);
   }
   // 点当前项：不拦（浏览器照常处理）
   {
-    const r = run('oll.html');
-    const c = fire(r.active);
+    // 当前页是 OLL；页面自己会写 cube-last:f2l.html = oll.html（见那几页的脚本），
+    // 所以「三阶公式」那一项的 href 就是当前页 —— 桩里手动给上这份存档
+    const r = run('oll.html', { store: { 'cube-last:f2l.html': 'oll.html' } });
+    const c = fire(r.active);            // active 就是「三阶公式」那一项
     r.click(c.e);
-    ok('点当前项：不拦、也不动蓝框', !c.got());
+    ok('点当前项（一项管好几页时也算当前项）：不拦、也不动蓝框', !c.got());
   }
   // 下面这些也都不该拦
   [['ctrl+点击（新标签）', { ctrlKey: true }],
@@ -562,7 +575,7 @@ console.log('\n[14] 导航高亮框：会滑动的 .pill');
   // 系统设了「减少动态效果」：既不滑也不淡，直接跳
   {
     const r = run('oll.html', { reduce: true });
-    const c = fire(r.linkTo('PLL'));
+    const c = fire(r.linkTo('练习'));
     r.click(c.e);
     ok('「减少动态效果」：不拦、不滑、不淡',
       !c.got() && !r.body.classList.contains('nav-fade'),
@@ -594,6 +607,73 @@ console.log('\n[14] 导航高亮框：会滑动的 .pill');
     ok('减少动态效果时内容也不淡（别把内容真藏起来）',
       /prefers-reduced-motion: reduce\)\{[\s\S]{0,240}?body\.nav-fade > \*:not\(\.topnav\)\{opacity:1\}/.test(css));
   }
+}
+
+console.log('\n[14b] 悬停导航项展开「二级目录」（教程 / 二阶公式）');
+{
+  const css = fs.readFileSync(path.join(ROOT, 'nav.css'), 'utf8');
+  ok('nav.css 有二级目录的样式（平时收着、.on 展开；收起用 visibility，键盘也走不到）',
+    /\.topnav \.sub\{position:absolute/.test(css) && /\.topnav \.sub\.on\{/.test(css) &&
+    /visibility:hidden/.test(css) && /\.topnav \.sub a\.on\{/.test(css));
+  // 首页那条 GitHub 纸带（.ghribbon，z-index:30）就挂在导航条下面、屏幕右端，
+  // 正好和「二阶 / 三阶公式」那一项展开的目录重叠。
+  // 导航条自己是个层叠上下文（position:relative + z-index），目录在里面 ——
+  // 所以要比的是**导航条**那一层的 z-index，单独给目录调多大都没用。
+  {
+    const idx = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+    const ribbon = +(idx.match(/\.ghribbon\{[^}]*z-index:(\d+)/) || [])[1];
+    const navZ = +(css.match(/\.topnav\{[^}]*z-index:(\d+)/) || [])[1];
+    const sub = +(css.match(/\.topnav \.sub\{[^}]*z-index:(\d+)/) || [])[1];
+    ok('整条导航压在首页 GitHub 纸带上面（导航 ' + navZ + ' > 纸带 ' + ribbon + '），目录才盖得住它',
+      !!ribbon && !!navZ && navZ > ribbon, 'ribbon=' + ribbon + ' nav=' + navZ);
+    ok('目录自己的 z-index 只要高过导航里那几个兄弟（.pill 是 20）',
+      !!sub && sub > 20, 'sub=' + sub);
+  }
+
+  const r = run('tutorial-advanced.html');
+  r.domReady();
+  const grp = r.linkTo('教程');
+  const sub = grp._sub;
+  ok('「教程」那一项挂上了二级目录（aria-haspopup / aria-expanded 都在）',
+    !!sub && grp.getAttribute('aria-haspopup') === 'true' &&
+    grp.getAttribute('aria-expanded') === 'false');
+  ok('目录里两条：初级 / 进阶，当前这页（进阶）高亮，href 各自指过去',
+    sub.children.length === 2 &&
+    sub.children[0].textContent === '初级 · 层先法' &&
+    sub.children[0].getAttribute('href') === 'tutorial-basic.html' &&
+    sub.children[1].textContent === '进阶 · CFOP' &&
+    sub.children[1].getAttribute('href') === 'tutorial-advanced.html' &&
+    sub.children[1].className === 'on' && !sub.children[0].className,
+    sub.children.map(c => c.textContent + '->' + c.getAttribute('href')).join(' | '));
+  ok('平时是收着的', !sub.classList.contains('on'));
+  grp.fire('mouseenter');
+  ok('鼠标移上去：展开，并对齐到这一项下面（left / minWidth 按这一项算）',
+    sub.classList.contains('on') && grp.getAttribute('aria-expanded') === 'true' &&
+    sub.style.left === grp.offsetLeft + 'px' && sub.style.minWidth === grp.offsetWidth + 'px',
+    sub.style.left + ' / ' + sub.style.minWidth);
+  sub.fire('mouseenter');                    // 鼠标挪到目录上：不能收
+  ok('鼠标挪到目录上也还开着', sub.classList.contains('on'));
+  sub.fire('mouseleave');
+  ok('移开：收起来，aria-expanded 落回 false',
+    !sub.classList.contains('on') && grp.getAttribute('aria-expanded') === 'false');
+
+  // 二阶公式那一条：OLL / PBL
+  const r2 = run('pbl2.html');
+  r2.domReady();
+  const g2 = r2.linkTo('二阶公式');
+  const s2 = g2._sub;
+  ok('「二阶公式」也能展开，两条是 OLL / PBL，当前这页（PBL）高亮',
+    !!s2 && s2.children.length === 2 &&
+    s2.children[0].getAttribute('href') === 'oll2.html' &&
+    s2.children[1].getAttribute('href') === 'pbl2.html' &&
+    s2.children[1].className === 'on' && !s2.children[0].className,
+    s2 ? s2.children.map(c => c.textContent + '->' + c.getAttribute('href')).join(' | ') : '没有目录');
+  ok('只有「一项管好几页」的入口才有二级目录（其它项没有）',
+    !r.linkTo('首页')._sub && !r.linkTo('编辑器')._sub && !r.linkTo('计算器')._sub &&
+    !r.linkTo('练习')._sub && !r.linkTo('计时器')._sub);
+  ok('二级目录里的链接也认得出是哪个入口（点了蓝框会滑到那一项）',
+    !!s2.children[0]._pages && s2.children[0]._pages.indexOf('oll2.html') >= 0 &&
+    s2.children[0]._pages.indexOf('pbl2.html') >= 0);
 }
 
 console.log('\n[15] 各页的明暗底色约定必须一致');
@@ -1023,8 +1103,8 @@ console.log('\n[19] 公式页的打印按钮');
     ok(p + ' 点了调 window.print()',
       /getElementById\('printbtn'\)\.addEventListener\('click', function \(\) \{ window\.print\(\); \}\)/.test(h));
     // 打印出来当然不能再印这个按钮（主题开关也一样）
-    ok(p + ' 打印时不印按钮',
-      /@media print\{[\s\S]*?\.themebtn,\.printbtn(,\.opts)?\{display:none\}/.test(h));
+    ok(p + ' 打印时不印按钮（主题开关、页面目录一起藏）',
+      /@media print\{[\s\S]*?\.themebtn,\.printbtn(,\.opts)?,nav\.side\{display:none\}/.test(h));
     // 摆在主题开关左边，别叠上去
     ok(p + ' 和主题开关并排、互不重叠',
       /\.themebtn\{position:absolute;right:16px;top:16px\}/.test(h) &&
@@ -1131,9 +1211,9 @@ console.log('\n[19d] 二阶 PBL 公式页（pbl2.html）');
     (h.match(/href="calc\.html#@2:/g) || []).length === 5);
   // 计算器得认识这个前缀：一进来先切二阶，再摆局面、再播
   const calcSrc = fs.readFileSync(path.join(ROOT, 'calc.html'), 'utf8');
-  ok('计算器认 @2: 前缀（先 setMode(\'2\') 再播）',
+  ok('计算器认 @2: 前缀（先切二阶再播）；没带阶数标记的链接按三阶算',
     /else if \(h\.indexOf\('@2:'\) === 0\) \{ hashCube2 = true/.test(calcSrc) &&
-    /if \(hashCube2\) setMode\('2'\)/.test(calcSrc));
+    /setMode\(hashCube4 \? '4' : hashCube2 \? '2' : '3'\)/.test(calcSrc));
   ok('点公式能复制（code + copied + toast）',
     /addEventListener\('click'/.test(h) && /closest\('code'\)/.test(h) &&
     /classList\.add\('copied'\)/.test(h) && /id="toast"/.test(h));
@@ -1144,17 +1224,52 @@ console.log('\n[19d] 二阶 PBL 公式页（pbl2.html）');
   ok('打印时每张图都换回白天那版（纸上是白底）',
     ids.every(id => new RegExp('img\\[data-pbl2="' + id +
       '"\\]\\{content:url\\(2x2pbl/' + id + '_day-256x197\\.png\\)\\}').test(h)));
-  ok('导航条里有这一页（二阶 PBL）',
-    /'pbl2\.html'\s*,\s*'二阶 PBL'/.test(fs.readFileSync(path.join(ROOT, 'nav.js'), 'utf8')));
-
-  // 首页也留一张卡片：从主页两步之内能点到这页
+  // 左边那条「二阶公式」目录：和教程页那条目录同一套（能互相切、当前这页高亮）
+  ok('左边目录两条（OLL / PBL），当前这页高亮的是 PBL',
+    /<nav class="side" aria-label="二阶公式目录">\s*<a href="oll2\.html">OLL · 7 种<\/a>\s*<a class="on" href="pbl2\.html">PBL · 5 种<\/a>/.test(h));
+  ok('目录的样式和教程页那条一样（固定在左侧、窄屏收起、打印不印）',
+    /\.side\{position:fixed;[^}]*top:calc\(var\(--nav-h, 63px\) \+ 16px\)/.test(h) &&
+    /\.side a\.on\{/.test(h) && /@media \(max-width:1240px\)\{ \.side\{display:none\} \}/.test(h) &&
+    /\.themebtn,\.printbtn,\.side\{display:none\}/.test(h));
+  // 导航条 / 首页：两页合成一个入口、一张卡片（和教程那套一样）
+  const nav = fs.readFileSync(path.join(ROOT, 'nav.js'), 'utf8');
+  const navGroup = nav.slice(nav.indexOf("'oll2.html'"), nav.indexOf(']]', nav.indexOf("'oll2.html'")));
+  ok('导航条里合成一个入口：文字「二阶公式」，管着这两页（二级目录里叫 OLL / PBL）',
+    /'oll2\.html'\s*,\s*'二阶公式',\s*0,/.test(nav) &&
+    /'oll2\.html', 'OLL · 7 种'/.test(navGroup) && /'pbl2\.html', 'PBL · 5 种'/.test(navGroup),
+    navGroup.replace(/\s+/g, ' '));
   const idx = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
-  const card = (idx.match(/<a class="card" href="pbl2\.html">[\s\S]{0,400}?<\/a>/) || [''])[0];
-  ok('首页有这张卡片（连到 pbl2.html，标着 5 个情况）',
-    /<h2>二阶 PBL<span class="n">5<\/span><\/h2>/.test(card));
-  ok('首页缩略图也是昼夜两版（pblthumb 交给 applyTheme 换）',
-    /<img src="2x2pbl\/ad_day-256x197\.png"[^>]*id="pblthumb"/.test(card) &&
-    /'2x2pbl\/ad_' \+ \(t === 'dark' \? 'night' : 'day'\) \+ '-256x197\.png'/.test(idx));
+  const card = (idx.match(/<div class="card">\s*<a class="stretch" href="oll2\.html"[\s\S]{0,700}?<\/div>/) || [''])[0];
+  ok('首页那张卡片：整张通往二阶公式（data-last 跟着上次看的那页），标题右边 OLL / PBL 两个入口',
+    /data-last="oll2\.html"[^>]*aria-label="二阶公式（OLL \/ PBL）"/.test(card) &&
+    /<a href="oll2\.html">OLL<\/a>/.test(card) && /<a href="pbl2\.html">PBL<\/a>/.test(card),
+    card.replace(/\s+/g, ' ').slice(0, 90));
+  ok('首页缩略图也是昼夜两版（x2thumb 交给 applyTheme 换）',
+    /<img src="2x2oll\/sune_day-256x256\.png"[^>]*id="x2thumb"/.test(card) &&
+    /'2x2oll\/sune_' \+ \(t === 'dark' \? 'night' : 'day'\) \+ '-256x256\.png'/.test(idx));
+
+  /* 和教程那两页一样：这一组记住「上次看的是哪一页」——
+     从 PBL 离开，再点导航条 / 首页那个入口回来，还是 PBL */
+  ok('两页各自记下「二阶公式这个入口看的是谁」（键名是这一组的第一页，和教程同一个做法）',
+    /localStorage\.setItem\('cube-last:oll2\.html', 'pbl2\.html'\)/.test(h) &&
+    /localStorage\.setItem\('cube-last:oll2\.html', 'oll2\.html'\)/.test(
+      fs.readFileSync(path.join(ROOT, 'oll2.html'), 'utf8')));
+  {
+    const back = run('index.html', { store: { 'cube-last:oll2.html': 'pbl2.html' } });
+    back.domReady();
+    ok('从 PBL 离开后：导航条「二阶公式」指回 PBL',
+      (back.linkTo('二阶公式').href || '').indexOf('pbl2.html') >= 0,
+      back.linkTo('二阶公式').href);
+    ok('从 PBL 离开后：首页那张卡片也指回 PBL',
+      (back.last2.getAttribute('href') || '').indexOf('pbl2.html') >= 0,
+      back.last2.getAttribute('href'));
+    const fresh = run('index.html');
+    fresh.domReady();
+    ok('没看过 -> 默认这一组的第一个页面（OLL）',
+      (fresh.linkTo('二阶公式').href || '').indexOf('oll2.html') >= 0 &&
+      (fresh.last2.getAttribute('href') || '').indexOf('oll2.html') >= 0,
+      fresh.linkTo('二阶公式').href + ' / ' + fresh.last2.getAttribute('href'));
+  }
 }
 
 console.log('\n[19f] 二阶 OLL 公式页（oll2.html）');
@@ -1227,17 +1342,99 @@ console.log('\n[19f] 二阶 OLL 公式页（oll2.html）');
       '"\\]\\{content:url\\(2x2oll/' + id + '_day-256x256\\.png\\)\\}').test(h)));
   ok('页头写缩写 + 英文全称（二阶 OLL / Orientation of the Last Layer）',
     /<h1>二阶 OLL<\/h1>\s*<p>Orientation of the Last Layer<\/p>/.test(h));
-  ok('导航条里有这一页（二阶 OLL）',
-    /'oll2\.html'\s*,\s*'二阶 OLL'/.test(fs.readFileSync(path.join(ROOT, 'nav.js'), 'utf8')));
+  // 左边那条「二阶公式」目录：同一套目录，这页高亮的是 OLL
+  ok('左边目录两条（OLL / PBL），当前这页高亮的是 OLL',
+    /<nav class="side" aria-label="二阶公式目录">\s*<a class="on" href="oll2\.html">OLL · 7 种<\/a>\s*<a href="pbl2\.html">PBL · 5 种<\/a>/.test(h));
+  ok('目录指向的是另外那一页（点 PBL 过去就是 pbl2.html）',
+    /<a href="pbl2\.html">PBL · 5 种<\/a>/.test(h) &&
+    /\.side\{position:fixed;/.test(h) && /\.side a\.on\{/.test(h));
+}
 
-  // 首页也留一张卡片
-  const idx = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
-  const card = (idx.match(/<a class="card" href="oll2\.html">[\s\S]{0,400}?<\/a>/) || [''])[0];
-  ok('首页有这张卡片（连到 oll2.html，标着 7 个情况）',
-    /<h2>二阶 OLL<span class="n">7<\/span><\/h2>/.test(card));
-  ok('首页缩略图也是昼夜两版（oll2thumb 交给 applyTheme 换）',
-    /<img src="2x2oll\/sune_day-256x256\.png"[^>]*id="oll2thumb"/.test(card) &&
-    /'2x2oll\/sune_' \+ \(t === 'dark' \? 'night' : 'day'\) \+ '-256x256\.png'/.test(idx));
+console.log('\n[19g] 三阶公式页（f2l / oll / pll）：一个导航入口 + 左边目录');
+{
+  const pages = ['f2l.html', 'oll.html', 'pll.html'];
+  const nav = fs.readFileSync(path.join(ROOT, 'nav.js'), 'utf8');
+  const navGroup = nav.slice(nav.indexOf("'f2l.html'"), nav.indexOf(']]', nav.indexOf("'f2l.html'")));
+  ok('导航条里三页合成一个入口（三阶公式 → F2L / OLL / PLL，带回到顶部）',
+    /'f2l\.html'\s*,\s*'三阶公式',\s*1,/.test(nav) &&
+    /'f2l\.html', 'F2L · 39 种'/.test(navGroup) &&
+    /'oll\.html', 'OLL · 57 种'/.test(navGroup) &&
+    /'pll\.html', 'PLL · 21 种'/.test(navGroup),
+    navGroup.replace(/\s+/g, ' '));
+
+  pages.forEach(p => {
+    const h = fs.readFileSync(path.join(ROOT, p), 'utf8');
+    const others = pages.filter(x => x !== p);
+    ok(p + '：左边目录三条（含自己），当前这页高亮',
+      /<nav class="side" aria-label="三阶公式目录">/.test(h) &&
+      others.every(o => h.indexOf('href="' + o + '"') >= 0) &&
+      new RegExp('<a class="on" href="' + p.replace('.', '\\.') + '">').test(h));
+    ok(p + '：目录的样式和教程 / 二阶那条一样（固定左侧、窄屏收起、打印不印）',
+      /nav\.side\{position:fixed;/.test(h) && /nav\.side a\.on\{/.test(h) &&
+      /@media \(max-width:1544px\)|@media \(max-width:1240px\)/.test(h) &&
+      /,nav\.side\{display:none\}/.test(h));
+    ok(p + '：记下「三阶公式这个入口看的是自己」（和教程 / 二阶同一条规则）',
+      new RegExp("localStorage\\.setItem\\('cube-last:f2l\\.html', '" + p + "'\\)").test(h));
+  });
+
+  // 目录不能压在正文上：按各页 CSS 里声明的正文宽 / 目录位置 / 收起阈值算一遍
+  {
+    const bad = [];
+    pages.concat(['oll2.html', 'pbl2.html', 'tutorial-basic.html', 'tutorial-advanced.html'])
+      .forEach(p => {
+        const h = fs.readFileSync(path.join(ROOT, p), 'utf8');
+        const mw = +(h.match(/main\{max-width:(\d+)px/) || [])[1];
+        // 目录的左边：只认「left:max(14px, calc(50% - Npx))」这一种写法
+        // （F2L 页里还有 col.side{width:110px}，不能拿 `.side{…}` 当目录那条规则）
+        const lx = +(h.match(/left:max\(14px, calc\(50% - (\d+)px\)\)/) || [])[1];
+        // 收起的那条规则写法不一：有的是「{ nav.side{display:none} }」，
+        // 教程页是「{ .side,.steps{display:none} }」—— 认「这个 @media 里提到 .side 且藏起来」
+        const hide = +(h.match(/max-width:(\d+)px\)\{[^}]*\.side[^}]*display:none/) || [])[1];
+        if (!mw || !lx || !hide) { bad.push(p + '（读不出正文宽 / 目录位置 / 阈值）'); return; }
+        [1, 40, 200, 400, 900, 1400].forEach(add => {
+          const vw = hide + add;
+          const panel = Math.max(14, vw / 2 - lx) + 152;
+          const content = vw / 2 - mw / 2;
+          if (panel > content) bad.push(p + '@' + vw + '：目录右缘 ' + panel.toFixed(0) +
+                                        ' > 正文左缘 ' + content.toFixed(0));
+        });
+      });
+    ok('左边目录在任何「显示得出来」的宽度下都不压正文（按 CSS 里那几个数算的）',
+      bad.length === 0, bad.slice(0, 3).join(' | '));
+  }
+
+  // 首页：三张卡片并成一张，标题右边三个入口
+  {
+    const idx = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+    const card = (idx.match(/<div class="card">\s*<a class="stretch" href="f2l\.html"[\s\S]{0,700}?<\/div>/) || [''])[0];
+    ok('首页那张卡片：整张通往三阶公式（data-last 跟着上次看的那页），标题右边 F2L / OLL / PLL 三个入口',
+      /data-last="f2l\.html"[^>]*aria-label="三阶公式（F2L \/ OLL \/ PLL）"/.test(card) &&
+      /<a href="f2l\.html">F2L<\/a>/.test(card) && /<a href="oll\.html">OLL<\/a>/.test(card) &&
+      /<a href="pll\.html">PLL<\/a>/.test(card), card.replace(/\s+/g, ' ').slice(0, 100));
+    ok('首页那张三阶卡片的缩略图跟着主题换（OLL 那张紫顶 / 黄顶）',
+      /<img src="oll\/oll-01-day-256x256\.png"[^>]*id="ollthumb"/.test(card) &&
+      /'oll\/oll-01-' \+ \(t === 'dark' \? 'night' : 'day'\) \+ '-256x256\.png'/.test(idx));
+    ok('三阶那三张老卡片没了（首页只剩一张合成卡）',
+      !/<a class="card" href="f2l\.html">/.test(idx) && !/<a class="card" href="oll\.html">/.test(idx) &&
+      !/<a class="card" href="pll\.html">/.test(idx));
+  }
+
+  // 从 PLL 离开，再点导航条 / 首页卡片回来还是 PLL
+  {
+    const back = run('index.html', { store: { 'cube-last:f2l.html': 'pll.html' } });
+    back.domReady();
+    ok('从 PLL 离开后：导航条「三阶公式」指回 PLL',
+      (back.linkTo('三阶公式').href || '').indexOf('pll.html') >= 0, back.linkTo('三阶公式').href);
+    ok('从 PLL 离开后：首页那张卡片也指回 PLL',
+      (back.last3.getAttribute('href') || '').indexOf('pll.html') >= 0,
+      back.last3.getAttribute('href'));
+    const fresh = run('index.html');
+    fresh.domReady();
+    ok('没看过 -> 默认这一组的第一个页面（F2L）',
+      (fresh.linkTo('三阶公式').href || '').indexOf('f2l.html') >= 0 &&
+      (fresh.last3.getAttribute('href') || '').indexOf('f2l.html') >= 0,
+      fresh.linkTo('三阶公式').href + ' / ' + fresh.last3.getAttribute('href'));
+  }
 }
 
 console.log('\n[19e] 公式页页头：缩写 + 英文全称');
@@ -1247,7 +1444,8 @@ console.log('\n[19e] 公式页页头：缩写 + 英文全称');
     'f2l.html': 'First Two Layers',
     'oll.html': 'Orientation of the Last Layer',
     'pll.html': 'Permutation of the Last Layer',
-    'pbl2.html': 'Permutation of Both Layers'
+    'pbl2.html': 'Permutation of Both Layers',
+    'oll2.html': 'Orientation of the Last Layer'
   };
   Object.keys(EN).forEach(p => {
     const h = fs.readFileSync(path.join(ROOT, p), 'utf8');
@@ -1271,6 +1469,28 @@ console.log('\n[19c] 教程页：公式都能送进计算器，进阶页的 OLL 
     // 初级教程的记号表也在跳计算器（class="mv"），所以两种加起来才是全部 calc 链接
     ok(p + ' 有 ' + n + ' 条公式带 ↗、' + mv + ' 个记号链接（共 ' + all + ' 条 calc.html#）',
       n >= 7 && all === n + mv);
+    if (p === 'tutorial-advanced.html') {
+      // 这一页还没写完：最前面先明说一句（内容是占位的），别让人当成定稿
+      ok('进阶页最前面有一段「还没写完」的说明：内容暂时是 AI 草稿',
+        /<main>\s*(?:<!--[\s\S]*?-->\s*)?<p class="wip"><b>这一页还没写完<\/b>[\s\S]{0,200}?AI 生成的草稿/.test(h) &&
+        /\.wip\{[^}]*border-left:3px solid var\(--head-red\)/.test(h) &&
+        /\.wip\{[^}]*background:none/.test(h.slice(h.indexOf('@media print'))),
+        (h.match(/<p class="wip">[^<]*<b>[^<]*/) || [''])[0]);
+      ok('说明里点名了「以哪几页为准」（初级教程 + F2L / OLL / PLL），而且都链过去',
+        ['tutorial-basic.html', 'f2l.html', 'oll.html', 'pll.html']
+          .every(x => new RegExp('<a href="' + x.replace('.', '\\.') + '">').test(
+            (h.match(/<p class="wip">[\s\S]*?<\/p>/) || [''])[0])) &&
+        /那几页是逐条核过的/.test(h));
+    }
+    if (p === 'tutorial-basic.html') {
+      // 记号表：六个小写（宽转 r l u d f b）也在，而且都能点着跳计算器
+      ok('初级记号表里有一个小写（宽转）记号 r，点一下能跳计算器；其余方向只是文字提一句',
+        /<a class="mv" href="calc\.html#r"[^>]*title="在计算器里看 r"><code>r<\/code><\/a>/.test(h) &&
+        /小写 = <b>宽转<\/b>/.test(h) && /r = R \+ M/.test(h) &&
+        /<code>l<\/code> \/ <code>u<\/code>/.test(h) && /<code>Rw<\/code>/.test(h) &&
+        // 别把六个都做成链接：表里只留 r 一个
+        !/<a class="mv" href="calc\.html#u"/.test(h), String(mv) + ' 个记号链接');
+    }
     ok(p + ' 点公式能复制（<code> + copied 态 + toast）',
       /document\.addEventListener\('click'/.test(h) && /closest\('code'\)/.test(h) &&
       /classList\.add\('copied'\)/.test(h) && /id="toast"/.test(h));
@@ -1408,7 +1628,8 @@ console.log('\n[21] PLL 页的「显示颜色」开关 + 无色图');
   ok('切主题时无色图跟着换成夜晚黄箭头那版',
     /function applyTheme\(t\)[\s\S]{0,140}?syncPllImages\(\);/.test(pll) &&
     /root\.dataset\.theme = t;\s*\n\s*syncPllImages\(\);/.test(pll));
-  ok('打印时不印这个开关', /@media print\{[\s\S]*?\.themebtn,\.printbtn,\.opts\{display:none\}/.test(pll));
+  ok('打印时不印这个开关（连页面目录一起藏）',
+    /@media print\{[\s\S]*?\.themebtn,\.printbtn,\.opts,nav\.side\{display:none\}/.test(pll));
 
   // 图片：每个 PLL 编号三张 —— 彩色 / 无色白天（紫箭头）/ 无色夜晚（黄箭头）
   const src = pll.match(/var SECTIONS = (\[[\s\S]*?\n\]);/);

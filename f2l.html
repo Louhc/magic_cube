@@ -84,6 +84,25 @@
          opacity:0;pointer-events:none;transition:.18s}
   #toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
 
+  /* 左边这条「三阶公式」目录：和教程页 / 二阶那两页那条同一套做法 ——
+     固定在正文左侧（导航条底下），窄屏收起；当前这一页那条高亮。
+     ⚠ 这一页的表格里有 <col class="side">（F2L 那种「图 + 公式」两列），
+     所以这里的规则必须限定成 nav.side，不能裸写 .side —— 否则打印时
+     「.side{display:none}」会把那两列一起藏掉，列宽全乱。 */
+  /* 这一页正文宽 1180（F2L 表要两列「图 + 公式」），比别的公式页（880）宽一截，
+     目录得跟着往左让，否则会压在表上：
+       正文左边缘 = 50% - 1180/2 = 50% - 590
+       目录左边   = 正文左边缘 - 152（目录宽）- 16（留白）= 50% - 758
+     窄到两边放不下（< 1544px）就整条收起来。 */
+  nav.side{position:fixed;width:152px;display:flex;flex-direction:column;gap:2px;z-index:3;
+        top:calc(var(--nav-h, 63px) + 16px);left:max(14px, calc(50% - 758px));
+        align-items:flex-start}
+  nav.side a{color:var(--muted);text-decoration:none;font-size:12.5px;line-height:1.5;
+          padding:4px 9px;border-radius:7px;border-left:2px solid transparent;white-space:nowrap}
+  nav.side a:hover{color:var(--accent-text);background:var(--chip)}
+  nav.side a.on{color:var(--text);border-left-color:var(--accent);background:var(--chip)}
+  @media (max-width:1544px){ nav.side{display:none} }
+
   @media (max-width:720px){
     col.side{width:78px}
     td.pic img{width:64px}
@@ -92,7 +111,7 @@
   }
   @media print{
     body{background:#fff;color:#000}
-    .themebtn,.printbtn{display:none}
+    .themebtn,.printbtn,nav.side{display:none}
     a.tocalc{display:none}
     /* 打印分页：卡片别拦着分页 —— break-inside:avoid + overflow:hidden 会让整张表
        变成「不可拆分的一块」，这一页装不下就整节推到下一页，标题也跟着单独占一页。
@@ -117,6 +136,12 @@
 try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.dataset.theme='dark'}catch(e){}</script>
 </head>
 <body>
+  <nav class="side" aria-label="三阶公式目录">
+    <a class="on" href="f2l.html">F2L · 39 种</a>
+    <a href="oll.html">OLL · 57 种</a>
+    <a href="pll.html">PLL · 21 种</a>
+  </nav>
+
 
 <script src="nav.js"></script>
 <header>
@@ -275,6 +300,9 @@ SECTIONS.forEach(function (sec) {
   html += '</tbody></table></section>';
 });
 document.getElementById('app').innerHTML = html;
+/* 下次从导航条 / 首页点「三阶公式」要回到这一次看的那一页（nav.js 读这个键）——
+   和教程那两页、二阶那两页一个做法：键名是这一组的第一个页面 */
+try { localStorage.setItem('cube-last:f2l.html', 'f2l.html'); } catch (e) {}
 /* 夜晚模式 */
 var root = document.documentElement, themeBtn = document.getElementById('themebtn');
 function applyTheme(t) {

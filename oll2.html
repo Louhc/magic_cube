@@ -80,6 +80,17 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
          opacity:0;pointer-events:none;transition:.18s}
   #toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
 
+  /* 左边这条「二阶公式」目录：和教程页那条目录同一套做法 —— 固定在正文左侧
+     （导航条底下），窄屏就收起来；当前这一页那条高亮 */
+  .side{position:fixed;width:152px;display:flex;flex-direction:column;gap:2px;z-index:3;
+        top:calc(var(--nav-h, 63px) + 16px);left:max(14px, calc(50% - 616px));
+        align-items:flex-start}
+  .side a{color:var(--muted);text-decoration:none;font-size:12.5px;line-height:1.5;
+          padding:4px 9px;border-radius:7px;border-left:2px solid transparent}
+  .side a:hover{color:var(--accent-text);background:var(--chip)}
+  .side a.on{color:var(--text);border-left-color:var(--accent);background:var(--chip)}
+  @media (max-width:1240px){ .side{display:none} }
+
   @media (max-width:720px){
     col.pic{width:128px}
     td.pic img{width:108px}
@@ -97,7 +108,7 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     th,td{border:1px solid #333}
     th{border-bottom-width:2px}
     code{font-size:15px;font-weight:600}
-    .themebtn,.printbtn{display:none}
+    .themebtn,.printbtn,.side{display:none}
     a.tocalc{display:none}
     code:hover{background:none}
     #toast{display:none}
@@ -115,7 +126,11 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
 </head>
 <body>
 <script src="nav.js"></script>
-<header>
+  <nav class="side" aria-label="二阶公式目录">
+    <a class="on" href="oll2.html">OLL · 7 种</a>
+    <a href="pbl2.html">PBL · 5 种</a>
+  </nav>
+  <header>
   <h1>二阶 OLL</h1>
   <p>Orientation of the Last Layer</p>
   <button class="themebtn" id="themebtn" type="button" title="切到夜晚"></button>
@@ -251,6 +266,10 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   });
 
   document.getElementById('printbtn').addEventListener('click', function () { window.print(); });
+
+  /* 下次从导航条 / 首页点「二阶公式」要回到这一次看的那一页（nav.js 读这个键）——
+     和教程那两页一个做法：键名永远是「这一组的第一个页面」，值才是当前这一页 */
+  try { localStorage.setItem('cube-last:oll2.html', 'oll2.html'); } catch (e) {}
 
   /* ---------- 白天 / 夜晚 ---------- */
   var root = document.documentElement, btn = document.getElementById('themebtn');

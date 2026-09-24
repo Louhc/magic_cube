@@ -141,38 +141,29 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
         <h2>计时器</h2>
       </span>
     </a>
-    <a class="card" href="f2l.html">
-      <span class="thumb"><img src="f2l/f2l-01a-256x258.png" alt="F2L"></span>
+    <!-- 三阶那三套公式（F2L / OLL / PLL）也是分页 + 一个入口 ——
+         整张卡片通往「三阶公式」（跟着上次看的那一页），标题右边三个入口各跳一页 -->
+    <div class="card">
+      <a class="stretch" href="f2l.html" data-last="f2l.html"
+         aria-label="三阶公式（F2L / OLL / PLL）"></a>
+      <span class="thumb"><img src="oll/oll-01-day-256x256.png" alt="三阶公式"
+        id="ollthumb"></span>
       <span>
-        <h2>F2L<span class="n">39</span></h2>
+        <h2>三阶 <a href="f2l.html">F2L</a> · <a href="oll.html">OLL</a> ·
+          <a href="pll.html">PLL</a></h2>
       </span>
-    </a>
-    <a class="card" href="oll.html">
-      <span class="thumb"><img src="oll/oll-01-day-256x256.png" alt="OLL" id="ollthumb"></span>
+    </div>
+    <!-- 二阶那两套公式分两页（左边那条目录互相切），导航 / 卡片合成一个入口 ——
+         和「教程」那张同一个做法：整张卡片可点，标题右边两个字各是一个入口 -->
+    <div class="card">
+      <a class="stretch" href="oll2.html" data-last="oll2.html"
+         aria-label="二阶公式（OLL / PBL）"></a>
+      <span class="thumb"><img src="2x2oll/sune_day-256x256.png" alt="二阶公式"
+        id="x2thumb"></span>
       <span>
-        <h2>OLL<span class="n">57</span></h2>
+        <h2>二阶 <a href="oll2.html">OLL</a> · <a href="pbl2.html">PBL</a></h2>
       </span>
-    </a>
-    <a class="card" href="pll.html">
-      <span class="thumb"><img src="pll/pll-Aa-256x256.png" alt="PLL"></span>
-      <span>
-        <h2>PLL<span class="n">21</span></h2>
-      </span>
-    </a>
-    <a class="card" href="oll2.html">
-      <span class="thumb"><img src="2x2oll/sune_day-256x256.png" alt="二阶 OLL"
-        id="oll2thumb"></span>
-      <span>
-        <h2>二阶 OLL<span class="n">7</span></h2>
-      </span>
-    </a>
-    <a class="card" href="pbl2.html">
-      <span class="thumb"><img src="2x2pbl/ad_day-256x197.png" alt="二阶 PBL"
-        id="pblthumb"></span>
-      <span>
-        <h2>二阶 PBL<span class="n">5</span></h2>
-      </span>
-    </a>
+    </div>
   </div>
 </main>
 
@@ -187,11 +178,9 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
     // 二阶 PBL 那张是线稿图（白天深线、夜晚浅线），也得跟着换，不然夜底上看不见。
     var ot = document.getElementById('ollthumb');
     if (ot) ot.src = 'oll/oll-01-' + (t === 'dark' ? 'night' : 'day') + '-256x256.png';
-    // 二阶 OLL 那张也是线稿（白天深线、夜晚浅线），跟着一起换
-    var o2 = document.getElementById('oll2thumb');
+    // 二阶那张也是线稿（白天深线、夜晚浅线），跟着一起换
+    var o2 = document.getElementById('x2thumb');
     if (o2) o2.src = '2x2oll/sune_' + (t === 'dark' ? 'night' : 'day') + '-256x256.png';
-    var pt = document.getElementById('pblthumb');
-    if (pt) pt.src = '2x2pbl/ad_' + (t === 'dark' ? 'night' : 'day') + '-256x197.png';
     try { localStorage.setItem('cube-theme', t); } catch (e) {}
   }
   var saved = null;

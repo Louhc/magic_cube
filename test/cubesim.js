@@ -1232,6 +1232,18 @@ console.log('\n[11g] 二阶模式：@2: 链接切到二阶、只画八个角、�
   ok('带存档打开：二阶也一样（8 个角块、公式表是二阶那一套）',
     again2.els.mode2.classList.contains('on') && posOf(again2.els.cube.innerHTML).length === 8 &&
     /2x2oll\//.test(again2.els.plist.innerHTML));
+
+  // 从三阶公式页点 ↗ 过来（链接里没带阶数标记）：要切回三阶，
+  // 不能因为上次停在四阶就拿四阶去播（用户报过的那个）
+  const plainFrom4 = boot('#R U', { 'calc-cube-v1': '4' });
+  ok('三阶公式页的 ↗（链接没带阶数标记）：切回三阶（26 个块）再播，不受上次那一阶影响',
+    plainFrom4.els.mode3.classList.contains('on') &&
+    posOf(plainFrom4.els.cube.innerHTML).length === 26 &&
+    plainFrom4.els.alg.value === 'R U', plainFrom4.els.alg.value);
+  const greenFrom2 = boot('#@g:' + encodeURIComponent("U' L' U L"), { 'calc-cube-v1': '2' });
+  ok('@g:（绿面那版 F2L）也是三阶：切回三阶再摆局面',
+    greenFrom2.els.mode3.classList.contains('on') &&
+    posOf(greenFrom2.els.cube.innerHTML).length === 26);
 }
 
 console.log('\n[11h] 四阶模式：64 块只画 56 个有贴纸的、公式走四阶模型、换阶数就重置');
@@ -1606,8 +1618,10 @@ console.log('\n[11d] 教程页：主题开关能切、写进存档（真跑一�
       // 记号本身是链接：点一下带着这一步打开计算器（不再是"复制一个 R"）
       {
         const links = [...h.matchAll(/<a class="mv" href="calc\.html#([^"]+)"[^>]*><code>([^<]+)<\/code><\/a>/g)];
-        ok('教程：记号表 14 个记号都包成了跳计算器的链接（x/y/z 分开，' + links.length + ' 个）',
-          links.length === 14, String(links.length));
+        // 15 个：R L U D F B M S E R' R2 x y z + 小写宽转 r
+        ok('教程：记号表 15 个记号都包成了跳计算器的链接（x/y/z 分开、小写 r）' +
+           '（' + links.length + ' 个）',
+          links.length === 15, String(links.length));
         const bad = links.filter(m => {
           let alg;
           try { alg = decodeURIComponent(m[1]); } catch (e) { return true; }
@@ -2422,8 +2436,8 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
     ok('计算器认识 @2s: / @4s:（计时器的二阶 / 四阶打乱）',
       /h\.indexOf\('@2s:'\) === 0\) \{ hashCube2 = true; hashScramble = true; h = h\.slice\(4\)/.test(src2) &&
       /h\.indexOf\('@4s:'\) === 0\) \{ hashCube4 = true; hashScramble = true; h = h\.slice\(4\)/.test(src2) &&
-      /if \(hashCube4\) setMode\('4'\);/.test(src2) &&
-      /if \(hashCube2\) setMode\('2'\);/.test(src2));
+      // 阶数以链接为准：@2: / @2s: 二阶、@4: / @4s: 四阶、其它（三阶那几页 + @g: / @s:）三阶
+      /setMode\(hashCube4 \? '4' : hashCube2 \? '2' : '3'\);/.test(src2));
     ok('计算器认识 @g: 前缀',
       /indexOf\('@g:'\) === 0/.test(src2));
     // 必须先解码再判断 —— 浏览器会把 @ 编码成 %40，否则前缀留在框里，
@@ -2567,6 +2581,13 @@ console.log('\n[12] 提交 / 历史 / 累积（端到端，真的点提交）');
     // 三个来源按钮合并成了一个「选公式」，来源改到展开栏里切
     ok('面板里只有一个「选公式」按钮',
       /id="openpick"/.test(src2) && !/class="pick"/.test(src2));
+    // 位置：挂在「公式」标题里（标题行 flex + space-between，它落到这一行最右边），
+    // 也就是公式框上面、「公式」这两个字右边；样式是小胶囊，不再占一整行
+    ok('展开公式表的键在「公式」标题右边（公式框上面），不再是独占一行的横幅',
+      /<h2>公式<button class="openpick" id="openpick"/.test(src2) &&
+      /\.openpick\{[^}]*height:22px/.test(src2) &&
+      !/\.openpick\{width:100%/.test(src2) &&
+      (src2.match(/id="openpick"/g) || []).length === 1);
     ok('来源按钮在展开栏里（F2L/OLL/PLL）',
       /\.tabs button/.test(src2) &&
       ['f2l', 'oll', 'pll', 'oll2', 'pbl2'].every(k => src2.includes('data-pick="' + k + '"')) &&

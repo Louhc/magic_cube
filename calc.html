@@ -454,13 +454,15 @@
   .moves span.cur{background:transparent;border-color:transparent;color:var(--on-accent, #fff)}
   .moves span.cur:hover{background:transparent}
 
-  /* 选公式：三个来源按钮一排，下面是可滚动的公式表 */
-  .openpick{width:100%;height:32px;margin-bottom:8px;border-radius:8px;cursor:pointer;
-            display:flex;align-items:center;justify-content:center;gap:6px;
-            font:inherit;font-size:12.5px;color:var(--muted)}
+  /* 展开公式表这个键：贴在「公式」标题右边（标题行是 flex + space-between，
+     它自然落到最右边），做成小胶囊 —— 它只是个开合开关，不该和下面
+     「正向 / 反向」那种主操作抢版面。悬停 / 按下那两条共用配方照旧管着它。 */
+  .openpick{height:22px;padding:0 8px;border-radius:6px;cursor:pointer;
+            display:inline-flex;align-items:center;gap:5px;
+            font:inherit;font-size:11.5px;letter-spacing:0;color:var(--muted)}
   .openpick:hover:not(:disabled){border-color:var(--accent-text);color:var(--accent-text);
                                  background:var(--field-hover)}
-  .openpick i{font-style:normal;font-size:13px;line-height:1;color:var(--muted2)}
+  .openpick i{font-style:normal;font-size:12px;line-height:1;color:var(--muted2)}
   .openpick:hover:not(:disabled) i{color:var(--accent-text)}
   .openpick.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent, #fff)}
   .openpick.on i{color:var(--on-accent, #fff)}
@@ -606,7 +608,11 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
   </main>
   <aside class="panel">
     <section class="sec">
-      <h2>公式</h2>
+      <!-- 展开公式表的键就摆在「公式」这两个字右边（标题行是 flex + space-between，
+           所以它落在这一行的最右边），不再单独占一行 -->
+      <h2>公式<button class="openpick" id="openpick" type="button" aria-controls="picker"
+              aria-expanded="false" title="展开 / 收起公式表，选一条填进输入框"
+              ><i>&#9776;</i><span>公式表</span></button></h2>
       <div class="row">
         <div class="algwrap">
           <input id="alg" type="text" spellcheck="false" autocomplete="off"
@@ -623,9 +629,6 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
         <button id="fwd" type="button" title="按公式正向转动（在输入框里按回车同此）"><i>↻</i>正向</button>
         <button id="rev" type="button" title="取逆执行：顺序倒过来，每一步再取反"><i>↺</i>反向</button>
       </div>
-      <button class="openpick" id="openpick" type="button" aria-controls="picker"
-              aria-expanded="false" title="展开 / 收起公式表，选一条填进输入框"
-              ><i>&#9776;</i><span>公式</span></button>
       <div class="ctrl">
         <button id="scramble" type="button">打乱</button>
         <button id="reset" type="button">复原</button>
@@ -2173,11 +2176,10 @@ try{if(localStorage.getItem('cube-theme')==='dark')document.documentElement.data
       }
     } catch (e) {}
     try { localStorage.removeItem(STORE); } catch (e) {}
-    // 二阶公式（PBL 页那些 ↗）带 @2:、计时器的二阶 / 四阶打乱带 @2s: / @4s:：
-    // 先切到对应阶数，再摆局面、再播 —— 切阶数不动局面（换模型那一步会自己重置），
-    // 所以放在 reset() 前后都一样，这里跟 reset 一起做完
-    if (hashCube4) setMode('4');
-    if (hashCube2) setMode('2');
+    /* 点 ↗ 跳过来的那一次，阶数以**链接**为准（别用上次留下的那一阶）：
+         @2: / @2s: 是二阶，@4: / @4s: 是四阶，其它（三阶公式页的 #公式、@g:、@s:）都是三阶。
+       切阶数不动局面（换模型那一步会自己重置），所以放在 reset() 前后都一样。 */
+    setMode(hashCube4 ? '4' : hashCube2 ? '2' : '3');
     reset();                 // 复原 + 清空历史（reset 里也会清存档）
     if (keepDur !== null) DUR = keepDur;
     if (keepSkip !== null) skipAnim = keepSkip;

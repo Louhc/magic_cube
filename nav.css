@@ -12,7 +12,12 @@
   border-bottom:1px solid var(--line, #ddd);
   color:var(--text, #222);
   font:14px/1 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
-  position:relative; z-index:10;
+  /* z-index 要高于首页那条 GitHub 纸带（.ghribbon 是 30）——
+     导航条自己是个层叠上下文，里面那个展开的二级目录再怎么调 z-index
+     都出不了这一层，所以得把整条导航抬上去。
+     纸带正挂在导航条下面、屏幕右端，而「二阶 / 三阶公式」那两项也在右边，
+     不抬的话展开的目录会被它盖住、点不到。 */
+  position:relative; z-index:40;
 }
 /* 站标：导航条里只放图形（「六面」两个字标，矢量源 logo.svg，由 nav.js 内联进来）。
    SVG 的颜色走 CSS 变量，所以跟着主题一起变；两色沿用首页大标题那套 ——
@@ -113,6 +118,26 @@ html.lb-open{overflow:hidden}
    换页时它的 transform/width/height 有过渡，看上去就是蓝框滑到了另一项。
    （页面是整页跳转，所以是「点下去先滑、滑完再跳」，新页上它已在正确位置。） */
 .topnav .links{position:relative}
+/* 二级目录：一项管好几页的入口（教程的初级 / 进阶、二阶公式的 OLL / PBL）悬停展开。
+   它和主链接是兄弟节点（不是套一层盒子 —— 那会动到 .pill 量位置的坐标），
+   绝对定位以 .links 为基准，left 由 nav.js 按悬停那一项对齐。
+   它自己的 z-index 只要高过导航条里那几个兄弟（.pill 是 20、链接是 1）就行；
+   真正要压过首页那条 GitHub 纸带（.ghribbon，z-index:30）的是**整条导航**
+   （见上面 .topnav 的 z-index）——目录在导航这一层里，单改它没用。
+   收起时用 visibility（不是 display:none）：键盘 Tab 也走不到看不见的链接。 */
+.topnav .sub{position:absolute;top:100%;left:0;display:flex;flex-direction:column;gap:2px;
+             padding:5px;min-width:96px;z-index:40;
+             background:var(--panel);border:1px solid var(--line);border-radius:10px;
+             box-shadow:0 12px 30px #00000026;
+             opacity:0;visibility:hidden;transform:translateY(-4px);
+             transition:opacity .14s ease,transform .14s ease,visibility 0s linear .14s}
+.topnav .sub.on{opacity:1;visibility:visible;transform:none;
+                transition:opacity .14s ease,transform .14s ease,visibility 0s}
+.topnav .sub a{flex:none;padding:5px 10px;border-radius:7px;color:var(--muted);
+               font-size:12.5px;line-height:1.5;text-decoration:none;white-space:nowrap}
+.topnav .sub a:hover{color:var(--accent-text);background:var(--field-hover)}
+.topnav .sub a.on{color:var(--text);background:var(--chip)}
+@media (prefers-reduced-motion: reduce){ .topnav .sub{transition:none} }
 .topnav .pill{
   position:absolute; top:0; left:0; z-index:0; pointer-events:none;
   border-radius:7px; background:var(--accent, #5A5FBF);

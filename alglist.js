@@ -1,5 +1,5 @@
 /* 公式表的共享数据，供计算器的「选公式」面板使用。
-   从 f2l.html / oll.html / pll.html / pbl2.html 抽出，不要手改 ——
+   从 f2l.html / oll.html / pll.html / oll2.html / pbl2.html 抽出，不要手改 ——
    页面里同一格的多条写法会拆成多条。
    test/cubesim.js 有一条测试盯着它必须和页面一致。
    pbl2（二阶 PBL）的键就是页面情况那格的短编号（a / d = 一层邻换 / 对角换，

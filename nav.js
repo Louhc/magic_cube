@@ -9,22 +9,38 @@
 (function () {
   'use strict';
 
-  // [文件名, 导航文字, 需要「回到顶部」]
+  // [文件名, 导航文字, 需要「回到顶部」, 这一组还有哪几页]
   // 第三项给长表格页用 —— 那几页要翻很久才到底。
+  // 第四项写 [[文件, 二级目录里的名字], …]（**含第一页**，第一页排最前）：
+  // 鼠标停在导航项上会展开成一条二级目录；写成一串文件名也行（那就显示文件名）。
   var PAGES = [
     ['index.html',  '首页'],
     ['editor.html', '编辑器'],
     ['calc.html',   '计算器'],
-    // 第 4 项：同一个导航项还管哪些页面（教程初级/进阶共用一个入口）
-    ['tutorial-basic.html', '教程', 1, ['tutorial-advanced.html']],
+    // 教程初级 / 进阶共用一个入口，悬停展开「二级目录」
+    ['tutorial-basic.html', '教程', 1,
+     [['tutorial-basic.html', '初级 · 层先法'], ['tutorial-advanced.html', '进阶 · CFOP']]],
     ['practice.html', '练习'],
     ['timer.html', '计时器'],
-    ['f2l.html',    'F2L 公式', 1],
-    ['oll.html',    'OLL 公式', 1],
-    ['pll.html',    'PLL 公式', 1],
-    ['oll2.html',   '二阶 OLL'],
-    ['pbl2.html',   '二阶 PBL']
+    // 三阶那三套公式（F2L / OLL / PLL）也是分页 + 一个入口，悬停展开二级目录
+    ['f2l.html',    '三阶公式', 1,
+     [['f2l.html', 'F2L · 39 种'], ['oll.html', 'OLL · 57 种'], ['pll.html', 'PLL · 21 种']]],
+    // 二阶那两套公式分两页，导航条上合成一个入口（页内左边还有一条目录互相切）
+    ['oll2.html',   '二阶公式', 0,
+     [['oll2.html', 'OLL · 7 种'], ['pbl2.html', 'PBL · 5 种']]]
   ];
+
+  /* 一个导航项管哪几页：统一成 [[文件, 名字], …]（含第一页）。
+     没写第四项的入口就是「一页一组」—— 也就不展开二级目录。 */
+  function groupOf(p) {
+    if (!p[3]) return [[p[0], p[1]]];
+    var out = [].concat(p[3]).map(function (g) {
+      var a = [].concat(g);
+      return a.length > 1 ? [a[0], a[1]] : [a[0], a[0]];
+    });
+    if (!out.some(function (g) { return g[0] === p[0]; })) out.unshift([p[0], p[1]]);
+    return out;
+  }
 
   // 当前页文件名；直接访问目录（结尾是 /）时按首页算
   var here = location.pathname.split('/').pop().toLowerCase();
@@ -44,14 +60,15 @@
     var entry = null;
     for (var i = 0; i < PAGES.length; i++) if (PAGES[i][0] === page) entry = PAGES[i];
     if (!entry) return page;
-    var extra = [].concat(entry[3] || []);
-    if (!extra.length) return page;
+    var files = groupOf(entry).map(function (g) { return g[0]; });
+    if (files.length < 2) return page;
     try {
       var last = localStorage.getItem('cube-last:' + entry[0]);
-      if (last === entry[0] || extra.indexOf(last) >= 0) return last;
+      if (files.indexOf(last) >= 0) return last;
     } catch (e) {}
     return page;
   }
+
 
   /* ---------- 站标 ----------
      导航条里只放图形（「六面」两字的字标），不放文字。矢量源是 logo.svg，
@@ -75,21 +92,80 @@
   var links = document.createElement('span');
   links.className = 'links';
   var activeLink = null;
+  /* 二级目录（悬停 / 键盘聚焦时展开）：一项管好几页的入口才有。
+     它排在主链接**后面**（做个兄弟节点，而不是套一层盒子）——
+     套盒子会动到 .pill 量位置的坐标；主链接直接挂在 .links 下最省事。
+     展开时用 JS 把它对齐到这一项下面（.links 是 position:relative，绝对定位以它为基准），
+     鼠标从主链接挪到目录上有 140ms 的缓冲，不然中间那一线空隙会把目录收掉。 */
+  var openSub = null;
+  function closeSub(sub) { if (sub) sub.classList.remove('on'); }
+  function hideSoon(sub) {
+    if (!sub) return;
+    clearTimeout(sub._t);
+    sub._t = setTimeout(function () { closeSub(sub); }, 140);
+  }
+  function showSub(link, sub) {
+    if (!sub) return;
+    clearTimeout(sub._t);
+    if (openSub && openSub !== sub) closeSub(openSub);
+    openSub = sub;
+    sub.classList.add('on');
+    // 先量宽度再对齐到这一项下面；太靠右就往左收一点，别顶出屏幕
+    sub.style.left = '0px';
+    var lx = link.offsetLeft, box = links.clientWidth || 0, w = sub.offsetWidth || 0;
+    if (box && lx + w > box) lx = Math.max(0, box - w);
+    sub.style.left = lx + 'px';
+    sub.style.minWidth = link.offsetWidth + 'px';
+    link.setAttribute('aria-expanded', 'true');
+  }
+  function bindSub(link, sub) {
+    link._sub = sub;
+    link.setAttribute('aria-haspopup', 'true');
+    link.setAttribute('aria-expanded', 'false');
+    function open() { showSub(link, sub); }
+    function shut() { link.setAttribute('aria-expanded', 'false'); hideSoon(sub); }
+    link.addEventListener('mouseenter', open);
+    link.addEventListener('mouseleave', function () { hideSoon(sub); });
+    link.addEventListener('focus', open);
+    link.addEventListener('blur', shut);
+    sub.addEventListener('mouseenter', open);
+    sub.addEventListener('mouseleave', shut);
+  }
+
   PAGES.forEach(function (p) {
     var a = document.createElement('a');
     a.textContent = p[1];
-    // 一个入口管好几页时（教程的初级 / 进阶），跳到上次看的那一篇
-    var extra = [].concat(p[3] || []);
+    // 一个入口管好几页时（教程的初级 / 进阶、二阶公式的 OLL / PBL），
+    // 跳到上次看的那一篇
+    var group = groupOf(p);
     a.href = lastOf(p[0]);
     // 「这个入口管哪几页」记在链接上：点卡片 / 点 ↗ 跳过去时，
     // 蓝框要能找到对应的那一项（见下面点链接那段）
-    a._pages = [p[0]].concat(extra);
+    a._pages = group.map(function (g) { return g[0]; });
     if (a._pages.indexOf(here) >= 0) {
       a.className = 'on';
       a.setAttribute('aria-current', 'page');
       activeLink = a;
     }
     links.appendChild(a);
+    // 二级目录：和主链接一起挂在 .links 下
+    if (group.length > 1) {
+      var sub = document.createElement('span');
+      sub.className = 'sub';
+      sub.setAttribute('role', 'group');
+      sub.setAttribute('aria-label', p[1] + '的目录');
+      group.forEach(function (g) {
+        var s2 = document.createElement('a');
+        s2.textContent = g[1];
+        s2.href = g[0];
+        // 和主链接同一组：点二级目录里的链接时，蓝框也要滑到这个入口上
+        s2._pages = a._pages;
+        if (g[0] === here) s2.className = 'on';
+        sub.appendChild(s2);
+      });
+      links.appendChild(sub);
+      bindSub(a, sub);
+    }
   });
 
   // 当前页的蓝框做成一整块 .pill，垫在链接下面 —— 换页时让它滑过去
@@ -227,7 +303,7 @@
   // 「长页」标志看的是入口那一行；一个入口管好几页时（教程初级/进阶），
   // 每一页都得有按钮，所以 extras 也要算进来
   var me = PAGES.filter(function (p) {
-    return p[0] === here || [].concat(p[3] || []).indexOf(here) >= 0;
+    return groupOf(p).some(function (g) { return g[0] === here; });
   })[0];
   if (me && me[2]) {
     var top = document.createElement('button');
