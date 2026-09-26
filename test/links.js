@@ -65,7 +65,7 @@ console.log('\n[4b] 首页的 GitHub 纸带');
   const m = html.match(/class="ghribbon"><a href="([^"]+)"/);
   ok('首页有 GitHub 纸带', !!m, '没找到 .ghribbon');
   ok('指向本仓库、新窗口打开',
-    !!m && /^https:\/\/github\.com\/Louhc\/magic_cube\/?$/.test(m[1]) &&
+    !!m && /^https:\/\/github\.com\/Louhc\/sixfold\/?$/.test(m[1]) &&
     /class="ghribbon"[\s\S]{0,300}?target="_blank"/.test(html) &&
     /class="ghribbon"[\s\S]{0,300}?rel="noopener"/.test(html),
     m && m[1]);
